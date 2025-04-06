@@ -4,7 +4,7 @@
     --apple-gray-2: #E5E5E7;
     --apple-gray-3: #D2D2D7;
     --apple-gray-4: #86868B;
-    --apple-gray-5: #1D1D1F;
+    --apple-gray-5: #000000;
     --apple-gray-6: #000000;
     --apple-gold: #FFD700;
     --apple-rose: #FFB6C1;
@@ -103,6 +103,7 @@ body {
 .supported-formats p {
     margin-bottom: 1rem;
     font-size: 1rem;
+    color: #000;
 }
 
 .supported-formats ul {
@@ -115,7 +116,7 @@ body {
 }
 
 .supported-formats li {
-    color: var(--apple-gray-2);
+    color: #000;
     font-size: 0.9rem;
 }
 
@@ -171,7 +172,7 @@ body {
 }
 
 .drop-zone i {
-    color: var(--apple-gray-4);
+    color: #000;
     margin-bottom: 1rem;
 }
 
@@ -198,7 +199,7 @@ body {
 .control-group label {
     display: block;
     margin-bottom: 8px;
-    color: var(--apple-gray-5);
+    color: #000;
     font-size: 14px;
     font-weight: 500;
 }
@@ -276,6 +277,7 @@ body {
     padding: 8px 5px;
     border-bottom: 1px solid #f1f1f1;
     transition: background-color 0.2s;
+    color: #000;
 }
 
 .model-item:hover {
@@ -539,4 +541,56 @@ footer a:hover {
     left: -20px;
     top: 50%;
     transform: translateY(-50%);
+}
+
+/* Text color fixes for better readability */
+.frontpage h1 {
+    color: #000;
+}
+
+.frontpage p {
+    color: #000;
+}
+
+.frontpage .supported-formats p {
+    color: #000;
+}
+
+.frontpage .supported-formats li {
+    color: #000;
+}
+
+.drop-zone p {
+    color: #000;
+}
+
+.control-group label {
+    color: #000;
+}
+
+.model-list h3 {
+    color: #000;
+}
+
+.model-label span {
+    color: #000;
+}
+
+/* Make sure icons in the drop zone are visible */
+.drop-zone i {
+    color: #000;
+}
+
+/* Fix for model list items */
+.model-item {
+    color: #000;
+}
+
+.empty-model-list {
+    color: #000;
+}
+
+/* Loading indicator text */
+.loading-indicator p {
+    color: #000;
 } 
