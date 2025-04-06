@@ -322,13 +322,21 @@ function handleFiles(files) {
                 try {
                     if (file.name.toLowerCase().endsWith('.3dm')) {
                         // Special handling for 3DM files
+                        console.log('Loading 3DM file:', file.name);
                         loader.load(event.target.result, function(object) {
+                            console.log('3DM file loaded:', object);
                             if (object) {
                                 loadModel(object, file.name);
                             } else {
                                 console.error('Failed to load 3DM file:', file.name);
                             }
-                        }, undefined, function(error) {
+                        }, 
+                        // Progress callback
+                        function(xhr) {
+                            console.log('Loading progress:', (xhr.loaded / xhr.total * 100) + '%');
+                        },
+                        // Error callback
+                        function(error) {
                             console.error('Error loading 3DM file:', error);
                         });
                     } else {
