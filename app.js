@@ -257,6 +257,7 @@ function init() {
     controls.maxDistance = 1000;
     controls.maxPolarAngle = Math.PI / 2;
     controls.enablePan = true;
+    controls.enableRotate = true;
     controls.panSpeed = 0.5;
     controls.rotateSpeed = 0.5;
     controls.zoomSpeed = 0.5;
@@ -766,6 +767,8 @@ function loadModel(object, fileName) {
     // If this is the first model, center the view
     if (models.length === 1) {
         zoomToFit(mesh, camera, controls);
+        controls.enableRotate = true;
+        controls.update();
     }
 }
 
@@ -1038,6 +1041,8 @@ function animate() {
     if (isTurntableActive && selectedObject) {
         const delta = turntableClock.getDelta();
         const rotationSpeed = turntableSpeed * delta;
+        
+        // Apply rotation to the selected object
         selectedObject.rotation.y += rotationSpeed;
         
         // Ensure smooth continuous rotation
@@ -1046,6 +1051,7 @@ function animate() {
         }
     }
     
+    // Always update controls
     controls.update();
     composer.render();
 }
@@ -1122,6 +1128,9 @@ function resetCamera() {
     const duration = 1000;
     const startTime = Date.now();
 
+    // Ensure rotation is enabled
+    controls.enableRotate = true;
+
     function animateCamera() {
         const elapsed = Date.now() - startTime;
         const progress = Math.min(elapsed / duration, 1);
@@ -1157,10 +1166,12 @@ function toggleTurntable() {
     
     if (isTurntableActive) {
         turntableClock.start();
-        // Store the initial rotation
+        controls.enableRotate = false; // Disable manual rotation during turntable
         selectedObject.userData.initialRotation = selectedObject.rotation.y;
     } else {
         turntableClock.stop();
+        controls.enableRotate = true; // Re-enable manual rotation
+        
         // Reset to initial rotation smoothly
         if (selectedObject.userData.initialRotation !== undefined) {
             const targetRotation = selectedObject.userData.initialRotation;
