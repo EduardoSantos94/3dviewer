@@ -24,16 +24,41 @@ let bloomPass;
 // Initialize rhino3dm
 let rhino = null;
 
-// Initialize rhino3dm before anything else
-rhino3dm().then((module) => {
-    rhino = module;
-    console.log("✅ Rhino3dm loaded");
-    init(); // Initialize the rest of the application
-    setupEventListeners();
-    animate();
-}).catch(error => {
-    console.error("Failed to load Rhino3dm:", error);
-    alert("Failed to initialize 3D viewer. Please refresh the page.");
+// Wait for the page to load
+window.addEventListener('load', async () => {
+    try {
+        // Check if rhino3dm is available
+        if (typeof rhino3dm === 'undefined') {
+            console.log("Waiting for rhino3dm to load...");
+            // Wait for rhino3dm script to load
+            await new Promise((resolve, reject) => {
+                let attempts = 0;
+                const checkRhino = setInterval(() => {
+                    attempts++;
+                    if (typeof rhino3dm !== 'undefined') {
+                        clearInterval(checkRhino);
+                        resolve();
+                    }
+                    if (attempts > 50) { // 5 seconds timeout
+                        clearInterval(checkRhino);
+                        reject(new Error("Failed to load rhino3dm"));
+                    }
+                }, 100);
+            });
+        }
+
+        // Initialize rhino3dm
+        rhino = await rhino3dm();
+        console.log("✅ Rhino3dm loaded");
+        
+        // Initialize the application
+        init();
+        setupEventListeners();
+        animate();
+    } catch (error) {
+        console.error("Failed to initialize:", error);
+        alert("Failed to initialize 3D viewer. Please refresh the page.");
+    }
 });
 
 // Material presets with outline
