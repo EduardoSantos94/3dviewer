@@ -330,4 +330,155 @@ footer a:hover {
 
 .dialog-buttons button#cancel-material:hover {
     background-color: #e0e0e0;
+}
+
+/* Frontpage Styles */
+.frontpage {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+    color: white;
+    z-index: 1000;
+}
+
+.frontpage-content {
+    text-align: center;
+    padding: 2rem;
+    max-width: 600px;
+}
+
+.frontpage h1 {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+    color: #ffd700;
+}
+
+.frontpage p {
+    font-size: 1.2rem;
+    margin-bottom: 2rem;
+    opacity: 0.9;
+}
+
+.cta-buttons {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+}
+
+.cta-button {
+    background: #ffd700;
+    color: #1a1a1a;
+    border: none;
+    padding: 1rem 2rem;
+    font-size: 1.2rem;
+    border-radius: 50px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.cta-button:hover {
+    background: #ffc000;
+    transform: scale(1.05);
+}
+
+.supported-formats {
+    margin-top: 1rem;
+    font-size: 0.9rem;
+    opacity: 0.7;
+}
+
+/* Existing styles with updates */
+.container {
+    width: 100%;
+    height: 100vh;
+    position: relative;
+    overflow: hidden;
+}
+
+#viewer-container {
+    width: 100%;
+    height: 100%;
+    position: relative;
+}
+
+.drop-zone {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 80%;
+    max-width: 500px;
+    height: 300px;
+    border: 2px dashed #ffd700;
+    border-radius: 10px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    background: rgba(26, 26, 26, 0.8);
+    color: white;
+    z-index: 100;
+    display: none;
+}
+
+.drop-zone.active {
+    display: flex;
+}
+
+.drop-zone i {
+    font-size: 3rem;
+    color: #ffd700;
+    margin-bottom: 1rem;
+}
+
+.add-model-btn {
+    background: #ffd700;
+    color: #1a1a1a;
+    border: none;
+    padding: 0.8rem 1.5rem;
+    border-radius: 50px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.add-model-btn:hover {
+    background: #ffc000;
+    transform: scale(1.05);
+}
+
+.controls-panel {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    background: rgba(26, 26, 26, 0.8);
+    padding: 1rem;
+    border-radius: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    z-index: 10;
+}
+
+.model-list {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    background: rgba(26, 26, 26, 0.8);
+    padding: 1rem;
+    border-radius: 10px;
+    max-width: 300px;
+    z-index: 10;
 } 

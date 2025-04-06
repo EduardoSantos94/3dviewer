@@ -255,7 +255,8 @@ function init() {
     controls.dampingFactor = 0.05;
     controls.minDistance = 0.5;
     controls.maxDistance = 1000;
-    controls.maxPolarAngle = Math.PI / 2;
+    controls.maxPolarAngle = Math.PI; // Allow full 360-degree rotation
+    controls.minPolarAngle = 0; // Allow viewing from below
     controls.enablePan = true;
     controls.enableRotate = true;
     controls.panSpeed = 0.5;
@@ -302,6 +303,23 @@ function init() {
 
     // Start animation loop
     animate();
+
+    // Add event listener for the start viewing button
+    const startViewingBtn = document.getElementById('start-viewing');
+    if (startViewingBtn) {
+        startViewingBtn.addEventListener('click', () => {
+            document.getElementById('frontpage').style.display = 'none';
+            document.getElementById('drop-zone').style.display = 'flex';
+        });
+    }
+
+    // Add event listener for the add model button
+    const addModelBtn = document.getElementById('add-model');
+    if (addModelBtn) {
+        addModelBtn.addEventListener('click', () => {
+            document.getElementById('file-input').click();
+        });
+    }
 }
 
 // Setup event listeners
@@ -764,11 +782,16 @@ function loadModel(object, fileName) {
         document.getElementById('drop-zone').style.display = 'none';
     }
 
-    // If this is the first model, center the view
+    // If this is the first model, center the view and show the UI
     if (models.length === 1) {
         zoomToFit(mesh, camera, controls);
         controls.enableRotate = true;
         controls.update();
+        
+        // Show the UI elements
+        document.querySelector('.controls-panel').style.display = 'block';
+        document.querySelector('.model-list').style.display = 'block';
+        document.getElementById('drop-zone').style.display = 'none';
     }
 }
 
