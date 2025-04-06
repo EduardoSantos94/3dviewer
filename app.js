@@ -6,6 +6,7 @@ import { STLLoader } from 'three/addons/loaders/STLLoader.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { Rhino3dmLoader } from 'three/addons/loaders/3DMLoader.js';
 
 // Initialize Three.js scene
 let scene, camera, renderer, controls;
@@ -367,6 +368,8 @@ function getLoaderForFile(filename) {
         case 'gltf':
         case 'glb':
             return new GLTFLoader();
+        case '3dm':
+            return new Rhino3dmLoader();
         default:
             return null;
     }
@@ -739,27 +742,35 @@ function animate() {
 function centerModel() {
     if (models.length === 0) return;
 
-    // Calculate the combined bounding box of all models
-    const combinedBox = new THREE.Box3();
-    models.forEach(model => {
-        const box = new THREE.Box3().setFromObject(model.mesh);
-        combinedBox.union(box);
-    });
+    let targetObject;
+    if (selectedObject) {
+        // If an object is selected, center on that object
+        targetObject = selectedObject;
+    } else {
+        // Otherwise center on all models
+        const combinedBox = new THREE.Box3();
+        models.forEach(model => {
+            const box = new THREE.Box3().setFromObject(model.mesh);
+            combinedBox.union(box);
+        });
 
-    const center = combinedBox.getCenter(new THREE.Vector3());
-    const size = combinedBox.getSize(new THREE.Vector3());
-    const maxDim = Math.max(size.x, size.y, size.z);
-    const scale = 1.5 / maxDim;
+        const center = combinedBox.getCenter(new THREE.Vector3());
+        const size = combinedBox.getSize(new THREE.Vector3());
+        const maxDim = Math.max(size.x, size.y, size.z);
+        const scale = 1.5 / maxDim;
 
-    // Center and scale all models
-    models.forEach(model => {
-        model.mesh.position.sub(center);
-        model.mesh.scale.set(scale, scale, scale);
-        model.mesh.position.y = -combinedBox.min.y * scale + 0.5;
-    });
+        // Center and scale all models
+        models.forEach(model => {
+            model.mesh.position.sub(center);
+            model.mesh.scale.set(scale, scale, scale);
+            model.mesh.position.y = -combinedBox.min.y * scale + 0.5;
+        });
+
+        targetObject = models[0].mesh;
+    }
 
     // Use zoomToFit for smooth camera transition
-    zoomToFit(models[0].mesh, camera, controls);
+    zoomToFit(targetObject, camera, controls);
 }
 
 function toggleFloor() {
