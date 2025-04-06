@@ -324,7 +324,9 @@ function handleFiles(files) {
                 try {
                     if (file.name.toLowerCase().endsWith('.3dm')) {
                         console.log('Loading 3DM file:', file.name);
-                        loader.load(event.target.result, 
+                        // For 3DM files, we need to use ArrayBuffer
+                        const arrayBuffer = event.target.result;
+                        loader.load(arrayBuffer, 
                             function(object) {
                                 console.log('3DM file loaded successfully:', object);
                                 if (object) {
@@ -364,7 +366,12 @@ function handleFiles(files) {
             console.error('Error reading file:', error);
         };
         
-        reader.readAsDataURL(file);
+        // For 3DM files, we need to read as ArrayBuffer
+        if (file.name.toLowerCase().endsWith('.3dm')) {
+            reader.readAsArrayBuffer(file);
+        } else {
+            reader.readAsDataURL(file);
+        }
     }
 }
 
@@ -401,6 +408,7 @@ function getLoaderForFile(filename) {
         case '3dm':
             console.log('Creating Rhino3dmLoader');
             const loader = new Rhino3dmLoader();
+            // Set the library path to the CDN version
             loader.setLibraryPath('https://cdn.jsdelivr.net/npm/rhino3dm@7.15.0/');
             return loader;
         default:
@@ -507,22 +515,24 @@ function updateModelList() {
         const item = document.createElement('div');
         item.className = `model-item ${model.selected ? 'selected' : ''}`;
         
+        const label = document.createElement('label');
+        label.className = 'model-label';
+        
         const checkbox = document.createElement('input');
         checkbox.type = 'checkbox';
-        checkbox.id = `model-${index}-visibility`;
         checkbox.checked = model.visible;
         checkbox.addEventListener('change', () => toggleModelVisibility(index));
         
-        const label = document.createElement('label');
-        label.htmlFor = `model-${index}-visibility`;
-        label.textContent = model.name;
-        label.addEventListener('click', () => selectModel(index));
+        const nameSpan = document.createElement('span');
+        nameSpan.textContent = model.name;
+        nameSpan.addEventListener('click', () => selectModel(index));
         
         const visibilityIcon = document.createElement('i');
         visibilityIcon.className = `fas fa-eye${model.visible ? '' : '-slash'}`;
         visibilityIcon.addEventListener('click', () => toggleModelVisibility(index));
         
-        item.appendChild(checkbox);
+        label.appendChild(checkbox);
+        label.appendChild(nameSpan);
         item.appendChild(label);
         item.appendChild(visibilityIcon);
         modelList.appendChild(item);
