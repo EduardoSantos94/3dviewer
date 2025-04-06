@@ -310,6 +310,30 @@ function unhighlight(e) {
     document.getElementById('drop-zone').classList.remove('dragover');
 }
 
+// Get appropriate loader for file type
+function getLoaderForFile(filename) {
+    const extension = filename.split('.').pop().toLowerCase();
+    console.log('Loading file with extension:', extension);
+    switch (extension) {
+        case 'stl':
+            return new STLLoader();
+        case 'obj':
+            return new OBJLoader();
+        case 'gltf':
+        case 'glb':
+            return new GLTFLoader();
+        case '3dm':
+            console.log('Creating Rhino3dmLoader');
+            const loader = new Rhino3dmLoader();
+            // Set the library path to the CDN version
+            loader.setLibraryPath('https://cdn.jsdelivr.net/npm/rhino3dm@7.15.0/');
+            return loader;
+        default:
+            console.log('No loader found for extension:', extension);
+            return null;
+    }
+}
+
 // Handle files
 function handleFiles(files) {
     for (let i = 0; i < files.length; i++) {
@@ -390,30 +414,6 @@ function handleDrop(e) {
     
     if (files && files.length > 0) {
         handleFiles(files);
-    }
-}
-
-// Get appropriate loader for file type
-function getLoaderForFile(filename) {
-    const extension = filename.split('.').pop().toLowerCase();
-    console.log('Loading file with extension:', extension);
-    switch (extension) {
-        case 'stl':
-            return new STLLoader();
-        case 'obj':
-            return new OBJLoader();
-        case 'gltf':
-        case 'glb':
-            return new GLTFLoader();
-        case '3dm':
-            console.log('Creating Rhino3dmLoader');
-            const loader = new Rhino3dmLoader();
-            // Set the library path to the CDN version
-            loader.setLibraryPath('https://cdn.jsdelivr.net/npm/rhino3dm@7.15.0/');
-            return loader;
-        default:
-            console.log('No loader found for extension:', extension);
-            return null;
     }
 }
 
