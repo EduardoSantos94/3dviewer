@@ -314,6 +314,8 @@ function unhighlight(e) {
 function handleFiles(files) {
     for (let i = 0; i < files.length; i++) {
         const file = files[i];
+        console.log('Processing file:', file.name);
+        
         const reader = new FileReader();
         
         reader.onload = function(event) {
@@ -321,35 +323,40 @@ function handleFiles(files) {
             if (loader) {
                 try {
                     if (file.name.toLowerCase().endsWith('.3dm')) {
-                        // Special handling for 3DM files
                         console.log('Loading 3DM file:', file.name);
-                        loader.load(event.target.result, function(object) {
-                            console.log('3DM file loaded:', object);
-                            if (object) {
-                                loadModel(object, file.name);
-                            } else {
-                                console.error('Failed to load 3DM file:', file.name);
+                        loader.load(event.target.result, 
+                            function(object) {
+                                console.log('3DM file loaded successfully:', object);
+                                if (object) {
+                                    loadModel(object, file.name);
+                                } else {
+                                    console.error('Failed to load 3DM file - object is null:', file.name);
+                                }
+                            }, 
+                            function(xhr) {
+                                console.log('Loading progress:', (xhr.loaded / xhr.total * 100) + '%');
+                            },
+                            function(error) {
+                                console.error('Error loading 3DM file:', error);
                             }
-                        }, 
-                        // Progress callback
-                        function(xhr) {
-                            console.log('Loading progress:', (xhr.loaded / xhr.total * 100) + '%');
-                        },
-                        // Error callback
-                        function(error) {
-                            console.error('Error loading 3DM file:', error);
-                        });
+                        );
                     } else {
-                        // Handle other file types
-                        loader.load(event.target.result, function(object) {
-                            loadModel(object, file.name);
-                        }, undefined, function(error) {
-                            console.error('Error loading model:', error);
-                        });
+                        console.log('Loading non-3DM file:', file.name);
+                        loader.load(event.target.result, 
+                            function(object) {
+                                loadModel(object, file.name);
+                            },
+                            undefined,
+                            function(error) {
+                                console.error('Error loading model:', error);
+                            }
+                        );
                     }
                 } catch (error) {
                     console.error('Error processing model:', error);
                 }
+            } else {
+                console.error('No loader available for file type:', file.name);
             }
         };
         
@@ -382,6 +389,7 @@ function handleDrop(e) {
 // Get appropriate loader for file type
 function getLoaderForFile(filename) {
     const extension = filename.split('.').pop().toLowerCase();
+    console.log('Loading file with extension:', extension);
     switch (extension) {
         case 'stl':
             return new STLLoader();
@@ -391,10 +399,12 @@ function getLoaderForFile(filename) {
         case 'glb':
             return new GLTFLoader();
         case '3dm':
+            console.log('Creating Rhino3dmLoader');
             const loader = new Rhino3dmLoader();
             loader.setLibraryPath('https://cdn.jsdelivr.net/npm/rhino3dm@7.15.0/');
             return loader;
         default:
+            console.log('No loader found for extension:', extension);
             return null;
     }
 }
