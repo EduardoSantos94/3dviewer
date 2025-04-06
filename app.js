@@ -421,24 +421,63 @@ async function handleFiles(files) {
                         const geometry = obj.geometry();
                         
                         if (geometry) {
-                            if (geometry instanceof rhino.Mesh) {
-                                const mesh = convertRhinoMeshToThree(geometry);
-                                if (mesh) {
-                                    model.add(mesh);
-                                }
-                            } else if (geometry instanceof rhino.Brep) {
-                                const meshParams = new rhino.MeshParameters();
-                                meshParams.gridMaxCount = 100;
-                                meshParams.gridAspectRatio = 1.0;
-                                meshParams.tolerance = 0.1;
-                                const mesh = geometry.getMesh(meshParams);
-                                if (mesh) {
-                                    const threeMesh = convertRhinoMeshToThree(mesh);
-                                    if (threeMesh) {
-                                        model.add(threeMesh);
+                            try {
+                                if (geometry.objectType === rhino.ObjectType.Mesh) {
+                                    const mesh = convertRhinoMeshToThree(geometry);
+                                    if (mesh) {
+                                        model.add(mesh);
                                     }
-                                    mesh.delete();
+                                } else if (geometry.objectType === rhino.ObjectType.Brep || 
+                                         geometry.objectType === rhino.ObjectType.Surface ||
+                                         geometry.objectType === rhino.ObjectType.SubD) {
+                                    // Create meshing parameters
+                                    const mp = new rhino.MeshingParameters();
+                                    mp.gridMaxCount = 100;
+                                    mp.gridAspectRatio = 1.0;
+                                    mp.gridAngle = 0.0;
+                                    mp.gridAmplitude = 1.0;
+                                    mp.refineGrid = true;
+                                    mp.simplePlanes = false;
+                                    mp.computeCurvature = false;
+                                    mp.minimumEdgeLength = 0.0001;
+                                    mp.maximumEdgeLength = 0.1;
+                                    
+                                    let mesh;
+                                    if (geometry.objectType === rhino.ObjectType.Brep) {
+                                        mesh = rhino.Mesh.createFromBrep(geometry, mp);
+                                    } else if (geometry.objectType === rhino.ObjectType.Surface) {
+                                        const brep = geometry.toBrep();
+                                        if (brep) {
+                                            mesh = rhino.Mesh.createFromBrep(brep, mp);
+                                            brep.delete();
+                                        }
+                                    } else if (geometry.objectType === rhino.ObjectType.SubD) {
+                                        mesh = geometry.toMesh(mp);
+                                    }
+
+                                    if (mesh) {
+                                        if (Array.isArray(mesh)) {
+                                            // Handle array of meshes
+                                            mesh.forEach(m => {
+                                                const threeMesh = convertRhinoMeshToThree(m);
+                                                if (threeMesh) {
+                                                    model.add(threeMesh);
+                                                }
+                                                m.delete();
+                                            });
+                                        } else {
+                                            // Handle single mesh
+                                            const threeMesh = convertRhinoMeshToThree(mesh);
+                                            if (threeMesh) {
+                                                model.add(threeMesh);
+                                            }
+                                            mesh.delete();
+                                        }
+                                    }
+                                    mp.delete();
                                 }
+                            } catch (error) {
+                                console.error('Error converting geometry:', error);
                             }
                             geometry.delete();
                         }
