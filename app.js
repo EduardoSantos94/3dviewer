@@ -312,6 +312,7 @@ function loadModel(object, fileName) {
         // Create outline mesh
         const outlineMesh = new THREE.Mesh(object, outlineMaterials.yellow.clone());
         outlineMesh.scale.set(1.02, 1.02, 1.02);
+        outlineMesh.userData.isOutline = true; // Mark as outline mesh
         mesh.add(outlineMesh);
     } else if (object instanceof THREE.Group || object instanceof THREE.Mesh) {
         // For OBJ and GLTF files
@@ -320,13 +321,14 @@ function loadModel(object, fileName) {
         // Apply material to all meshes in the group
         if (mesh instanceof THREE.Group) {
             mesh.traverse(child => {
-                if (child instanceof THREE.Mesh) {
+                if (child instanceof THREE.Mesh && !child.userData.isOutline) {
                     const material = materialPresets.yellow.clone();
                     child.material = material;
                     
                     // Create outline mesh
                     const outlineMesh = new THREE.Mesh(child.geometry, outlineMaterials.yellow.clone());
                     outlineMesh.scale.set(1.02, 1.02, 1.02);
+                    outlineMesh.userData.isOutline = true; // Mark as outline mesh
                     child.add(outlineMesh);
                 }
             });
@@ -337,6 +339,7 @@ function loadModel(object, fileName) {
             // Create outline mesh
             const outlineMesh = new THREE.Mesh(mesh.geometry, outlineMaterials.yellow.clone());
             outlineMesh.scale.set(1.02, 1.02, 1.02);
+            outlineMesh.userData.isOutline = true; // Mark as outline mesh
             mesh.add(outlineMesh);
         }
     } else {
