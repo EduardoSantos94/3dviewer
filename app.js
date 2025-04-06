@@ -348,6 +348,43 @@ function getLoaderForFile(filename) {
     }
 }
 
+// Convert Rhino mesh to Three.js mesh
+function convertRhinoMeshToThree(rhinoMesh) {
+    const geometry = new THREE.BufferGeometry();
+    const vertices = [];
+    const indices = [];
+
+    const verts = rhinoMesh.vertices();
+    for (let i = 0; i < verts.count; i++) {
+        const pt = verts.get(i);
+        vertices.push(pt.x, pt.y, pt.z);
+    }
+
+    const faces = rhinoMesh.faces();
+    for (let i = 0; i < faces.count; i++) {
+        const face = faces.get(i);
+        indices.push(face.a, face.b, face.c);
+    }
+
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+    geometry.setIndex(indices);
+    geometry.computeVertexNormals();
+
+    const material = materialPresets.yellow.clone();
+    const mesh = new THREE.Mesh(geometry, material);
+
+    // Create outline mesh
+    const outlineMesh = new THREE.Mesh(
+        geometry,
+        outlineMaterials.yellow.clone()
+    );
+    outlineMesh.scale.set(1.02, 1.02, 1.02);
+    outlineMesh.userData.isOutline = true;
+    mesh.add(outlineMesh);
+
+    return mesh;
+}
+
 // Handle files
 async function handleFiles(files) {
     if (!rhino) {
@@ -360,12 +397,12 @@ async function handleFiles(files) {
         const file = files[i];
         console.log('Processing file:', file.name);
         
-        const reader = new FileReader();
-        
-        reader.onload = async function(event) {
-            try {
-                if (file.name.toLowerCase().endsWith('.3dm')) {
-                    console.log('Loading 3DM file:', file.name);
+        if (file.name.toLowerCase().endsWith('.3dm')) {
+            console.log('Loading 3DM file:', file.name);
+            const reader = new FileReader();
+            
+            reader.onload = function(event) {
+                try {
                     const buffer = new Uint8Array(event.target.result);
                     const doc = rhino.File3dm.fromByteArray(buffer);
                     
@@ -380,19 +417,32 @@ async function handleFiles(files) {
                     const model = new THREE.Group();
                     
                     for (let i = 0; i < objects.count; i++) {
-                        const rhinoObject = objects.get(i);
-                        const geometry = rhinoObject.geometry();
+                        const obj = objects.get(i);
+                        const geometry = obj.geometry();
                         
                         if (geometry) {
-                            try {
-                                const mesh = await convertRhinoGeometryToThree(geometry);
+                            if (geometry instanceof rhino.Mesh) {
+                                const mesh = convertRhinoMeshToThree(geometry);
                                 if (mesh) {
                                     model.add(mesh);
                                 }
-                            } catch (error) {
-                                console.error('Error converting geometry:', error);
+                            } else if (geometry instanceof rhino.Brep) {
+                                const meshParams = new rhino.MeshParameters();
+                                meshParams.gridMaxCount = 100;
+                                meshParams.gridAspectRatio = 1.0;
+                                meshParams.tolerance = 0.1;
+                                const mesh = geometry.getMesh(meshParams);
+                                if (mesh) {
+                                    const threeMesh = convertRhinoMeshToThree(mesh);
+                                    if (threeMesh) {
+                                        model.add(threeMesh);
+                                    }
+                                    mesh.delete();
+                                }
                             }
+                            geometry.delete();
                         }
+                        obj.delete();
                     }
                     
                     if (model.children.length > 0) {
@@ -403,35 +453,38 @@ async function handleFiles(files) {
                     }
                     
                     // Clean up
+                    objects.delete();
                     doc.delete();
-                } else {
-                    const loader = getLoaderForFile(file.name);
-                    if (loader) {
-                        loader.load(
-                            event.target.result,
-                            function(object) { loadModel(object, file.name); },
-                            undefined,
-                            function(error) { 
-                                console.error('Error loading model:', error);
-                                alert('Error loading model: ' + error.message);
-                            }
-                        );
-                    }
+                    
+                } catch (error) {
+                    console.error('Error processing 3DM file:', error);
+                    alert('Error processing 3DM file: ' + error.message);
                 }
-            } catch (error) {
-                console.error('Error processing file:', error);
-                alert('Error processing file: ' + error.message);
-            }
-        };
-        
-        reader.onerror = function(error) {
-            console.error('Error reading file:', error);
-            alert('Error reading file: ' + error.message);
-        };
-        
-        if (file.name.toLowerCase().endsWith('.3dm')) {
+            };
+            
+            reader.onerror = function(error) {
+                console.error('Error reading file:', error);
+                alert('Error reading file: ' + error.message);
+            };
+            
             reader.readAsArrayBuffer(file);
         } else {
+            // Handle other file types as before
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                const loader = getLoaderForFile(file.name);
+                if (loader) {
+                    loader.load(
+                        event.target.result,
+                        function(object) { loadModel(object, file.name); },
+                        undefined,
+                        function(error) { 
+                            console.error('Error loading model:', error);
+                            alert('Error loading model: ' + error.message);
+                        }
+                    );
+                }
+            };
             reader.readAsDataURL(file);
         }
     }
@@ -970,94 +1023,4 @@ function zoomToFit(object, camera, controls) {
     }
 
     animateCamera();
-}
-
-// Convert Rhino geometry to Three.js geometry
-async function convertRhinoGeometryToThree(geometry) {
-    if (!geometry) return null;
-    
-    try {
-        // Get the geometry type
-        const geometryType = geometry.objectType;
-        
-        switch (geometryType) {
-            case rhino.ObjectType.Mesh: {
-                // Convert Rhino mesh to Three.js geometry
-                const rhinoMesh = geometry;
-                const vertices = rhinoMesh.vertices();
-                const faces = rhinoMesh.faces();
-                
-                const bufferGeometry = new THREE.BufferGeometry();
-                
-                // Convert vertices
-                const positions = new Float32Array(vertices.count * 3);
-                for (let i = 0; i < vertices.count; i++) {
-                    const vertex = vertices.get(i);
-                    positions[i * 3] = vertex.x;
-                    positions[i * 3 + 1] = vertex.y;
-                    positions[i * 3 + 2] = vertex.z;
-                }
-                
-                // Convert faces
-                const indices = new Uint32Array(faces.count * 3);
-                for (let i = 0; i < faces.count; i++) {
-                    const face = faces.get(i);
-                    indices[i * 3] = face.a;
-                    indices[i * 3 + 1] = face.b;
-                    indices[i * 3 + 2] = face.c;
-                }
-                
-                bufferGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-                bufferGeometry.setIndex(new THREE.BufferAttribute(indices, 1));
-                bufferGeometry.computeVertexNormals();
-                
-                const material = materialPresets.yellow.clone();
-                const mesh = new THREE.Mesh(bufferGeometry, material);
-                
-                // Create outline mesh
-                const outlineMesh = new THREE.Mesh(
-                    bufferGeometry,
-                    outlineMaterials.yellow.clone()
-                );
-                outlineMesh.scale.set(1.02, 1.02, 1.02);
-                outlineMesh.userData.isOutline = true;
-                mesh.add(outlineMesh);
-                
-                return mesh;
-            }
-            case rhino.ObjectType.Brep: {
-                // For Breps, we need to mesh them first
-                const meshParameters = new rhino.MeshParameters();
-                meshParameters.gridMaxCount = 100; // Adjust for quality vs performance
-                meshParameters.gridAspectRatio = 1.0;
-                meshParameters.tolerance = 0.1;
-                
-                const mesh = geometry.getMesh(meshParameters);
-                if (mesh) {
-                    const convertedMesh = await convertRhinoGeometryToThree(mesh);
-                    mesh.delete();
-                    return convertedMesh;
-                }
-                break;
-            }
-            case rhino.ObjectType.Surface: {
-                // For surfaces, convert to Brep then mesh
-                const brep = geometry.toBrep();
-                if (brep) {
-                    const convertedMesh = await convertRhinoGeometryToThree(brep);
-                    brep.delete();
-                    return convertedMesh;
-                }
-                break;
-            }
-            default:
-                console.warn('Unsupported geometry type:', geometryType);
-                return null;
-        }
-    } catch (error) {
-        console.error('Error converting geometry:', error);
-        return null;
-    }
-    
-    return null;
 }
