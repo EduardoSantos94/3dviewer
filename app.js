@@ -350,39 +350,69 @@ function getLoaderForFile(filename) {
 
 // Convert Rhino mesh to Three.js mesh
 function convertRhinoMeshToThree(rhinoMesh) {
-    const geometry = new THREE.BufferGeometry();
-    const vertices = [];
-    const indices = [];
+    try {
+        const geometry = new THREE.BufferGeometry();
+        const vertices = [];
+        const indices = [];
 
-    const verts = rhinoMesh.vertices();
-    for (let i = 0; i < verts.count; i++) {
-        const pt = verts.get(i);
-        vertices.push(pt.x, pt.y, pt.z);
+        const verts = rhinoMesh.vertices();
+        if (!verts || verts.count === 0) {
+            console.error('No vertices found in Rhino mesh');
+            return null;
+        }
+
+        for (let i = 0; i < verts.count; i++) {
+            const pt = verts.get(i);
+            if (pt && typeof pt.x === 'number' && typeof pt.y === 'number' && typeof pt.z === 'number') {
+                vertices.push(pt.x, pt.y, pt.z);
+            } else {
+                console.error('Invalid vertex data at index', i, pt);
+                return null;
+            }
+        }
+
+        const faces = rhinoMesh.faces();
+        if (!faces || faces.count === 0) {
+            console.error('No faces found in Rhino mesh');
+            return null;
+        }
+
+        for (let i = 0; i < faces.count; i++) {
+            const face = faces.get(i);
+            if (face && typeof face.a === 'number' && typeof face.b === 'number' && typeof face.c === 'number') {
+                indices.push(face.a, face.b, face.c);
+            } else {
+                console.error('Invalid face data at index', i, face);
+                return null;
+            }
+        }
+
+        if (vertices.length === 0 || indices.length === 0) {
+            console.error('No valid geometry data found');
+            return null;
+        }
+
+        geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+        geometry.setIndex(indices);
+        geometry.computeVertexNormals();
+
+        const material = materialPresets.yellow.clone();
+        const mesh = new THREE.Mesh(geometry, material);
+
+        // Create outline mesh
+        const outlineMesh = new THREE.Mesh(
+            geometry,
+            outlineMaterials.yellow.clone()
+        );
+        outlineMesh.scale.set(1.02, 1.02, 1.02);
+        outlineMesh.userData.isOutline = true;
+        mesh.add(outlineMesh);
+
+        return mesh;
+    } catch (error) {
+        console.error('Error in convertRhinoMeshToThree:', error);
+        return null;
     }
-
-    const faces = rhinoMesh.faces();
-    for (let i = 0; i < faces.count; i++) {
-        const face = faces.get(i);
-        indices.push(face.a, face.b, face.c);
-    }
-
-    geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
-    geometry.setIndex(indices);
-    geometry.computeVertexNormals();
-
-    const material = materialPresets.yellow.clone();
-    const mesh = new THREE.Mesh(geometry, material);
-
-    // Create outline mesh
-    const outlineMesh = new THREE.Mesh(
-        geometry,
-        outlineMaterials.yellow.clone()
-    );
-    outlineMesh.scale.set(1.02, 1.02, 1.02);
-    outlineMesh.userData.isOutline = true;
-    mesh.add(outlineMesh);
-
-    return mesh;
 }
 
 // Handle files
@@ -423,6 +453,7 @@ async function handleFiles(files) {
                         if (geometry) {
                             try {
                                 if (geometry.objectType === rhino.ObjectType.Mesh) {
+                                    console.log('Processing Mesh geometry');
                                     const mesh = convertRhinoMeshToThree(geometry);
                                     if (mesh) {
                                         model.add(mesh);
@@ -430,50 +461,62 @@ async function handleFiles(files) {
                                 } else if (geometry.objectType === rhino.ObjectType.Brep || 
                                          geometry.objectType === rhino.ObjectType.Surface ||
                                          geometry.objectType === rhino.ObjectType.SubD) {
+                                    console.log('Processing Brep/Surface/SubD geometry');
                                     // Create meshing parameters
                                     const mp = new rhino.MeshingParameters();
-                                    mp.gridMaxCount = 100;
-                                    mp.gridAspectRatio = 1.0;
-                                    mp.gridAngle = 0.0;
-                                    mp.gridAmplitude = 1.0;
-                                    mp.refineGrid = true;
+                                    // Adjust quality settings
+                                    mp.gridMinCount = 16;
+                                    mp.gridMaxCount = 256;
+                                    mp.gridAngle = 0;
+                                    mp.gridAspectRatio = 1;
                                     mp.simplePlanes = false;
-                                    mp.computeCurvature = false;
-                                    mp.minimumEdgeLength = 0.0001;
-                                    mp.maximumEdgeLength = 0.1;
+                                    mp.refineGrid = true;
+                                    mp.elementParams = null;
                                     
-                                    let mesh;
+                                    let meshes = null;
+                                    
                                     if (geometry.objectType === rhino.ObjectType.Brep) {
-                                        mesh = rhino.Mesh.createFromBrep(geometry, mp);
+                                        console.log('Converting Brep to mesh');
+                                        // For Brep, we need to create a mesh directly
+                                        const faces = geometry.faces();
+                                        meshes = [];
+                                        
+                                        for (let faceIndex = 0; faceIndex < faces.count; faceIndex++) {
+                                            const face = faces.get(faceIndex);
+                                            const mesh = face.getMesh(mp);
+                                            if (mesh) {
+                                                meshes.push(mesh);
+                                            }
+                                            face.delete();
+                                        }
+                                        
+                                        faces.delete();
                                     } else if (geometry.objectType === rhino.ObjectType.Surface) {
-                                        const brep = geometry.toBrep();
-                                        if (brep) {
-                                            mesh = rhino.Mesh.createFromBrep(brep, mp);
-                                            brep.delete();
+                                        console.log('Converting Surface to mesh');
+                                        const mesh = geometry.getMesh(mp);
+                                        if (mesh) {
+                                            meshes = [mesh];
                                         }
                                     } else if (geometry.objectType === rhino.ObjectType.SubD) {
-                                        mesh = geometry.toMesh(mp);
+                                        console.log('Converting SubD to mesh');
+                                        const mesh = geometry.getMesh(mp);
+                                        if (mesh) {
+                                            meshes = [mesh];
+                                        }
                                     }
 
-                                    if (mesh) {
-                                        if (Array.isArray(mesh)) {
-                                            // Handle array of meshes
-                                            mesh.forEach(m => {
-                                                const threeMesh = convertRhinoMeshToThree(m);
+                                    if (meshes && meshes.length > 0) {
+                                        meshes.forEach(mesh => {
+                                            if (mesh && mesh.vertices().count > 0) {
+                                                const threeMesh = convertRhinoMeshToThree(mesh);
                                                 if (threeMesh) {
                                                     model.add(threeMesh);
                                                 }
-                                                m.delete();
-                                            });
-                                        } else {
-                                            // Handle single mesh
-                                            const threeMesh = convertRhinoMeshToThree(mesh);
-                                            if (threeMesh) {
-                                                model.add(threeMesh);
+                                                mesh.delete();
                                             }
-                                            mesh.delete();
-                                        }
+                                        });
                                     }
+                                    
                                     mp.delete();
                                 }
                             } catch (error) {
