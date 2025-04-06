@@ -79,46 +79,58 @@ if (document.readyState === 'loading') {
 
 // Material presets with outline
 const materialPresets = {
-    yellow: new THREE.MeshStandardMaterial({
+    yellow: new THREE.MeshPhysicalMaterial({
         color: 0xffd700,
-        metalness: 0.8,
+        metalness: 1.0,
         roughness: 0.2,
-        emissive: new THREE.Color(0x111111),
+        clearcoat: 1.0,
+        clearcoatRoughness: 0.1,
+        reflectivity: 1.0,
+        envMapIntensity: 1.0,
+        emissive: new THREE.Color(0x000000),
         emissiveIntensity: 0.1
     }),
-    rose: new THREE.MeshStandardMaterial({
+    rose: new THREE.MeshPhysicalMaterial({
         color: 0xe6b3b3,
-        metalness: 0.8,
+        metalness: 1.0,
         roughness: 0.2,
-        emissive: new THREE.Color(0x111111),
+        clearcoat: 1.0,
+        clearcoatRoughness: 0.1,
+        reflectivity: 1.0,
+        envMapIntensity: 1.0,
+        emissive: new THREE.Color(0x000000),
         emissiveIntensity: 0.1
     }),
-    white: new THREE.MeshStandardMaterial({
+    white: new THREE.MeshPhysicalMaterial({
         color: 0xffffff,
-        metalness: 0.8,
+        metalness: 1.0,
         roughness: 0.2,
-        emissive: new THREE.Color(0x111111),
+        clearcoat: 1.0,
+        clearcoatRoughness: 0.1,
+        reflectivity: 1.0,
+        envMapIntensity: 1.0,
+        emissive: new THREE.Color(0x000000),
         emissiveIntensity: 0.1
     }),
     fastYellow: new THREE.MeshStandardMaterial({
         color: 0xffd700,
-        metalness: 0.5,
-        roughness: 0.5,
-        emissive: new THREE.Color(0x111111),
+        metalness: 0.8,
+        roughness: 0.3,
+        emissive: new THREE.Color(0x000000),
         emissiveIntensity: 0.1
     }),
     fastRose: new THREE.MeshStandardMaterial({
         color: 0xe6b8b7,
-        metalness: 0.5,
-        roughness: 0.5,
-        emissive: new THREE.Color(0x111111),
+        metalness: 0.8,
+        roughness: 0.3,
+        emissive: new THREE.Color(0x000000),
         emissiveIntensity: 0.1
     }),
     fastWhite: new THREE.MeshStandardMaterial({
         color: 0xffffff,
-        metalness: 0.5,
-        roughness: 0.5,
-        emissive: new THREE.Color(0x111111),
+        metalness: 0.8,
+        roughness: 0.3,
+        emissive: new THREE.Color(0x000000),
         emissiveIntensity: 0.1
     })
 };
@@ -162,16 +174,19 @@ function init() {
     camera.position.set(0, 3, 5);
     camera.lookAt(0, 0, 0);
 
-    // Create renderer
+    // Create renderer with improved settings
     renderer = new THREE.WebGLRenderer({ 
         antialias: true,
         alpha: true,
-        powerPreference: "high-performance"
+        powerPreference: "high-performance",
+        logarithmicDepthBuffer: true
     });
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setPixelRatio(window.devicePixelRatio);
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.0;
     document.getElementById('viewer-container').appendChild(renderer.domElement);
 
     // Setup post-processing
@@ -179,23 +194,49 @@ function init() {
     const renderPass = new RenderPass(scene, camera);
     composer.addPass(renderPass);
 
-    // Add bloom effect
+    // Add bloom effect with improved settings
     bloomPass = new UnrealBloomPass(
         new THREE.Vector2(window.innerWidth, window.innerHeight),
-        0.5, // strength
-        0.4, // radius
-        0.85  // threshold
+        0.3, // strength
+        0.5, // radius
+        0.7  // threshold
     );
     composer.addPass(bloomPass);
 
-    // Add lights
-    ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+    // Add lights with improved settings
+    ambientLight = new THREE.AmbientLight(0xffffff, 0.3);
     scene.add(ambientLight);
 
-    directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    directionalLight = new THREE.DirectionalLight(0xffffff, 0.7);
     directionalLight.position.set(5, 5, 5);
     directionalLight.castShadow = true;
+    directionalLight.shadow.mapSize.width = 2048;
+    directionalLight.shadow.mapSize.height = 2048;
+    directionalLight.shadow.camera.near = 0.1;
+    directionalLight.shadow.camera.far = 500;
+    directionalLight.shadow.bias = -0.0001;
     scene.add(directionalLight);
+
+    // Add fill lights for better material rendering
+    const fillLight1 = new THREE.DirectionalLight(0xffffff, 0.3);
+    fillLight1.position.set(-5, 2, 2);
+    scene.add(fillLight1);
+
+    const fillLight2 = new THREE.DirectionalLight(0xffffff, 0.3);
+    fillLight2.position.set(5, -2, -2);
+    scene.add(fillLight2);
+
+    // Add environment map for better reflections
+    const envMapLoader = new THREE.CubeTextureLoader();
+    const envMap = envMapLoader.load([
+        'https://threejs.org/examples/textures/cube/SwedishRoyalCastle/px.jpg',
+        'https://threejs.org/examples/textures/cube/SwedishRoyalCastle/nx.jpg',
+        'https://threejs.org/examples/textures/cube/SwedishRoyalCastle/py.jpg',
+        'https://threejs.org/examples/textures/cube/SwedishRoyalCastle/ny.jpg',
+        'https://threejs.org/examples/textures/cube/SwedishRoyalCastle/pz.jpg',
+        'https://threejs.org/examples/textures/cube/SwedishRoyalCastle/nz.jpg'
+    ]);
+    scene.environment = envMap;
 
     // Add ground plane
     const planeGeometry = new THREE.PlaneGeometry(100, 100);
@@ -996,7 +1037,13 @@ function animate() {
     // Update turntable animation if active
     if (isTurntableActive && selectedObject) {
         const delta = turntableClock.getDelta();
-        selectedObject.rotation.y += turntableSpeed * delta;
+        const rotationSpeed = turntableSpeed * delta;
+        selectedObject.rotation.y += rotationSpeed;
+        
+        // Ensure smooth continuous rotation
+        if (selectedObject.rotation.y > Math.PI * 2) {
+            selectedObject.rotation.y -= Math.PI * 2;
+        }
     }
     
     controls.update();
@@ -1098,6 +1145,8 @@ function resetCamera() {
 
 // Toggle turntable animation
 function toggleTurntable() {
+    if (!selectedObject) return;
+    
     isTurntableActive = !isTurntableActive;
     
     // Update button state
@@ -1108,8 +1157,33 @@ function toggleTurntable() {
     
     if (isTurntableActive) {
         turntableClock.start();
+        // Store the initial rotation
+        selectedObject.userData.initialRotation = selectedObject.rotation.y;
     } else {
         turntableClock.stop();
+        // Reset to initial rotation smoothly
+        if (selectedObject.userData.initialRotation !== undefined) {
+            const targetRotation = selectedObject.userData.initialRotation;
+            const currentRotation = selectedObject.rotation.y;
+            const duration = 500; // milliseconds
+            const startTime = Date.now();
+            
+            function animateRotation() {
+                const elapsed = Date.now() - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+                
+                // Ease out function
+                const easeProgress = 1 - Math.pow(1 - progress, 3);
+                
+                selectedObject.rotation.y = currentRotation + (targetRotation - currentRotation) * easeProgress;
+                
+                if (progress < 1) {
+                    requestAnimationFrame(animateRotation);
+                }
+            }
+            
+            animateRotation();
+        }
     }
 }
 
