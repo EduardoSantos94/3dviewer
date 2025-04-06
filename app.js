@@ -320,8 +320,10 @@ async function initRhino3dm() {
         try {
             rhino3dm = await window.rhino3dm();
             console.log('rhino3dm initialized successfully');
+            return rhino3dm;
         } catch (error) {
             console.error('Failed to initialize rhino3dm:', error);
+            throw error;
         }
     }
     return rhino3dm;
@@ -352,8 +354,14 @@ function getLoaderForFile(filename) {
 
 // Handle files
 async function handleFiles(files) {
-    // Initialize rhino3dm if not already done
-    await initRhino3dm();
+    // Initialize rhino3dm before processing any files
+    try {
+        await initRhino3dm();
+    } catch (error) {
+        console.error('Failed to initialize rhino3dm:', error);
+        alert('Failed to initialize Rhino3DM library. Please try again.');
+        return;
+    }
     
     for (let i = 0; i < files.length; i++) {
         const file = files[i];
@@ -367,45 +375,70 @@ async function handleFiles(files) {
                 try {
                     if (file.name.toLowerCase().endsWith('.3dm')) {
                         console.log('Loading 3DM file:', file.name);
-                        // For 3DM files, we need to use ArrayBuffer
                         const buffer = event.target.result;
-                        loader.parse(buffer, function(object) {
-                            console.log('3DM file loaded successfully:', object);
-                            if (object) {
-                                loadModel(object, file.name);
-                            } else {
-                                console.error('Failed to load 3DM file - object is null:', file.name);
+                        const doc = rhino3dm.File3dm.fromByteArray(new Uint8Array(buffer));
+                        
+                        if (!doc) {
+                            console.error('Failed to parse 3DM file:', file.name);
+                            alert('Failed to parse 3DM file. The file may be corrupted or invalid.');
+                            return;
+                        }
+
+                        console.log('Successfully parsed 3DM file:', file.name);
+                        const objects = doc.objects();
+                        const model = new THREE.Group();
+                        
+                        for (let i = 0; i < objects.count; i++) {
+                            const rhinoObject = objects.get(i);
+                            const geometry = rhinoObject.geometry();
+                            
+                            if (geometry) {
+                                try {
+                                    // Convert Rhino geometry to Three.js geometry
+                                    const mesh = await convertRhinoGeometryToThree(geometry);
+                                    if (mesh) {
+                                        model.add(mesh);
+                                    }
+                                } catch (error) {
+                                    console.error('Error converting geometry:', error);
+                                }
                             }
-                        }, function(xhr) {
-                            console.log('Loading progress:', (xhr.loaded / xhr.total * 100) + '%');
-                        }, function(error) {
-                            console.error('Error loading 3DM file:', error);
-                        });
+                        }
+                        
+                        if (model.children.length > 0) {
+                            loadModel(model, file.name);
+                        } else {
+                            console.warn('No valid geometry found in 3DM file:', file.name);
+                            alert('No valid geometry found in the 3DM file.');
+                        }
+                        
+                        // Clean up
+                        doc.delete();
+                        
                     } else {
-                        console.log('Loading non-3DM file:', file.name);
-                        loader.load(event.target.result, 
-                            function(object) {
-                                loadModel(object, file.name);
-                            },
+                        // Handle other file types as before
+                        loader.load(
+                            event.target.result,
+                            function(object) { loadModel(object, file.name); },
                             undefined,
-                            function(error) {
-                                console.error('Error loading model:', error);
-                            }
+                            function(error) { console.error('Error loading model:', error); }
                         );
                     }
                 } catch (error) {
                     console.error('Error processing model:', error);
+                    alert('Error processing model: ' + error.message);
                 }
             } else {
                 console.error('No loader available for file type:', file.name);
+                alert('Unsupported file type: ' + file.name);
             }
         };
         
         reader.onerror = function(error) {
             console.error('Error reading file:', error);
+            alert('Error reading file: ' + error.message);
         };
         
-        // For 3DM files, we need to read as ArrayBuffer
         if (file.name.toLowerCase().endsWith('.3dm')) {
             reader.readAsArrayBuffer(file);
         } else {
@@ -947,6 +980,96 @@ function zoomToFit(object, camera, controls) {
     }
 
     animateCamera();
+}
+
+// Convert Rhino geometry to Three.js geometry
+async function convertRhinoGeometryToThree(geometry) {
+    if (!geometry) return null;
+    
+    try {
+        // Get the geometry type
+        const geometryType = geometry.objectType;
+        
+        switch (geometryType) {
+            case rhino3dm.ObjectType.Mesh: {
+                // Convert Rhino mesh to Three.js geometry
+                const rhinoMesh = geometry;
+                const vertices = rhinoMesh.vertices();
+                const faces = rhinoMesh.faces();
+                
+                const bufferGeometry = new THREE.BufferGeometry();
+                
+                // Convert vertices
+                const positions = new Float32Array(vertices.count * 3);
+                for (let i = 0; i < vertices.count; i++) {
+                    const vertex = vertices.get(i);
+                    positions[i * 3] = vertex.x;
+                    positions[i * 3 + 1] = vertex.y;
+                    positions[i * 3 + 2] = vertex.z;
+                }
+                
+                // Convert faces
+                const indices = new Uint32Array(faces.count * 3);
+                for (let i = 0; i < faces.count; i++) {
+                    const face = faces.get(i);
+                    indices[i * 3] = face.a;
+                    indices[i * 3 + 1] = face.b;
+                    indices[i * 3 + 2] = face.c;
+                }
+                
+                bufferGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+                bufferGeometry.setIndex(new THREE.BufferAttribute(indices, 1));
+                bufferGeometry.computeVertexNormals();
+                
+                const material = materialPresets.yellow.clone();
+                const mesh = new THREE.Mesh(bufferGeometry, material);
+                
+                // Create outline mesh
+                const outlineMesh = new THREE.Mesh(
+                    bufferGeometry,
+                    outlineMaterials.yellow.clone()
+                );
+                outlineMesh.scale.set(1.02, 1.02, 1.02);
+                outlineMesh.userData.isOutline = true;
+                mesh.add(outlineMesh);
+                
+                return mesh;
+            }
+            case rhino3dm.ObjectType.Brep: {
+                // For Breps, we need to mesh them first
+                const meshParameters = new rhino3dm.MeshParameters();
+                meshParameters.gridMaxCount = 100; // Adjust for quality vs performance
+                meshParameters.gridAspectRatio = 1.0;
+                meshParameters.tolerance = 0.1;
+                
+                const mesh = geometry.getMesh(meshParameters);
+                if (mesh) {
+                    const convertedMesh = await convertRhinoGeometryToThree(mesh);
+                    mesh.delete();
+                    return convertedMesh;
+                }
+                break;
+            }
+            case rhino3dm.ObjectType.Surface: {
+                // For surfaces, convert to Brep then mesh
+                const brep = geometry.toBrep();
+                if (brep) {
+                    const convertedMesh = await convertRhinoGeometryToThree(brep);
+                    brep.delete();
+                    return convertedMesh;
+                }
+                break;
+            }
+            default:
+                console.warn('Unsupported geometry type:', geometryType);
+                return null;
+        }
+    } catch (error) {
+        console.error('Error converting geometry:', error);
+        return null;
+    }
+    
+    return null;
 }
 
 // Initialize the application
