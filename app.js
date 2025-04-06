@@ -320,11 +320,25 @@ function handleFiles(files) {
             const loader = getLoaderForFile(file.name);
             if (loader) {
                 try {
-                    loader.load(event.target.result, function(object) {
-                        loadModel(object, file.name);
-                    }, undefined, function(error) {
-                        console.error('Error loading model:', error);
-                    });
+                    if (file.name.toLowerCase().endsWith('.3dm')) {
+                        // Special handling for 3DM files
+                        loader.load(event.target.result, function(object) {
+                            if (object) {
+                                loadModel(object, file.name);
+                            } else {
+                                console.error('Failed to load 3DM file:', file.name);
+                            }
+                        }, undefined, function(error) {
+                            console.error('Error loading 3DM file:', error);
+                        });
+                    } else {
+                        // Handle other file types
+                        loader.load(event.target.result, function(object) {
+                            loadModel(object, file.name);
+                        }, undefined, function(error) {
+                            console.error('Error loading model:', error);
+                        });
+                    }
                 } catch (error) {
                     console.error('Error processing model:', error);
                 }
