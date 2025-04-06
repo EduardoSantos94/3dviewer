@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self' https:; script-src 'self' 'unsafe-eval' https:; style-src 'self' 'unsafe-inline' https:;">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-eval' https://unpkg.com https://files.mcneel.com https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; img-src 'self' data: blob:; worker-src 'self' blob:; connect-src 'self' https://unpkg.com https://files.mcneel.com https://cdnjs.cloudflare.com">
     <title>3D Jewelry Viewer</title>
     <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <script src="https://unpkg.com/rhino3dm@latest/rhino3dm.min.js?v=1"></script>
+    <script src="https://unpkg.com/rhino3dm@latest/rhino3dm.min.js"></script>
     <script type="importmap">
         {
             "imports": {
