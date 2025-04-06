@@ -21,6 +21,7 @@ let turntableSpeed = 0.5; // radians per second
 let composer;
 let bloomPass;
 let rhino = null; // Global rhino3dm instance
+let animationId = null; // For tracking animation frames
 
 // Function to check if rhino3dm is loaded
 function isRhino3dmLoaded() {
@@ -121,57 +122,57 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 });
 
-// Material presets with improved quality
+// Improved material settings for better rendering quality
 const materialPresets = {
     yellow: new THREE.MeshPhysicalMaterial({
         color: 0xffd700,
-        metalness: 0.7,
-        roughness: 0.3,
-        clearcoat: 0.4,
-        clearcoatRoughness: 0.2,
-        reflectivity: 0.8,
-        envMapIntensity: 0.7,
+        metalness: 0.85,
+        roughness: 0.12,
+        clearcoat: 0.6,
+        clearcoatRoughness: 0.1,
+        reflectivity: 0.9,
+        envMapIntensity: 1.2,
         side: THREE.DoubleSide
     }),
     rose: new THREE.MeshPhysicalMaterial({
         color: 0xe6b3b3,
-        metalness: 0.7,
-        roughness: 0.3,
-        clearcoat: 0.4,
-        clearcoatRoughness: 0.2,
-        reflectivity: 0.8,
-        envMapIntensity: 0.7,
+        metalness: 0.85,
+        roughness: 0.12,
+        clearcoat: 0.6,
+        clearcoatRoughness: 0.1,
+        reflectivity: 0.9,
+        envMapIntensity: 1.2,
         side: THREE.DoubleSide
     }),
     white: new THREE.MeshPhysicalMaterial({
         color: 0xffffff,
-        metalness: 0.7,
-        roughness: 0.3,
-        clearcoat: 0.4,
-        clearcoatRoughness: 0.2,
-        reflectivity: 0.8,
-        envMapIntensity: 0.7,
+        metalness: 0.85,
+        roughness: 0.12,
+        clearcoat: 0.6,
+        clearcoatRoughness: 0.1,
+        reflectivity: 0.9,
+        envMapIntensity: 1.2,
         side: THREE.DoubleSide
     }),
     fastYellow: new THREE.MeshStandardMaterial({
         color: 0xffd700,
-        metalness: 0.9,
-        roughness: 0.1,
-        envMapIntensity: 2.0,
+        metalness: 0.95,
+        roughness: 0.05,
+        envMapIntensity: 1.5,
         side: THREE.DoubleSide
     }),
     fastRose: new THREE.MeshStandardMaterial({
         color: 0xe6b8b7,
-        metalness: 0.9,
-        roughness: 0.1,
-        envMapIntensity: 2.0,
+        metalness: 0.95,
+        roughness: 0.05,
+        envMapIntensity: 1.5,
         side: THREE.DoubleSide
     }),
     fastWhite: new THREE.MeshStandardMaterial({
         color: 0xffffff,
-        metalness: 0.9,
-        roughness: 0.1,
-        envMapIntensity: 2.0,
+        metalness: 0.95,
+        roughness: 0.05,
+        envMapIntensity: 1.5,
         side: THREE.DoubleSide
     })
 };
@@ -227,7 +228,7 @@ function init() {
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 0.8;
+    renderer.toneMappingExposure = 0.75; // Slightly reduced for better dynamic range
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     document.getElementById('viewer-container').appendChild(renderer.domElement);
 
@@ -239,19 +240,19 @@ function init() {
     // Add subtle bloom for metallic highlights
     bloomPass = new UnrealBloomPass(
         new THREE.Vector2(window.innerWidth, window.innerHeight),
-        0.2,  // strength
-        0.5,  // radius
-        0.8   // threshold
+        0.3,  // strength - slightly increased
+        0.4,  // radius - slightly decreased
+        0.7   // threshold
     );
     composer.addPass(bloomPass);
 
-    // Studio lighting setup
-    ambientLight = new THREE.AmbientLight(0xffffff, 0.3);
+    // Studio lighting setup - improved for jewelry
+    ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
     scene.add(ambientLight);
 
-    // Key light
-    directionalLight = new THREE.DirectionalLight(0xffffff, 0.7);
-    directionalLight.position.set(5, 5, 5);
+    // Key light - brighter and slightly repositioned
+    directionalLight = new THREE.DirectionalLight(0xffffff, 0.9);
+    directionalLight.position.set(5, 8, 5);
     directionalLight.castShadow = true;
     directionalLight.shadow.mapSize.width = 2048;
     directionalLight.shadow.mapSize.height = 2048;
@@ -260,27 +261,33 @@ function init() {
     directionalLight.shadow.bias = -0.0001;
     scene.add(directionalLight);
 
-    // Fill light
-    const fillLight = new THREE.DirectionalLight(0xffffff, 0.3);
-    fillLight.position.set(-5, 2, 2);
+    // Fill light - adjusted for better modeling
+    const fillLight = new THREE.DirectionalLight(0xffffff, 0.5);
+    fillLight.position.set(-5, 3, 2);
     scene.add(fillLight);
 
-    // Rim light for edge definition
-    const rimLight = new THREE.DirectionalLight(0xffffff, 0.2);
-    rimLight.position.set(0, -5, -5);
+    // Rim light for edge definition - increased intensity
+    const rimLight = new THREE.DirectionalLight(0xffffff, 0.4);
+    rimLight.position.set(0, -3, -5);
     scene.add(rimLight);
 
     // Create studio environment
     const pmremGenerator = new THREE.PMREMGenerator(renderer);
     pmremGenerator.compileEquirectangularShader();
 
-    // Create a simple gradient environment
+    // Create a higher quality gradient environment
     const canvas = document.createElement('canvas');
-    canvas.width = 1024;
-    canvas.height = 512;
+    canvas.width = 2048; // Increased for better quality
+    canvas.height = 1024;
     const context = canvas.getContext('2d');
-    const gradient = context.createLinearGradient(0, 0, 0, canvas.height);
+    
+    // Create a more sophisticated gradient for better reflections
+    const gradient = context.createRadialGradient(
+        canvas.width / 2, canvas.height / 2, 0,
+        canvas.width / 2, canvas.height / 2, canvas.width / 2
+    );
     gradient.addColorStop(0, '#ffffff');
+    gradient.addColorStop(0.5, '#f5f5f5');
     gradient.addColorStop(1, '#e0e0e0');
     context.fillStyle = gradient;
     context.fillRect(0, 0, canvas.width, canvas.height);
@@ -299,8 +306,8 @@ function init() {
     const planeGeometry = new THREE.PlaneGeometry(100, 100);
     const planeMaterial = new THREE.MeshStandardMaterial({
         color: 0xf0f0f0,
-        metalness: 0.0,
-        roughness: 0.7,
+        metalness: 0.1, // Slight metalness for subtle reflections
+        roughness: 0.8,
         side: THREE.DoubleSide
     });
     groundPlane = new THREE.Mesh(planeGeometry, planeMaterial);
@@ -382,7 +389,7 @@ function init() {
     }
 }
 
-// Setup event listeners
+// Setup event listeners with improved turntable support
 function setupEventListeners() {
     // Window resize
     window.addEventListener('resize', onWindowResize);
@@ -396,11 +403,16 @@ function setupEventListeners() {
         const newFileInput = fileInput.cloneNode(true);
         fileInput.parentNode.replaceChild(newFileInput, fileInput);
         
+        // Allow multiple file selection
+        newFileInput.setAttribute('multiple', 'multiple');
+        
         newFileInput.addEventListener('change', (event) => {
             console.log('File input change event triggered');
             const files = event.target.files;
             if (files && files.length > 0) {
                 handleFiles(files);
+                // Clear the input to allow selecting the same file again
+                newFileInput.value = '';
             }
         });
     }
@@ -419,7 +431,7 @@ function setupEventListeners() {
         });
     }
 
-    // Drop zone
+    // Drop zone with multiple file support
     const dropZone = document.getElementById('drop-zone');
     
     if (dropZone) {
@@ -464,12 +476,18 @@ function setupEventListeners() {
     // Add turntable button event listener
     const toggleTurntableBtn = document.getElementById('toggle-turntable');
     if (toggleTurntableBtn) {
-        toggleTurntableBtn.addEventListener('click', () => {
-            if (selectedObject) {
-                toggleTurntable();
-                toggleTurntableBtn.classList.toggle('active', isTurntableActive);
-            }
-        });
+        toggleTurntableBtn.addEventListener('click', toggleTurntable);
+    } else {
+        // Create turntable button if it doesn't exist
+        const controlsPanel = document.querySelector('.controls-panel');
+        if (controlsPanel) {
+            const newTurntableBtn = document.createElement('button');
+            newTurntableBtn.id = 'toggle-turntable';
+            newTurntableBtn.innerHTML = '<i class="fas fa-sync-alt"></i>';
+            newTurntableBtn.title = 'Toggle Turntable Animation';
+            newTurntableBtn.addEventListener('click', toggleTurntable);
+            controlsPanel.appendChild(newTurntableBtn);
+        }
     }
 
     // Click handling for object selection
@@ -515,181 +533,269 @@ function getLoaderForFile(filename) {
 // Update meshing parameters for better quality
 function getMeshingParameters(rhino) {
     const mp = new rhino.MeshingParameters();
-    mp.gridMinCount = 50;      // Increase from 16 for better detail
-    mp.gridMaxCount = 512;     // Increase from 256 for better detail
-    mp.gridAngle = 15;         // Decrease for smoother curves
-    mp.gridAspectRatio = 1.5;  // Adjust for better mesh quality
+    mp.gridMinCount = 100;      // Increase for better detail
+    mp.gridMaxCount = 1000;     // Increase for better detail
+    mp.gridAngle = 10;         // Decrease for smoother curves
+    mp.gridAspectRatio = 1.0;  // Keep aspect ratio uniform
     mp.simplePlanes = false;   // Don't simplify planar surfaces
     mp.refineGrid = true;      // Enable grid refinement
     mp.simplifyMesh = false;   // Don't simplify the resulting mesh
     mp.packNormals = true;     // Pack normals for better quality
-    mp.tolerance = 0.01;       // Set tolerance for better accuracy
+    mp.tolerance = 0.001;      // Increase accuracy
+    mp.minimumEdgeLength = 0.0001; // Better edge detail
+    mp.maximumEdgeLength = 0.1;   // Limit long edges
     return mp;
 }
 
-// Update file handling to ensure single-click works
+// Create mesh with improved material settings
+function createMeshMaterial(color = 0xffd700) {
+    return new THREE.MeshPhysicalMaterial({
+        color: color,
+        metalness: 0.8,
+        roughness: 0.15,
+        clearcoat: 0.5,
+        clearcoatRoughness: 0.1,
+        reflectivity: 0.9,
+        envMapIntensity: 1.0,
+        side: THREE.DoubleSide,
+        flatShading: false,
+        vertexColors: false,
+        wireframe: false,
+        precision: 'highp'
+    });
+}
+
+// Update turntable animation
+function updateTurntable() {
+    if (isTurntableActive && selectedObject) {
+        const delta = turntableClock.getDelta();
+        const rotationSpeed = turntableSpeed * delta;
+        
+        // Apply smooth rotation
+        selectedObject.rotation.y += rotationSpeed;
+        
+        // Reset rotation after full circle
+        if (selectedObject.rotation.y >= Math.PI * 2) {
+            selectedObject.rotation.y = 0;
+        }
+        
+        // Request next frame
+        requestAnimationFrame(updateTurntable);
+    }
+}
+
+// Toggle turntable animation with improved handling
+function toggleTurntable() {
+    console.log("Toggle turntable called, selectedObject:", selectedObject);
+    
+    if (!selectedObject) {
+        console.warn('No object selected for turntable animation');
+        alert('Please select an object first by clicking on it');
+        return;
+    }
+    
+    isTurntableActive = !isTurntableActive;
+    console.log("Turntable active:", isTurntableActive);
+    
+    // Update button state
+    const toggleTurntableBtn = document.getElementById('toggle-turntable');
+    if (toggleTurntableBtn) {
+        toggleTurntableBtn.classList.toggle('active', isTurntableActive);
+    }
+    
+    if (isTurntableActive) {
+        console.log('Starting turntable animation');
+        controls.enableRotate = false; // Disable manual rotation during turntable
+        selectedObject.userData.initialRotation = selectedObject.rotation.y;
+        
+        // Reset and start the clock
+        turntableClock.stop();
+        turntableClock.start();
+    } else {
+        console.log('Stopping turntable animation');
+        turntableClock.stop();
+        controls.enableRotate = true; // Re-enable manual rotation
+    }
+}
+
+// Update file handling to support multiple files
 async function handleFiles(files) {
     if (!files || files.length === 0) return;
-
-    const file = files[0];
-    const extension = file.name.split('.').pop().toLowerCase();
 
     try {
         showLoadingIndicator();
         hideFrontpage();
-
-        if (extension === '3dm') {
-            if (!rhino) {
-                throw new Error('rhino3dm is not initialized. Please refresh the page and try again.');
-            }
-
-            console.log('Processing 3DM file...');
-            const buffer = await file.arrayBuffer();
+        
+        let successCount = 0;
+        
+        // Process each file sequentially to avoid memory issues
+        for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+            const extension = file.name.split('.').pop().toLowerCase();
+            console.log(`Processing file ${i + 1}/${files.length}: ${file.name}`);
             
             try {
-                const doc = rhino.File3dm.fromByteArray(new Uint8Array(buffer));
-                if (!doc) {
-                    throw new Error('Failed to parse 3DM file');
-                }
-
-                console.log('Successfully parsed 3DM file');
-                const objects = doc.objects();
-                const group = new THREE.Group();
-                let geometryFound = false;
-
-                // Get improved meshing parameters
-                const mp = getMeshingParameters(rhino);
-
-                for (let i = 0; i < objects.count; i++) {
-                    const obj = objects.get(i);
-                    const geometry = obj.geometry();
-
-                    if (geometry) {
-                        try {
-                            if (geometry.objectType === rhino.ObjectType.Mesh) {
-                                console.log('Processing Mesh geometry');
-                                const mesh = convertRhinoMeshToThree(geometry);
-                                if (mesh) {
-                                    group.add(mesh);
-                                    geometryFound = true;
-                                }
-                            } else if (geometry.objectType === rhino.ObjectType.Brep || 
-                                     geometry.objectType === rhino.ObjectType.Surface ||
-                                     geometry.objectType === rhino.ObjectType.SubD) {
-                                console.log(`Processing ${geometry.objectType} geometry`);
-                                
-                                let meshes = null;
-
-                                if (geometry.objectType === rhino.ObjectType.Brep) {
-                                    console.log('Converting Brep to mesh');
-                                    const faces = geometry.faces();
-                                    meshes = [];
-                                    
-                                    for (let faceIndex = 0; faceIndex < faces.count; faceIndex++) {
-                                        const face = faces.get(faceIndex);
-                                        const mesh = face.getMesh(mp);
-                                        if (mesh) {
-                                            meshes.push(mesh);
-                                        }
-                                        face.delete();
-                                    }
-                                    
-                                    faces.delete();
-                                } else {
-                                    console.log('Converting Surface/SubD to mesh');
-                                    const mesh = geometry.getMesh(mp);
-                                    if (mesh) {
-                                        meshes = [mesh];
-                                    }
-                                }
-
-                                if (meshes && meshes.length > 0) {
-                                    meshes.forEach(mesh => {
-                                        if (mesh && mesh.vertices().count > 0) {
-                                            const threeMesh = convertRhinoMeshToThree(mesh);
-                                            if (threeMesh) {
-                                                group.add(threeMesh);
-                                                geometryFound = true;
-                                            }
-                                            mesh.delete();
-                                        }
-                                    });
-                                }
-                            }
-                            geometry.delete();
-                        } catch (error) {
-                            console.error('Error converting geometry:', error);
-                        }
-                    }
-                    obj.delete();
-                }
-
-                mp.delete();
-                objects.delete();
-                doc.delete();
-
-                if (geometryFound) {
-                    loadModel(group, file.name);
-                    
-                    // Ensure controls panel and center button are visible
-                    const controlsPanel = document.querySelector('.controls-panel');
-                    if (controlsPanel) {
-                        controlsPanel.style.display = 'block';
-                        
-                        // Make sure center button exists and is visible
-                        const centerBtn = document.getElementById('center-model');
-                        if (!centerBtn) {
-                            const centerBtn = document.createElement('button');
-                            centerBtn.id = 'center-model';
-                            centerBtn.innerHTML = '<i class="fas fa-compress-arrows-alt"></i>';
-                            centerBtn.title = 'Center Model';
-                            centerBtn.addEventListener('click', centerModel);
-                            controlsPanel.appendChild(centerBtn);
-                        }
-                    }
+                if (extension === '3dm') {
+                    // Important: Wait for each 3DM file to complete before moving to the next
+                    await process3DMFile(file);
+                    successCount++;
+                } else if (['stl', 'obj', 'gltf', 'glb'].includes(extension)) {
+                    await processOtherFile(file);
+                    successCount++;
                 } else {
-                    throw new Error('No valid geometry found in the 3DM file');
+                    console.warn(`Unsupported file type: ${extension}`);
+                    alert(`File type not supported: ${extension}`);
                 }
             } catch (error) {
-                console.error('Error parsing 3DM file:', error);
-                throw new Error(`Failed to parse 3DM file: ${error.message}`);
+                console.error(`Error processing file ${file.name}:`, error);
+                alert(`Failed to process ${file.name}: ${error.message}`);
             }
-        } else {
-            // Handle other file formats (OBJ, STL, GLTF)
-            const loader = getLoaderForFile(file.name);
-            if (!loader) {
-                throw new Error(`Unsupported file format: ${extension}`);
-            }
-
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                try {
-                    loader.load(e.target.result, function(object) {
-                        loadModel(object, file.name);
-                        hideLoadingIndicator();
-                    }, undefined, function(error) {
-                        console.error('Error loading file:', error);
-                        hideLoadingIndicator();
-                        alert('Failed to load file: ' + error.message);
-                    });
-                } catch (error) {
-                    console.error('Error loading file:', error);
-                    hideLoadingIndicator();
-                    alert('Failed to load file: ' + error.message);
-                }
-            };
-            reader.readAsDataURL(file);
         }
-
-        hideLoadingIndicator();
+        
+        // Update UI after all files are processed
+        if (successCount > 0) {
+            document.querySelector('.controls-panel').style.display = 'block';
+            document.querySelector('.model-list').style.display = 'block';
+            document.getElementById('drop-zone').style.display = 'none';
+            
+            // Center and fit all models
+            centerModel();
+            
+            console.log(`Successfully loaded ${successCount} out of ${files.length} files`);
+        } else {
+            console.error('No files were successfully loaded');
+            alert('No files were successfully loaded. Please try different files.');
+            
+            // Show drop zone if no files were loaded
+            document.getElementById('drop-zone').style.display = 'flex';
+        }
     } catch (error) {
-        console.error('Error processing file:', error);
+        console.error('Error processing files:', error);
+        alert(error.message || 'Failed to process files. Please try again.');
+    } finally {
         hideLoadingIndicator();
-        alert(error.message || 'Failed to process file. Please try again.');
     }
 }
 
-// Update convertRhinoMeshToThree function for better material handling
+// Process 3DM file with improved quality
+async function process3DMFile(file) {
+    if (!rhino) {
+        throw new Error('rhino3dm is not initialized. Please refresh the page and try again.');
+    }
+
+    console.log('Processing 3DM file:', file.name);
+    const buffer = await file.arrayBuffer();
+    
+    const doc = rhino.File3dm.fromByteArray(new Uint8Array(buffer));
+    if (!doc) {
+        throw new Error('Failed to parse 3DM file');
+    }
+
+    const objects = doc.objects();
+    const group = new THREE.Group();
+    let geometryFound = false;
+
+    const mp = getMeshingParameters(rhino);
+
+    for (let i = 0; i < objects.count; i++) {
+        const obj = objects.get(i);
+        const geometry = obj.geometry();
+
+        if (geometry) {
+            try {
+                if (geometry.objectType === rhino.ObjectType.Mesh) {
+                    const mesh = convertRhinoMeshToThree(geometry);
+                    if (mesh) {
+                        group.add(mesh);
+                        geometryFound = true;
+                    }
+                } else if (geometry.objectType === rhino.ObjectType.Brep || 
+                         geometry.objectType === rhino.ObjectType.Surface ||
+                         geometry.objectType === rhino.ObjectType.SubD) {
+                    const meshes = await convertRhinoGeometryToMesh(geometry, mp, rhino);
+                    if (meshes && meshes.length > 0) {
+                        meshes.forEach(mesh => group.add(mesh));
+                        geometryFound = true;
+                    }
+                }
+            } catch (error) {
+                console.error('Error converting geometry:', error);
+            } finally {
+                geometry.delete();
+            }
+        }
+        obj.delete();
+    }
+
+    mp.delete();
+    objects.delete();
+    doc.delete();
+
+    if (geometryFound) {
+        loadModel(group, file.name);
+    } else {
+        throw new Error('No valid geometry found in the 3DM file');
+    }
+}
+
+// Convert Rhino geometry to mesh with improved quality
+async function convertRhinoGeometryToMesh(geometry, mp, rhino) {
+    const meshes = [];
+    
+    if (geometry.objectType === rhino.ObjectType.Brep) {
+        const faces = geometry.faces();
+        for (let faceIndex = 0; faceIndex < faces.count; faceIndex++) {
+            const face = faces.get(faceIndex);
+            const mesh = face.getMesh(mp);
+            if (mesh && mesh.vertices().count > 0) {
+                const threeMesh = convertRhinoMeshToThree(mesh);
+                if (threeMesh) meshes.push(threeMesh);
+                mesh.delete();
+            }
+            face.delete();
+        }
+        faces.delete();
+    } else {
+        const mesh = geometry.getMesh(mp);
+        if (mesh && mesh.vertices().count > 0) {
+            const threeMesh = convertRhinoMeshToThree(mesh);
+            if (threeMesh) meshes.push(threeMesh);
+            mesh.delete();
+        }
+    }
+    
+    return meshes;
+}
+
+// Process other file formats
+async function processOtherFile(file) {
+    const loader = getLoaderForFile(file.name);
+    if (!loader) {
+        throw new Error(`Unsupported file format: ${file.name.split('.').pop()}`);
+    }
+
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            loader.load(e.target.result, 
+                (object) => {
+                    loadModel(object, file.name);
+                    resolve();
+                },
+                (progress) => {
+                    console.log(`Loading ${file.name}: ${Math.round(progress.loaded / progress.total * 100)}%`);
+                },
+                (error) => {
+                    reject(new Error(`Failed to load ${file.name}: ${error.message}`));
+                }
+            );
+        };
+        reader.onerror = () => reject(new Error(`Failed to read ${file.name}`));
+        reader.readAsDataURL(file);
+    });
+}
+
+// Improved mesh conversion for better quality
 function convertRhinoMeshToThree(rhinoMesh) {
     const vertices = rhinoMesh.vertices();
     const faces = rhinoMesh.faces();
@@ -699,6 +805,7 @@ function convertRhinoMeshToThree(rhinoMesh) {
         return null;
     }
     
+    // Create high-quality geometry with proper normals
     const geometry = new THREE.BufferGeometry();
     const positions = new Float32Array(vertices.count * 3);
     
@@ -716,7 +823,7 @@ function convertRhinoMeshToThree(rhinoMesh) {
     
     geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
     
-    // Get faces
+    // Get faces and create index array for triangles
     const indices = [];
     for (let i = 0; i < faces.count; i++) {
         const face = faces.get(i);
@@ -732,20 +839,28 @@ function convertRhinoMeshToThree(rhinoMesh) {
         return null;
     }
     
+    // Set indices and compute normals for smooth shading
     geometry.setIndex(indices);
     geometry.computeVertexNormals();
     
-    // Create mesh with improved material settings
+    // For better quality, compute tangents too if possible
+    try {
+        geometry.computeTangents();
+    } catch (e) {
+        console.warn('Could not compute tangents:', e.message);
+    }
+    
+    // Create mesh with high quality material
     const mesh = new THREE.Mesh(
         geometry,
         new THREE.MeshPhysicalMaterial({
             color: 0xffd700,
-            metalness: 0.7,
-            roughness: 0.3,
-            clearcoat: 0.4,
-            clearcoatRoughness: 0.2,
-            reflectivity: 0.8,
-            envMapIntensity: 0.7,
+            metalness: 0.85,
+            roughness: 0.12,
+            clearcoat: 0.6,
+            clearcoatRoughness: 0.1,
+            reflectivity: 0.9,
+            envMapIntensity: 1.2,
             side: THREE.DoubleSide
         })
     );
@@ -839,12 +954,21 @@ function loadModel(object, fileName) {
     }
 }
 
-// Update model list in UI
+// Update model list in UI with improved multiple model handling
 function updateModelList() {
     const modelList = document.getElementById('model-list');
     if (!modelList) return;
 
-    modelList.innerHTML = '';
+    modelList.innerHTML = '<h3>Models</h3>';
+    
+    if (models.length === 0) {
+        const emptyMessage = document.createElement('div');
+        emptyMessage.className = 'empty-model-list';
+        emptyMessage.textContent = 'No models loaded. Click "Add Model" to get started.';
+        modelList.appendChild(emptyMessage);
+        return;
+    }
+
     models.forEach((model, index) => {
         const item = document.createElement('div');
         item.className = `model-item ${model.selected ? 'selected' : ''}`;
@@ -861,16 +985,56 @@ function updateModelList() {
         nameSpan.textContent = model.name;
         nameSpan.addEventListener('click', () => selectModel(index));
         
-        const visibilityIcon = document.createElement('i');
-        visibilityIcon.className = `fas fa-eye${model.visible ? '' : '-slash'}`;
-        visibilityIcon.addEventListener('click', () => toggleModelVisibility(index));
+        const controlsDiv = document.createElement('div');
+        controlsDiv.className = 'model-controls';
         
+        // Visibility toggle
+        const visibilityBtn = document.createElement('button');
+        visibilityBtn.className = 'model-btn visibility-btn';
+        visibilityBtn.innerHTML = `<i class="fas fa-eye${model.visible ? '' : '-slash'}"></i>`;
+        visibilityBtn.title = model.visible ? 'Hide' : 'Show';
+        visibilityBtn.addEventListener('click', () => toggleModelVisibility(index));
+        
+        // Material options
+        const materialBtn = document.createElement('button');
+        materialBtn.className = 'model-btn material-btn';
+        materialBtn.innerHTML = `<i class="fas fa-palette"></i>`;
+        materialBtn.title = 'Change Material';
+        materialBtn.addEventListener('click', () => showMaterialDialog(index));
+        
+        // Delete button
+        const deleteBtn = document.createElement('button');
+        deleteBtn.className = 'model-btn delete-btn';
+        deleteBtn.innerHTML = `<i class="fas fa-trash"></i>`;
+        deleteBtn.title = 'Remove Model';
+        deleteBtn.addEventListener('click', () => {
+            if (confirm(`Are you sure you want to remove "${model.name}"?`)) {
+                removeModel(index);
+            }
+        });
+        
+        // Add all buttons to controls
+        controlsDiv.appendChild(visibilityBtn);
+        controlsDiv.appendChild(materialBtn);
+        controlsDiv.appendChild(deleteBtn);
+        
+        // Assemble the item
         label.appendChild(checkbox);
         label.appendChild(nameSpan);
         item.appendChild(label);
-        item.appendChild(visibilityIcon);
+        item.appendChild(controlsDiv);
         modelList.appendChild(item);
     });
+    
+    // Add "Add More Models" button at the bottom
+    const addMoreBtn = document.createElement('button');
+    addMoreBtn.className = 'add-more-models-btn';
+    addMoreBtn.innerHTML = '<i class="fas fa-plus"></i> Add More Models';
+    addMoreBtn.addEventListener('click', () => {
+        document.getElementById('file-input').click();
+    });
+    
+    modelList.appendChild(addMoreBtn);
 }
 
 // Select a model
@@ -1065,32 +1229,75 @@ function handleClick(event) {
     const raycaster = new THREE.Raycaster();
     raycaster.setFromCamera(mouse, camera);
 
-    const intersects = raycaster.intersectObjects(scene.children, true);
+    // Collect all selectable objects
+    const selectableObjects = [];
+    models.forEach(model => {
+        if (model.mesh) {
+            selectableObjects.push(model.mesh);
+        }
+    });
+
+    const intersects = raycaster.intersectObjects(selectableObjects, true);
 
     if (intersects.length > 0) {
         const selected = intersects[0].object;
         
         // Find the parent model in our models array
         let parentModel = null;
-        for (const model of models) {
-            if (model.mesh === selected || model.mesh.children.includes(selected)) {
+        let modelIndex = -1;
+        
+        for (let i = 0; i < models.length; i++) {
+            const model = models[i];
+            if (model.mesh === selected || 
+                (model.mesh.isGroup && model.mesh.children.includes(selected)) ||
+                findInChildren(model.mesh, selected)) {
                 parentModel = model.mesh;
+                modelIndex = i;
                 break;
             }
         }
         
         if (parentModel) {
-            selectedObject = parentModel;
             // Stop turntable if it was active
-            isTurntableActive = false;
-            turntableClock.stop();
+            if (isTurntableActive) {
+                isTurntableActive = false;
+                turntableClock.stop();
+                const toggleTurntableBtn = document.getElementById('toggle-turntable');
+                if (toggleTurntableBtn) {
+                    toggleTurntableBtn.classList.remove('active');
+                }
+            }
+            
+            // Set the new selected object
+            selectedObject = parentModel;
+            
+            // Update model list UI to show selection
+            selectModel(modelIndex);
             
             // Zoom to fit the selected object
             zoomToFit(selectedObject, camera, controls);
+            
+            console.log('Selected model:', models[modelIndex].name);
         }
-    } else {
-        selectedObject = null;
     }
+}
+
+// Helper function to find an object in children recursively
+function findInChildren(parent, target) {
+    if (!parent.children || parent.children.length === 0) {
+        return false;
+    }
+    
+    for (const child of parent.children) {
+        if (child === target) {
+            return true;
+        }
+        if (findInChildren(child, target)) {
+            return true;
+        }
+    }
+    
+    return false;
 }
 
 // Handle window resize with improved handling
@@ -1107,26 +1314,30 @@ function onWindowResize() {
     composer.setPixelRatio(pixelRatio);
 }
 
-// Animation loop
+// Animation loop with fixed turntable functionality
 function animate() {
-    requestAnimationFrame(animate);
+    // Store the animation ID so we can cancel it if needed
+    animationId = requestAnimationFrame(animate);
     
-    // Update turntable animation if active
+    // Update controls for responsive camera movement
+    controls.update();
+    
+    // Handle turntable animation with improved handling
     if (isTurntableActive && selectedObject) {
+        if (!turntableClock.running) {
+            turntableClock.start();
+        }
+        
         const delta = turntableClock.getDelta();
-        const rotationSpeed = turntableSpeed * delta;
+        selectedObject.rotation.y += turntableSpeed * delta;
         
-        // Apply rotation to the selected object
-        selectedObject.rotation.y += rotationSpeed;
-        
-        // Ensure smooth continuous rotation
+        // Keep rotation within 0-2π range for better performance
         if (selectedObject.rotation.y > Math.PI * 2) {
             selectedObject.rotation.y -= Math.PI * 2;
         }
     }
     
-    // Always update controls
-    controls.update();
+    // Render the scene with post-processing for better quality
     composer.render();
 }
 
@@ -1224,52 +1435,6 @@ function resetCamera() {
     }
 
     animateCamera();
-}
-
-// Toggle turntable animation
-function toggleTurntable() {
-    if (!selectedObject) return;
-    
-    isTurntableActive = !isTurntableActive;
-    
-    // Update button state
-    const toggleTurntableBtn = document.getElementById('toggle-turntable');
-    if (toggleTurntableBtn) {
-        toggleTurntableBtn.classList.toggle('active', isTurntableActive);
-    }
-    
-    if (isTurntableActive) {
-        turntableClock.start();
-        controls.enableRotate = false; // Disable manual rotation during turntable
-        selectedObject.userData.initialRotation = selectedObject.rotation.y;
-    } else {
-        turntableClock.stop();
-        controls.enableRotate = true; // Re-enable manual rotation
-        
-        // Reset to initial rotation smoothly
-        if (selectedObject.userData.initialRotation !== undefined) {
-            const targetRotation = selectedObject.userData.initialRotation;
-            const currentRotation = selectedObject.rotation.y;
-            const duration = 500; // milliseconds
-            const startTime = Date.now();
-            
-            function animateRotation() {
-                const elapsed = Date.now() - startTime;
-                const progress = Math.min(elapsed / duration, 1);
-                
-                // Ease out function
-                const easeProgress = 1 - Math.pow(1 - progress, 3);
-                
-                selectedObject.rotation.y = currentRotation + (targetRotation - currentRotation) * easeProgress;
-                
-                if (progress < 1) {
-                    requestAnimationFrame(animateRotation);
-                }
-            }
-            
-            animateRotation();
-        }
-    }
 }
 
 // Improved zoom to fit function
