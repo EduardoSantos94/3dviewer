@@ -21,6 +21,9 @@ let turntableSpeed = 0.5; // radians per second
 let composer;
 let bloomPass;
 
+// Initialize rhino3dm
+let rhino3dm = null;
+
 // Material presets with outline
 const materialPresets = {
     yellow: new THREE.MeshPhysicalMaterial({
@@ -310,6 +313,20 @@ function unhighlight(e) {
     document.getElementById('drop-zone').classList.remove('dragover');
 }
 
+// Load rhino3dm
+async function initRhino3dm() {
+    if (!rhino3dm) {
+        console.log('Initializing rhino3dm...');
+        try {
+            rhino3dm = await window.rhino3dm();
+            console.log('rhino3dm initialized successfully');
+        } catch (error) {
+            console.error('Failed to initialize rhino3dm:', error);
+        }
+    }
+    return rhino3dm;
+}
+
 // Get appropriate loader for file type
 function getLoaderForFile(filename) {
     const extension = filename.split('.').pop().toLowerCase();
@@ -325,8 +342,7 @@ function getLoaderForFile(filename) {
         case '3dm':
             console.log('Creating Rhino3dmLoader');
             const loader = new Rhino3dmLoader();
-            // Set the library path to the CDN version
-            loader.setLibraryPath('https://cdn.jsdelivr.net/npm/rhino3dm@7.15.0/');
+            loader.setLibraryPath('https://files.mcneel.com/rhino3dm/js/');
             return loader;
         default:
             console.log('No loader found for extension:', extension);
@@ -335,37 +351,36 @@ function getLoaderForFile(filename) {
 }
 
 // Handle files
-function handleFiles(files) {
+async function handleFiles(files) {
+    // Initialize rhino3dm if not already done
+    await initRhino3dm();
+    
     for (let i = 0; i < files.length; i++) {
         const file = files[i];
         console.log('Processing file:', file.name);
         
         const reader = new FileReader();
         
-        reader.onload = function(event) {
+        reader.onload = async function(event) {
             const loader = getLoaderForFile(file.name);
             if (loader) {
                 try {
                     if (file.name.toLowerCase().endsWith('.3dm')) {
                         console.log('Loading 3DM file:', file.name);
                         // For 3DM files, we need to use ArrayBuffer
-                        const arrayBuffer = event.target.result;
-                        loader.load(arrayBuffer, 
-                            function(object) {
-                                console.log('3DM file loaded successfully:', object);
-                                if (object) {
-                                    loadModel(object, file.name);
-                                } else {
-                                    console.error('Failed to load 3DM file - object is null:', file.name);
-                                }
-                            }, 
-                            function(xhr) {
-                                console.log('Loading progress:', (xhr.loaded / xhr.total * 100) + '%');
-                            },
-                            function(error) {
-                                console.error('Error loading 3DM file:', error);
+                        const buffer = event.target.result;
+                        loader.parse(buffer, function(object) {
+                            console.log('3DM file loaded successfully:', object);
+                            if (object) {
+                                loadModel(object, file.name);
+                            } else {
+                                console.error('Failed to load 3DM file - object is null:', file.name);
                             }
-                        );
+                        }, function(xhr) {
+                            console.log('Loading progress:', (xhr.loaded / xhr.total * 100) + '%');
+                        }, function(error) {
+                            console.error('Error loading 3DM file:', error);
+                        });
                     } else {
                         console.log('Loading non-3DM file:', file.name);
                         loader.load(event.target.result, 
