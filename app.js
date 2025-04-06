@@ -24,42 +24,58 @@ let bloomPass;
 // Initialize rhino3dm
 let rhino = null;
 
-// Wait for the page to load
-window.addEventListener('load', async () => {
+// Function to check if rhino3dm is loaded
+function isRhino3dmLoaded() {
+    return typeof rhino3dm !== 'undefined';
+}
+
+// Function to wait for rhino3dm to load
+async function waitForRhino3dm(maxAttempts = 50, interval = 100) {
+    return new Promise((resolve, reject) => {
+        let attempts = 0;
+        const check = () => {
+            if (isRhino3dmLoaded()) {
+                resolve();
+            } else if (attempts >= maxAttempts) {
+                reject(new Error('Failed to load rhino3dm'));
+            } else {
+                attempts++;
+                setTimeout(check, interval);
+            }
+        };
+        check();
+    });
+}
+
+// Initialize the application
+async function initializeApp() {
     try {
-        // Check if rhino3dm is available
-        if (typeof rhino3dm === 'undefined') {
-            console.log("Waiting for rhino3dm to load...");
-            // Wait for rhino3dm script to load
-            await new Promise((resolve, reject) => {
-                let attempts = 0;
-                const checkRhino = setInterval(() => {
-                    attempts++;
-                    if (typeof rhino3dm !== 'undefined') {
-                        clearInterval(checkRhino);
-                        resolve();
-                    }
-                    if (attempts > 50) { // 5 seconds timeout
-                        clearInterval(checkRhino);
-                        reject(new Error("Failed to load rhino3dm"));
-                    }
-                }, 100);
-            });
+        // Wait for rhino3dm to be available
+        if (!isRhino3dmLoaded()) {
+            console.log('Waiting for rhino3dm to load...');
+            await waitForRhino3dm();
         }
 
         // Initialize rhino3dm
         rhino = await rhino3dm();
-        console.log("✅ Rhino3dm loaded");
-        
-        // Initialize the application
+        console.log('✅ Rhino3dm loaded');
+
+        // Initialize the rest of the application
         init();
         setupEventListeners();
         animate();
     } catch (error) {
-        console.error("Failed to initialize:", error);
-        alert("Failed to initialize 3D viewer. Please refresh the page.");
+        console.error('Failed to initialize:', error);
+        alert('Failed to initialize 3D viewer. Please refresh the page and ensure you have a stable internet connection.');
     }
-});
+}
+
+// Start initialization when the page loads
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeApp);
+} else {
+    initializeApp();
+}
 
 // Material presets with outline
 const materialPresets = {
@@ -750,49 +766,43 @@ function updateModelList() {
 function selectModel(index) {
     models.forEach((model, i) => {
         model.selected = i === index;
-        if (model.mesh instanceof THREE.Group) {
-            model.mesh.traverse(child => {
-                if (child instanceof THREE.Mesh && child.material) {
-                    // Add emissive glow to selected model
-                    if (model.selected) {
-                        if (child.material.emissive) {
-                            child.material.emissive.setHex(0x333333);
-                        } else {
-                            const newMaterial = child.material.clone();
-                            newMaterial.emissive = new THREE.Color(0x333333);
-                            child.material = newMaterial;
-                        }
-                        // Add bloom effect to selected model
-                        child.layers.enable(1);
-                    } else {
-                        if (child.material.emissive) {
-                            child.material.emissive.setHex(0x000000);
-                        }
-                        // Remove bloom effect
-                        child.layers.disable(1);
-                    }
-                }
-            });
-        } else if (model.mesh.material) {
-            if (model.selected) {
-                if (model.mesh.material.emissive) {
-                    model.mesh.material.emissive.setHex(0x333333);
+        
+        const handleMesh = (mesh) => {
+            if (mesh instanceof THREE.Mesh && !mesh.userData.isOutline) {
+                // Create a new material instance to avoid sharing uniforms
+                const baseMaterial = materialPresets[mesh.material.userData.materialType || 'yellow'];
+                const newMaterial = new THREE.MeshStandardMaterial({
+                    color: baseMaterial.color,
+                    metalness: baseMaterial.metalness,
+                    roughness: baseMaterial.roughness,
+                    emissive: model.selected ? new THREE.Color(0x333333) : new THREE.Color(0x000000),
+                    emissiveIntensity: 0.1
+                });
+                
+                // Store the material type for future reference
+                newMaterial.userData.materialType = mesh.material.userData.materialType || 'yellow';
+                
+                // Apply the new material
+                mesh.material = newMaterial;
+                
+                // Handle bloom effect
+                if (model.selected) {
+                    mesh.layers.enable(1);
                 } else {
-                    const newMaterial = model.mesh.material.clone();
-                    newMaterial.emissive = new THREE.Color(0x333333);
-                    model.mesh.material = newMaterial;
+                    mesh.layers.disable(1);
                 }
-                // Add bloom effect
-                model.mesh.layers.enable(1);
-            } else {
-                if (model.mesh.material.emissive) {
-                    model.mesh.material.emissive.setHex(0x000000);
-                }
-                // Remove bloom effect
-                model.mesh.layers.disable(1);
             }
+        };
+
+        // Apply to all meshes in the model
+        if (model.mesh instanceof THREE.Group) {
+            model.mesh.traverse(handleMesh);
+        } else if (model.mesh instanceof THREE.Mesh) {
+            handleMesh(model.mesh);
         }
     });
+
+    // Update the model list in UI
     updateModelList();
 }
 
@@ -843,34 +853,28 @@ function applyMaterialToModel(index, materialType) {
     const model = models[index];
     if (!model) return;
 
-    // Create new materials instead of cloning
     const baseMaterial = materialPresets[materialType];
-    const newMaterial = new THREE.MeshStandardMaterial({
-        color: baseMaterial.color,
-        metalness: baseMaterial.metalness,
-        roughness: baseMaterial.roughness,
-        emissive: baseMaterial.emissive,
-        emissiveIntensity: baseMaterial.emissiveIntensity
-    });
-
-    const newOutlineMaterial = new THREE.MeshBasicMaterial({
-        ...outlineMaterials[materialType].toJSON()
-    });
+    
+    const handleMesh = (mesh) => {
+        if (mesh instanceof THREE.Mesh && !mesh.userData.isOutline) {
+            const newMaterial = new THREE.MeshStandardMaterial({
+                color: baseMaterial.color,
+                metalness: baseMaterial.metalness,
+                roughness: baseMaterial.roughness,
+                emissive: model.selected ? new THREE.Color(0x333333) : new THREE.Color(0x000000),
+                emissiveIntensity: 0.1
+            });
+            
+            // Store the material type
+            newMaterial.userData.materialType = materialType;
+            mesh.material = newMaterial;
+        }
+    };
 
     if (model.mesh instanceof THREE.Group) {
-        model.mesh.traverse(child => {
-            if (child instanceof THREE.Mesh) {
-                child.material = newMaterial;
-                if (child.children.length > 0 && child.children[0] instanceof THREE.Mesh) {
-                    child.children[0].material = newOutlineMaterial;
-                }
-            }
-        });
-    } else {
-        model.mesh.material = newMaterial;
-        if (model.mesh.children.length > 0 && model.mesh.children[0] instanceof THREE.Mesh) {
-            model.mesh.children[0].material = newOutlineMaterial;
-        }
+        model.mesh.traverse(handleMesh);
+    } else if (model.mesh instanceof THREE.Mesh) {
+        handleMesh(model.mesh);
     }
 }
 
@@ -902,26 +906,26 @@ function handleMaterialChange(event) {
     const baseMaterial = materialPresets[materialType];
     
     models.forEach(model => {
+        const handleMesh = (mesh) => {
+            if (mesh instanceof THREE.Mesh && !mesh.userData.isOutline) {
+                const newMaterial = new THREE.MeshStandardMaterial({
+                    color: baseMaterial.color,
+                    metalness: baseMaterial.metalness,
+                    roughness: baseMaterial.roughness,
+                    emissive: model.selected ? new THREE.Color(0x333333) : new THREE.Color(0x000000),
+                    emissiveIntensity: 0.1
+                });
+                
+                // Store the material type
+                newMaterial.userData.materialType = materialType;
+                mesh.material = newMaterial;
+            }
+        };
+
         if (model.mesh instanceof THREE.Group) {
-            model.mesh.traverse(child => {
-                if (child instanceof THREE.Mesh) {
-                    child.material = new THREE.MeshStandardMaterial({
-                        color: baseMaterial.color,
-                        metalness: baseMaterial.metalness,
-                        roughness: baseMaterial.roughness,
-                        emissive: baseMaterial.emissive,
-                        emissiveIntensity: baseMaterial.emissiveIntensity
-                    });
-                }
-            });
+            model.mesh.traverse(handleMesh);
         } else if (model.mesh instanceof THREE.Mesh) {
-            model.mesh.material = new THREE.MeshStandardMaterial({
-                color: baseMaterial.color,
-                metalness: baseMaterial.metalness,
-                roughness: baseMaterial.roughness,
-                emissive: baseMaterial.emissive,
-                emissiveIntensity: baseMaterial.emissiveIntensity
-            });
+            handleMesh(model.mesh);
         }
     });
 }
