@@ -24,21 +24,22 @@ let rhino3dmModule = null;
 
 // Function to check if rhino3dm is loaded
 function isRhino3dmLoaded() {
-    return typeof rhino3dm !== 'undefined' && rhino3dm !== null;
+    return typeof rhino3dm !== 'undefined';
 }
 
-// Function to wait for rhino3dm to load
+// Function to wait for rhino3dm to load with better error handling
 async function waitForRhino3dm(maxAttempts = 50, interval = 100) {
     return new Promise((resolve, reject) => {
         let attempts = 0;
         const check = () => {
             if (isRhino3dmLoaded()) {
-                console.log('rhino3dm loaded successfully');
+                console.log('rhino3dm found in global scope');
                 resolve();
             } else if (attempts >= maxAttempts) {
-                reject(new Error('Failed to load rhino3dm after ' + maxAttempts + ' attempts'));
+                reject(new Error(`Failed to load rhino3dm after ${maxAttempts} attempts. Please check your internet connection and refresh the page.`));
             } else {
                 attempts++;
+                console.log(`Waiting for rhino3dm to load... attempt ${attempts}`);
                 setTimeout(check, interval);
             }
         };
@@ -66,7 +67,15 @@ function hideLoadingIndicator() {
 function showFrontpage() {
     const frontpage = document.getElementById('frontpage');
     if (frontpage) {
-        frontpage.style.display = 'block';
+        frontpage.style.display = 'flex';
+    }
+}
+
+// Hide frontpage
+function hideFrontpage() {
+    const frontpage = document.getElementById('frontpage');
+    if (frontpage) {
+        frontpage.style.display = 'none';
     }
 }
 
@@ -81,19 +90,19 @@ async function initializeApp() {
         setupEventListeners();
         animate();
 
-        // Try to load rhino3dm
-        try {
-            console.log('Loading rhino3dm...');
-            rhino3dmModule = await rhino3dm();
-            console.log('✅ Rhino3dm loaded successfully');
-        } catch (error) {
-            console.error('Failed to load rhino3dm:', error);
-            // Continue without rhino3dm - other file formats will still work
-        }
+        // Initially hide UI elements
+        const controlsPanel = document.querySelector('.controls-panel');
+        const modelList = document.querySelector('.model-list');
+        const dropZone = document.getElementById('drop-zone');
+        const frontpage = document.getElementById('frontpage');
 
-        // Hide loading indicator and show frontpage
+        if (controlsPanel) controlsPanel.style.display = 'none';
+        if (modelList) modelList.style.display = 'none';
+        if (dropZone) dropZone.style.display = 'none';
+        if (frontpage) frontpage.style.display = 'flex';
+
+        // Hide loading indicator
         hideLoadingIndicator();
-        showFrontpage();
     } catch (error) {
         console.error('Failed to initialize:', error);
         hideLoadingIndicator();
@@ -458,254 +467,293 @@ function getLoaderForFile(filename) {
         case 'glb':
             return new GLTFLoader();
         case '3dm':
-            console.log('Using Rhino3dmLoader');
-            return rhino3dmModule;
+            console.log('Initializing Rhino3dmLoader');
+            const loader = new Rhino3dmLoader();
+            loader.setLibraryPath('https://cdn.jsdelivr.net/npm/rhino3dm@7.15.0/');
+            return loader;
         default:
             console.log('No loader found for extension:', extension);
             return null;
     }
 }
 
-// Convert Rhino mesh to Three.js mesh
-function convertRhinoMeshToThree(rhinoMesh) {
-    try {
-        const geometry = new THREE.BufferGeometry();
-        const vertices = [];
-        const indices = [];
-
-        const verts = rhinoMesh.vertices();
-        if (!verts || verts.count === 0) {
-            console.error('No vertices found in Rhino mesh');
-            return null;
-        }
-
-        for (let i = 0; i < verts.count; i++) {
-            const pt = verts.get(i);
-            // Handle both array and object vertex formats
-            if (Array.isArray(pt)) {
-                if (pt.length >= 3 && pt.every(coord => typeof coord === 'number')) {
-                    vertices.push(pt[0], pt[1], pt[2]);
-                } else {
-                    console.error('Invalid array vertex data at index', i, pt);
-                    return null;
-                }
-            } else if (pt && typeof pt.x === 'number' && typeof pt.y === 'number' && typeof pt.z === 'number') {
-                vertices.push(pt.x, pt.y, pt.z);
-            } else {
-                console.error('Invalid vertex data at index', i, pt);
-                return null;
-            }
-        }
-
-        const faces = rhinoMesh.faces();
-        if (!faces || faces.count === 0) {
-            console.error('No faces found in Rhino mesh');
-            return null;
-        }
-
-        for (let i = 0; i < faces.count; i++) {
-            const face = faces.get(i);
-            // Handle both array and object face formats
-            if (Array.isArray(face)) {
-                if (face.length >= 3 && face.every(idx => typeof idx === 'number')) {
-                    indices.push(face[0], face[1], face[2]);
-                    // Handle quad faces if present
-                    if (face.length === 4) {
-                        indices.push(face[2], face[3], face[0]);
-                    }
-                } else {
-                    console.error('Invalid array face data at index', i, face);
-                    return null;
-                }
-            } else if (face && typeof face.a === 'number' && typeof face.b === 'number' && typeof face.c === 'number') {
-                indices.push(face.a, face.b, face.c);
-                // Handle quad faces if present
-                if (typeof face.d === 'number' && face.d !== face.c) {
-                    indices.push(face.c, face.d, face.a);
-                }
-            } else {
-                console.error('Invalid face data at index', i, face);
-                return null;
-            }
-        }
-
-        if (vertices.length === 0 || indices.length === 0) {
-            console.error('No valid geometry data found');
-            return null;
-        }
-
-        geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
-        geometry.setIndex(indices);
-        geometry.computeVertexNormals();
-
-        const material = materialPresets.yellow.clone();
-        const mesh = new THREE.Mesh(geometry, material);
-
-        // Create outline mesh
-        const outlineMesh = new THREE.Mesh(
-            geometry,
-            outlineMaterials.yellow.clone()
-        );
-        outlineMesh.scale.set(1.02, 1.02, 1.02);
-        outlineMesh.userData.isOutline = true;
-        mesh.add(outlineMesh);
-
-        return mesh;
-    } catch (error) {
-        console.error('Error in convertRhinoMeshToThree:', error);
-        return null;
-    }
-}
-
 // Handle files
 async function handleFiles(files) {
-    for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        console.log('Processing file:', file.name);
-        
-        if (file.name.toLowerCase().endsWith('.3dm')) {
-            // Check if rhino3dm is available
-            if (!rhino3dmModule) {
-                alert('Rhino3DM support is not available. Please try refreshing the page.');
-                continue;
+    if (!files || files.length === 0) return;
+
+    const file = files[0];
+    const extension = file.name.split('.').pop().toLowerCase();
+
+    try {
+        showLoadingIndicator();
+        hideFrontpage();
+
+        if (extension === '3dm') {
+            console.log('Processing 3DM file:', file.name);
+            const loader = getLoaderForFile(file.name);
+            if (!loader) {
+                throw new Error('Failed to initialize 3DM loader');
             }
 
-            // For 3DM files, use rhino3dm directly
-            const reader = new FileReader();
-            reader.onload = async function(event) {
-                try {
-                    const buffer = new Uint8Array(event.target.result);
-                    const doc = rhino3dmModule.File3dm.fromByteArray(buffer);
+            const arrayBuffer = await file.arrayBuffer();
+            const url = URL.createObjectURL(new Blob([arrayBuffer]));
+            
+            loader.load(
+                url,
+                function(object) {
+                    console.log('Successfully loaded 3DM file:', file.name);
+                    URL.revokeObjectURL(url);
                     
-                    if (!doc) {
-                        console.error('Failed to parse 3DM file:', file.name);
-                        alert('Failed to parse 3DM file. The file may be corrupted or invalid.');
+                    // Check if the object is valid
+                    if (!object || !object.children || object.children.length === 0) {
+                        console.error('3DM file contains no valid geometry');
+                        hideLoadingIndicator();
+                        alert('The 3DM file contains no valid geometry.');
                         return;
                     }
 
-                    console.log('Successfully parsed 3DM file:', file.name);
-                    const objects = doc.objects();
-                    const model = new THREE.Group();
-                    
-                    for (let i = 0; i < objects.count; i++) {
-                        const obj = objects.get(i);
-                        const geometry = obj.geometry();
-                        
-                        if (geometry) {
-                            try {
-                                if (geometry.objectType === rhino3dmModule.ObjectType.Mesh) {
-                                    console.log('Processing Mesh geometry');
-                                    const mesh = convertRhinoMeshToThree(geometry);
-                                    if (mesh) {
-                                        model.add(mesh);
-                                    }
-                                } else if (geometry.objectType === rhino3dmModule.ObjectType.Brep || 
-                                         geometry.objectType === rhino3dmModule.ObjectType.Surface ||
-                                         geometry.objectType === rhino3dmModule.ObjectType.SubD) {
-                                    console.log('Processing Brep/Surface/SubD geometry');
-                                    const mp = new rhino3dmModule.MeshingParameters();
-                                    mp.gridMinCount = 16;
-                                    mp.gridMaxCount = 256;
-                                    mp.gridAngle = 0;
-                                    mp.gridAspectRatio = 1;
-                                    mp.simplePlanes = false;
-                                    mp.refineGrid = true;
-                                    
-                                    let meshes = null;
-                                    
-                                    if (geometry.objectType === rhino3dmModule.ObjectType.Brep) {
-                                        console.log('Converting Brep to mesh');
-                                        const faces = geometry.faces();
-                                        meshes = [];
-                                        
-                                        for (let faceIndex = 0; faceIndex < faces.count; faceIndex++) {
-                                            const face = faces.get(faceIndex);
-                                            const mesh = face.getMesh(mp);
-                                            if (mesh) {
-                                                meshes.push(mesh);
-                                            }
-                                            face.delete();
-                                        }
-                                        
-                                        faces.delete();
-                                    } else if (geometry.objectType === rhino3dmModule.ObjectType.Surface) {
-                                        console.log('Converting Surface to mesh');
-                                        const mesh = geometry.getMesh(mp);
-                                        if (mesh) {
-                                            meshes = [mesh];
-                                        }
-                                    } else if (geometry.objectType === rhino3dmModule.ObjectType.SubD) {
-                                        console.log('Converting SubD to mesh');
-                                        const mesh = geometry.getMesh(mp);
-                                        if (mesh) {
-                                            meshes = [mesh];
-                                        }
-                                    }
-
-                                    if (meshes && meshes.length > 0) {
-                                        meshes.forEach(mesh => {
-                                            if (mesh && mesh.vertices().count > 0) {
-                                                const threeMesh = convertRhinoMeshToThree(mesh);
-                                                if (threeMesh) {
-                                                    model.add(threeMesh);
-                                                }
-                                                mesh.delete();
-                                            }
-                                        });
-                                    }
-                                    
-                                    mp.delete();
-                                }
-                            } catch (error) {
-                                console.error('Error converting geometry:', error);
+                    // Process the loaded object
+                    object.traverse(function(child) {
+                        if (child.isMesh) {
+                            // Ensure the mesh has proper geometry
+                            if (!child.geometry || !child.geometry.attributes.position) {
+                                console.warn('Mesh has invalid geometry:', child);
+                                return;
                             }
-                            geometry.delete();
+                            
+                            // Compute normals if they don't exist
+                            if (!child.geometry.attributes.normal) {
+                                child.geometry.computeVertexNormals();
+                            }
+
+                            // Add default material if none exists
+                            if (!child.material) {
+                                child.material = new THREE.MeshStandardMaterial({
+                                    color: 0x808080,
+                                    metalness: 0.5,
+                                    roughness: 0.5,
+                                    side: THREE.DoubleSide
+                                });
+                            }
                         }
-                        obj.delete();
-                    }
-                    
-                    if (model.children.length > 0) {
-                        loadModel(model, file.name);
-                    } else {
-                        console.warn('No valid geometry found in 3DM file:', file.name);
-                        alert('No valid geometry found in the 3DM file.');
-                    }
-                    
-                    objects.delete();
-                    doc.delete();
-                    
-                } catch (error) {
-                    console.error('Error processing 3DM file:', error);
-                    alert('Error processing 3DM file: ' + error.message);
-                }
-            };
-            
-            reader.onerror = function(error) {
-                console.error('Error reading file:', error);
-                alert('Error reading file: ' + error.message);
-            };
-            
-            reader.readAsArrayBuffer(file);
-        } else {
-            // For other file types, use the appropriate loader
-            const loader = getLoaderForFile(file.name);
-            if (loader) {
-                try {
-                    const object = await new Promise((resolve, reject) => {
-                        const reader = new FileReader();
-                        reader.onload = function(event) {
-                            loader.load(event.target.result, resolve, undefined, reject);
-                        };
-                        reader.readAsDataURL(file);
                     });
+
                     loadModel(object, file.name);
-                } catch (error) {
-                    console.error('Error loading file:', file.name, error);
-                    alert(`Error loading file ${file.name}: ${error.message}`);
+                    hideLoadingIndicator();
+                },
+                function(progress) {
+                    if (progress.total > 0) {
+                        const percent = (progress.loaded / progress.total * 100).toFixed(2);
+                        console.log('Loading progress:', percent + '%');
+                    }
+                },
+                function(error) {
+                    URL.revokeObjectURL(url);
+                    console.error('Error loading 3DM file:', error);
+                    hideLoadingIndicator();
+                    alert('Failed to load 3DM file. The file might be corrupted or using an unsupported format.');
                 }
+            );
+        } else {
+            // Handle other file formats (OBJ, STL, GLTF)
+            const loader = getLoaderForFile(file.name);
+            if (!loader) {
+                throw new Error(`Unsupported file format: ${extension}`);
             }
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    loader.load(e.target.result, function(object) {
+                        loadModel(object, file.name);
+                        hideLoadingIndicator();
+                    }, undefined, function(error) {
+                        console.error('Error loading file:', error);
+                        hideLoadingIndicator();
+                        alert('Failed to load file: ' + error.message);
+                    });
+                } catch (error) {
+                    console.error('Error loading file:', error);
+                    hideLoadingIndicator();
+                    alert('Failed to load file: ' + error.message);
+                }
+            };
+            reader.readAsDataURL(file);
+        }
+    } catch (error) {
+        console.error('Error processing file:', error);
+        hideLoadingIndicator();
+        alert(error.message || 'Failed to process file. Please try again.');
+    }
+}
+
+async function processRhinoObjects(objects) {
+    let geometryFound = false;
+    const group = new THREE.Group();
+
+    for (let i = 0; i < objects.count; i++) {
+        const obj = objects.get(i);
+        const geometry = obj.geometry();
+
+        if (!geometry) continue;
+
+        try {
+            let mesh = null;
+
+            if (geometry.objectType === rhino3dmModule.ObjectType.Mesh) {
+                mesh = rhinoMeshToThreeMesh(geometry);
+            } else if (geometry.objectType === rhino3dmModule.ObjectType.Brep) {
+                mesh = rhinoBrepToThreeMesh(geometry);
+            } else if (geometry.objectType === rhino3dmModule.ObjectType.Surface) {
+                mesh = rhinoSurfaceToThreeMesh(geometry);
+            } else if (geometry.objectType === rhino3dmModule.ObjectType.SubD) {
+                mesh = rhinoSubDToThreeMesh(geometry);
+            }
+
+            if (mesh) {
+                geometryFound = true;
+                group.add(mesh);
+            }
+        } catch (error) {
+            console.warn(`Failed to process object ${i}:`, error);
         }
     }
+
+    if (geometryFound) {
+        scene.add(group);
+        centerCamera(group);
+    }
+
+    return geometryFound;
+}
+
+function rhinoMeshToThreeMesh(rhinoMesh) {
+    const vertices = rhinoMesh.vertices();
+    const faces = rhinoMesh.faces();
+    
+    const geometry = new THREE.BufferGeometry();
+    const positions = new Float32Array(vertices.count * 3);
+    
+    for (let i = 0; i < vertices.count; i++) {
+        const vertex = vertices.get(i);
+        positions[i * 3] = vertex[0];
+        positions[i * 3 + 1] = vertex[1];
+        positions[i * 3 + 2] = vertex[2];
+    }
+    
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    
+    const indices = [];
+    for (let i = 0; i < faces.count; i++) {
+        const face = faces.get(i);
+        indices.push(face[0], face[1], face[2]);
+    }
+    
+    geometry.setIndex(indices);
+    geometry.computeVertexNormals();
+    
+    return new THREE.Mesh(
+        geometry,
+        new THREE.MeshStandardMaterial({
+            color: 0x808080,
+            metalness: 0.5,
+            roughness: 0.5,
+            side: THREE.DoubleSide
+        })
+    );
+}
+
+function rhinoBrepToThreeMesh(brep) {
+    const mp = new rhino3dmModule.MeshingParameters();
+    mp.gridMinCount = 16;
+    mp.gridMaxCount = 256;
+    mp.gridAngle = 0;
+    mp.gridAspectRatio = 1;
+    mp.simplePlanes = false;
+    mp.refineGrid = true;
+
+    const faces = brep.faces();
+    const group = new THREE.Group();
+
+    for (let i = 0; i < faces.count; i++) {
+        const face = faces.get(i);
+        const mesh = face.getMesh(mp);
+        
+        if (mesh) {
+            const threeMesh = rhinoMeshToThreeMesh(mesh);
+            if (threeMesh) {
+                group.add(threeMesh);
+            }
+            mesh.delete();
+        }
+        face.delete();
+    }
+
+    faces.delete();
+    mp.delete();
+
+    return group.children.length > 0 ? group : null;
+}
+
+function rhinoSurfaceToThreeMesh(surface) {
+    const mp = new rhino3dmModule.MeshingParameters();
+    mp.gridMinCount = 16;
+    mp.gridMaxCount = 256;
+    mp.gridAngle = 0;
+    mp.gridAspectRatio = 1;
+    mp.simplePlanes = false;
+    mp.refineGrid = true;
+
+    const mesh = surface.getMesh(mp);
+    let result = null;
+
+    if (mesh) {
+        result = rhinoMeshToThreeMesh(mesh);
+        mesh.delete();
+    }
+
+    mp.delete();
+    return result;
+}
+
+function rhinoSubDToThreeMesh(subd) {
+    const mp = new rhino3dmModule.MeshingParameters();
+    mp.gridMinCount = 16;
+    mp.gridMaxCount = 256;
+    mp.gridAngle = 0;
+    mp.gridAspectRatio = 1;
+    mp.simplePlanes = false;
+    mp.refineGrid = true;
+
+    const mesh = subd.getMesh(mp);
+    let result = null;
+
+    if (mesh) {
+        result = rhinoMeshToThreeMesh(mesh);
+        mesh.delete();
+    }
+
+    mp.delete();
+    return result;
+}
+
+function centerCamera(object) {
+    const box = new THREE.Box3().setFromObject(object);
+    const center = box.getCenter(new THREE.Vector3());
+    const size = box.getSize(new THREE.Vector3());
+    const maxDim = Math.max(size.x, size.y, size.z);
+    const fov = camera.fov * (Math.PI / 180);
+    let cameraZ = Math.abs(maxDim / Math.tan(fov / 2));
+    
+    // Add some padding
+    cameraZ *= 1.5;
+    
+    camera.position.set(center.x, center.y, center.z + cameraZ);
+    camera.lookAt(center);
+    
+    // Update the orbit controls target
+    controls.target.copy(center);
+    controls.update();
 }
 
 // Handle file selection
@@ -739,23 +787,20 @@ function loadModel(object, fileName) {
         // Create outline mesh
         const outlineMesh = new THREE.Mesh(object, outlineMaterials.yellow.clone());
         outlineMesh.scale.set(1.02, 1.02, 1.02);
-        outlineMesh.userData.isOutline = true; // Mark as outline mesh
+        outlineMesh.userData.isOutline = true;
         mesh.add(outlineMesh);
     } else if (object instanceof THREE.Group || object instanceof THREE.Mesh) {
-        // For OBJ, GLTF, and 3DM files
         mesh = object;
         
-        // Apply material to all meshes in the group
         if (mesh instanceof THREE.Group) {
             mesh.traverse(child => {
                 if (child instanceof THREE.Mesh && !child.userData.isOutline) {
                     const material = materialPresets.yellow.clone();
                     child.material = material;
                     
-                    // Create outline mesh
                     const outlineMesh = new THREE.Mesh(child.geometry, outlineMaterials.yellow.clone());
                     outlineMesh.scale.set(1.02, 1.02, 1.02);
-                    outlineMesh.userData.isOutline = true; // Mark as outline mesh
+                    outlineMesh.userData.isOutline = true;
                     child.add(outlineMesh);
                 }
             });
@@ -763,10 +808,9 @@ function loadModel(object, fileName) {
             const material = materialPresets.yellow.clone();
             mesh.material = material;
             
-            // Create outline mesh
             const outlineMesh = new THREE.Mesh(mesh.geometry, outlineMaterials.yellow.clone());
             outlineMesh.scale.set(1.02, 1.02, 1.02);
-            outlineMesh.userData.isOutline = true; // Mark as outline mesh
+            outlineMesh.userData.isOutline = true;
             mesh.add(outlineMesh);
         }
     } else {
@@ -782,12 +826,9 @@ function loadModel(object, fileName) {
     const maxDim = Math.max(size.x, size.y, size.z);
     const scale = 1.5 / maxDim;
     
-    // Position the model
-    mesh.position.set(0, 0, 0); // Reset position first
-    mesh.position.sub(center.multiplyScalar(scale)); // Center the model
+    mesh.position.set(0, 0, 0);
+    mesh.position.sub(center.multiplyScalar(scale));
     mesh.scale.set(scale, scale, scale);
-    
-    // Position the model slightly above the ground plane
     mesh.position.y = -box.min.y * scale + 0.5;
 
     // Add to models array
@@ -803,21 +844,16 @@ function loadModel(object, fileName) {
     // Update model list in UI
     updateModelList();
     
-    // Hide drop zone if we have models
-    if (models.length > 0) {
-        document.getElementById('drop-zone').style.display = 'none';
-    }
-
-    // If this is the first model, center the view and show the UI
+    // Show UI elements only after the first model is loaded
     if (models.length === 1) {
-        zoomToFit(mesh, camera, controls);
-        controls.enableRotate = true;
-        controls.update();
-        
-        // Show the UI elements
         document.querySelector('.controls-panel').style.display = 'block';
         document.querySelector('.model-list').style.display = 'block';
         document.getElementById('drop-zone').style.display = 'none';
+        document.getElementById('frontpage').style.display = 'none';
+        
+        zoomToFit(mesh, camera, controls);
+        controls.enableRotate = true;
+        controls.update();
     }
 }
 

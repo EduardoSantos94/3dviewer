@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>3D Jewelry Viewer</title>
     <link rel="stylesheet" href="styles.css">
-    <script src="https://files.mcneel.com/rhino3dm/js/rhino3dm.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <script type="importmap">
     {
         "imports": {
@@ -14,7 +14,8 @@
         }
     }
     </script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <!-- Load Rhino3dm first -->
+    <script src="https://cdn.jsdelivr.net/npm/rhino3dm@7.15.0/rhino3dm.js"></script>
 </head>
 <body>
     <div class="container">
@@ -29,15 +30,15 @@
             <div id="frontpage" class="frontpage">
                 <div class="frontpage-content">
                     <h1>3D Jewelry Viewer</h1>
-                    <p>View and interact with your 3D jewelry models in high quality</p>
+                    <p>Upload your 3D models to view and interact with them</p>
                     <button id="start-viewing" class="cta-button">Start Viewing</button>
                     <div class="supported-formats">
                         <p>Supported formats:</p>
                         <ul>
-                            <li>.3dm (Rhino)</li>
-                            <li>.stl</li>
-                            <li>.obj</li>
-                            <li>.gltf/.glb</li>
+                            <li>Rhino (.3dm)</li>
+                            <li>STL (.stl)</li>
+                            <li>OBJ (.obj)</li>
+                            <li>GLTF/GLB (.gltf/.glb)</li>
                         </ul>
                     </div>
                 </div>
@@ -45,38 +46,44 @@
 
             <!-- Drop Zone -->
             <div id="drop-zone" class="drop-zone" style="display: none;">
-                <i class="fas fa-cloud-upload-alt"></i>
+                <i class="fas fa-cloud-upload-alt fa-3x"></i>
                 <p>Drag and drop your 3D files here</p>
                 <p>or</p>
                 <button id="add-model" class="add-model-btn">Add Model</button>
-                <input type="file" id="file-input" accept=".3dm,.stl,.obj,.gltf,.glb" multiple style="display: none;">
+                <input type="file" id="file-input" style="display: none;" accept=".3dm,.stl,.obj,.gltf,.glb">
             </div>
 
             <!-- Controls Panel -->
             <div class="controls-panel" style="display: none;">
-                <div class="controls-group">
-                    <button id="toggle-turntable" title="Toggle Turntable">
-                        <i class="fas fa-sync"></i>
-                    </button>
-                    <button id="center-model" title="Center Model">
-                        <i class="fas fa-crosshairs"></i>
-                    </button>
-                    <button id="reset-camera" title="Reset Camera">
-                        <i class="fas fa-home"></i>
-                    </button>
+                <div class="control-group">
+                    <label for="material-select">Material:</label>
+                    <select id="material-select">
+                        <option value="yellow">Yellow Gold (High Quality)</option>
+                        <option value="rose">Rose Gold (High Quality)</option>
+                        <option value="white">White Gold (High Quality)</option>
+                        <option value="fastYellow">Yellow Gold (Fast Render)</option>
+                        <option value="fastRose">Rose Gold (Fast Render)</option>
+                        <option value="fastWhite">White Gold (Fast Render)</option>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <label for="ambient-light">Ambient Light:</label>
+                    <input type="range" id="ambient-light" min="0" max="1" step="0.1" value="0.5">
+                </div>
+                <div class="control-group">
+                    <label for="directional-light">Directional Light:</label>
+                    <input type="range" id="directional-light" min="0" max="1" step="0.1" value="0.5">
+                </div>
+                <div class="control-buttons">
                     <button id="toggle-floor" title="Toggle Floor">
-                        <i class="fas fa-th"></i>
+                        <i class="fas fa-border-all"></i>
                     </button>
                     <button id="toggle-background" title="Toggle Background">
-                        <i class="fas fa-adjust"></i>
+                        <i class="fas fa-fill-drip"></i>
                     </button>
-                </div>
-                <div class="material-controls">
-                    <select id="material-select">
-                        <option value="yellow">Yellow Gold</option>
-                        <option value="rose">Rose Gold</option>
-                        <option value="white">White Gold</option>
-                    </select>
+                    <button id="toggle-turntable" title="Toggle Turntable">
+                        <i class="fas fa-sync-alt"></i>
+                    </button>
                 </div>
             </div>
 
