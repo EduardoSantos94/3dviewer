@@ -38,61 +38,46 @@ rhino3dm().then((module) => {
 
 // Material presets with outline
 const materialPresets = {
-    yellow: new THREE.MeshPhysicalMaterial({
+    yellow: new THREE.MeshStandardMaterial({
         color: 0xffd700,
         metalness: 0.8,
         roughness: 0.2,
-        clearcoat: 0.5,
-        clearcoatRoughness: 0.1,
-        emissive: 0x111111,
+        emissive: new THREE.Color(0x111111),
         emissiveIntensity: 0.1
     }),
-    rose: new THREE.MeshPhysicalMaterial({
+    rose: new THREE.MeshStandardMaterial({
         color: 0xe6b3b3,
         metalness: 0.8,
         roughness: 0.2,
-        clearcoat: 0.5,
-        clearcoatRoughness: 0.1,
-        emissive: 0x111111,
+        emissive: new THREE.Color(0x111111),
         emissiveIntensity: 0.1
     }),
-    white: new THREE.MeshPhysicalMaterial({
+    white: new THREE.MeshStandardMaterial({
         color: 0xffffff,
         metalness: 0.8,
         roughness: 0.2,
-        clearcoat: 0.5,
-        clearcoatRoughness: 0.1,
-        emissive: 0x111111,
+        emissive: new THREE.Color(0x111111),
         emissiveIntensity: 0.1
     }),
-    fastYellow: new THREE.MeshPhongMaterial({
+    fastYellow: new THREE.MeshStandardMaterial({
         color: 0xffd700,
-        specular: 0xffffff,
-        shininess: 100,
-        transparent: true,
-        opacity: 0.9,
-        side: THREE.DoubleSide,
-        emissive: 0x111111,
+        metalness: 0.5,
+        roughness: 0.5,
+        emissive: new THREE.Color(0x111111),
         emissiveIntensity: 0.1
     }),
-    fastRose: new THREE.MeshPhongMaterial({
+    fastRose: new THREE.MeshStandardMaterial({
         color: 0xe6b8b7,
-        specular: 0xffffff,
-        shininess: 100,
-        transparent: true,
-        opacity: 0.9,
-        side: THREE.DoubleSide,
-        emissive: 0x111111,
+        metalness: 0.5,
+        roughness: 0.5,
+        emissive: new THREE.Color(0x111111),
         emissiveIntensity: 0.1
     }),
-    fastWhite: new THREE.MeshPhongMaterial({
+    fastWhite: new THREE.MeshStandardMaterial({
         color: 0xffffff,
-        specular: 0xffffff,
-        shininess: 100,
-        transparent: true,
-        opacity: 0.9,
-        side: THREE.DoubleSide,
-        emissive: 0x111111,
+        metalness: 0.5,
+        roughness: 0.5,
+        emissive: new THREE.Color(0x111111),
         emissiveIntensity: 0.1
     })
 };
@@ -834,10 +819,13 @@ function applyMaterialToModel(index, materialType) {
     if (!model) return;
 
     // Create new materials instead of cloning
-    const newMaterial = new THREE.MeshPhysicalMaterial({
-        ...materialPresets[materialType].toJSON(),
-        emissive: materialPresets[materialType].emissive,
-        emissiveIntensity: materialPresets[materialType].emissiveIntensity
+    const baseMaterial = materialPresets[materialType];
+    const newMaterial = new THREE.MeshStandardMaterial({
+        color: baseMaterial.color,
+        metalness: baseMaterial.metalness,
+        roughness: baseMaterial.roughness,
+        emissive: baseMaterial.emissive,
+        emissiveIntensity: baseMaterial.emissiveIntensity
     });
 
     const newOutlineMaterial = new THREE.MeshBasicMaterial({
@@ -886,24 +874,29 @@ function removeModel(index) {
 // Handle material change
 function handleMaterialChange(event) {
     const materialType = event.target.value;
-    const newMaterial = materialPresets[materialType].clone();
-    const newOutlineMaterial = outlineMaterials[materialType].clone();
+    const baseMaterial = materialPresets[materialType];
     
     models.forEach(model => {
         if (model.mesh instanceof THREE.Group) {
             model.mesh.traverse(child => {
                 if (child instanceof THREE.Mesh) {
-                    child.material = newMaterial;
-                    if (child.children.length > 0 && child.children[0] instanceof THREE.Mesh) {
-                        child.children[0].material = newOutlineMaterial;
-                    }
+                    child.material = new THREE.MeshStandardMaterial({
+                        color: baseMaterial.color,
+                        metalness: baseMaterial.metalness,
+                        roughness: baseMaterial.roughness,
+                        emissive: baseMaterial.emissive,
+                        emissiveIntensity: baseMaterial.emissiveIntensity
+                    });
                 }
             });
-        } else {
-            model.mesh.material = newMaterial;
-            if (model.mesh.children.length > 0 && model.mesh.children[0] instanceof THREE.Mesh) {
-                model.mesh.children[0].material = newOutlineMaterial;
-            }
+        } else if (model.mesh instanceof THREE.Mesh) {
+            model.mesh.material = new THREE.MeshStandardMaterial({
+                color: baseMaterial.color,
+                metalness: baseMaterial.metalness,
+                roughness: baseMaterial.roughness,
+                emissive: baseMaterial.emissive,
+                emissiveIntensity: baseMaterial.emissiveIntensity
+            });
         }
     });
 }
@@ -1029,9 +1022,11 @@ function toggleFloor() {
 function toggleBackground() {
     isDarkBackground = !isDarkBackground;
     scene.background = new THREE.Color(isDarkBackground ? 0x000000 : 0xf5f5f5);
+    
+    // Update button state
     const toggleBackgroundBtn = document.getElementById('toggle-background');
     if (toggleBackgroundBtn) {
-        toggleBackgroundBtn.classList.toggle('active');
+        toggleBackgroundBtn.classList.toggle('active', isDarkBackground);
     }
 }
 
@@ -1075,6 +1070,13 @@ function resetCamera() {
 // Toggle turntable animation
 function toggleTurntable() {
     isTurntableActive = !isTurntableActive;
+    
+    // Update button state
+    const toggleTurntableBtn = document.getElementById('toggle-turntable');
+    if (toggleTurntableBtn) {
+        toggleTurntableBtn.classList.toggle('active', isTurntableActive);
+    }
+    
     if (isTurntableActive) {
         turntableClock.start();
     } else {
