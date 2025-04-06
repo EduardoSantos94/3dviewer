@@ -146,8 +146,8 @@ function init() {
     controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.05;
-    controls.minDistance = 1;
-    controls.maxDistance = 20;
+    controls.minDistance = 0.5;
+    controls.maxDistance = 1000;
     controls.maxPolarAngle = Math.PI / 2;
     controls.enablePan = true;
     controls.panSpeed = 0.5;
@@ -159,6 +159,11 @@ function init() {
         MIDDLE: THREE.MOUSE.DOLLY,
         RIGHT: THREE.MOUSE.PAN
     };
+
+    // Add smooth zooming with inertia
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+    controls.zoomDampingFactor = 0.1;
 
     // Add double-click handler for camera reset
     renderer.domElement.addEventListener('dblclick', (event) => {
@@ -637,6 +642,9 @@ function handleClick(event) {
             // Stop turntable if it was active
             isTurntableActive = false;
             turntableClock.stop();
+            
+            // Zoom to fit the selected object
+            zoomToFit(selectedObject, camera, controls);
         }
     } else {
         selectedObject = null;
@@ -687,11 +695,8 @@ function centerModel() {
         model.mesh.position.y = -combinedBox.min.y * scale + 0.5;
     });
 
-    // Update camera position
-    camera.position.set(0, 3, 5);
-    camera.lookAt(0, 0, 0);
-    controls.target.set(0, 0, 0);
-    controls.update();
+    // Use zoomToFit for smooth camera transition
+    zoomToFit(models[0].mesh, camera, controls);
 }
 
 function toggleFloor() {
@@ -736,6 +741,55 @@ function toggleTurntable() {
     } else {
         turntableClock.stop();
     }
+}
+
+// Improved zoom to fit function
+function zoomToFit(object, camera, controls) {
+    const box = new THREE.Box3().setFromObject(object);
+    const size = box.getSize(new THREE.Vector3()).length();
+    const center = box.getCenter(new THREE.Vector3());
+
+    // Calculate the distance needed to fit the object
+    const distance = size / (2 * Math.tan((Math.PI * camera.fov) / 360));
+    const direction = controls.target.clone()
+        .sub(camera.position)
+        .normalize()
+        .multiplyScalar(distance);
+
+    // Smoothly animate to the new position
+    const startPosition = camera.position.clone();
+    const startTarget = controls.target.clone();
+    const duration = 1000; // Animation duration in ms
+    const startTime = Date.now();
+
+    function animateCamera() {
+        const elapsed = Date.now() - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        
+        // Ease in-out function for smooth animation
+        const easeProgress = progress < 0.5 
+            ? 2 * progress * progress 
+            : -1 + (4 - 2 * progress) * progress;
+
+        // Interpolate position and target
+        camera.position.lerpVectors(
+            startPosition,
+            center.clone().sub(direction),
+            easeProgress
+        );
+        controls.target.lerpVectors(
+            startTarget,
+            center,
+            easeProgress
+        );
+        controls.update();
+
+        if (progress < 1) {
+            requestAnimationFrame(animateCamera);
+        }
+    }
+
+    animateCamera();
 }
 
 // Initialize the application
