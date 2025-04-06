@@ -17,18 +17,27 @@
     </script>
 </head>
 <body>
-    <div id="viewer-container">
-        <div id="drop-zone">
-            <i class="fas fa-cloud-upload-alt"></i>
-            <p>Drag and drop 3D files here</p>
-            <p>or</p>
-            <label for="file-input" class="btn">Choose File
-                <input type="file" id="file-input" accept=".3dm,model/3dm,.stl,.obj,.gltf,.glb" multiple style="display: none;">
-            </label>
-        </div>
-        <div class="controls-panel">
-            <div class="control-group">
-                <label for="material-select">Material:
+    <div class="container">
+        <div id="viewer-container">
+            <div id="drop-zone">
+                <div class="drop-zone-content">
+                    <i class="fas fa-cloud-upload-alt upload-icon"></i>
+                    <p>Drag and drop 3D files here</p>
+                    <p>or</p>
+                    <div class="file-input-wrapper">
+                        <label class="file-input-label">
+                            Choose File
+                            <input type="file" id="file-input" accept=".stl,.obj,.gltf,.glb,.3dm" multiple>
+                        </label>
+                    </div>
+                </div>
+            </div>
+            <div class="controls-panel">
+                <button class="toggle-sidebar" id="toggle-sidebar">
+                    <i class="fas fa-bars"></i>
+                </button>
+                <div class="control-group">
+                    <h3>Material</h3>
                     <select id="material-select" name="material">
                         <option value="yellow">Yellow Gold (High Quality)</option>
                         <option value="rose">Rose Gold (High Quality)</option>
@@ -37,31 +46,40 @@
                         <option value="fastRose">Rose Gold (Fast Render)</option>
                         <option value="fastWhite">White Gold (Fast Render)</option>
                     </select>
-                </label>
-            </div>
-            <div class="control-group">
-                <label for="ambient-light">Ambient Light:
-                    <input type="range" id="ambient-light" name="ambient-light" min="0" max="1" step="0.1" value="0.5">
-                </label>
-            </div>
-            <div class="control-group">
-                <label for="directional-light">Directional Light:
-                    <input type="range" id="directional-light" name="directional-light" min="0" max="1" step="0.1" value="0.8">
-                </label>
-            </div>
-            <div class="control-group">
-                <label for="background-color">Background:
+                </div>
+                <div class="control-group">
+                    <h3>Lighting</h3>
+                    <div class="slider-container">
+                        <label for="ambient-light">Ambient Light</label>
+                        <input type="range" id="ambient-light" name="ambient-light" min="0" max="1" step="0.1" value="0.5">
+                    </div>
+                    <div class="slider-container">
+                        <label for="directional-light">Directional Light</label>
+                        <input type="range" id="directional-light" name="directional-light" min="0" max="1" step="0.1" value="0.8">
+                    </div>
+                </div>
+                <div class="control-group">
+                    <h3>Background</h3>
                     <input type="color" id="background-color" name="background-color" value="#f5f5f5">
-                </label>
+                </div>
+                <div class="control-group">
+                    <div class="icon-controls">
+                        <button id="center-model" title="Center Model">
+                            <i class="fas fa-crosshairs"></i>
+                        </button>
+                        <button id="toggle-floor" title="Toggle Floor">
+                            <i class="fas fa-th"></i>
+                        </button>
+                        <button id="toggle-background" title="Toggle Background">
+                            <i class="fas fa-adjust"></i>
+                        </button>
+                        <button id="toggle-turntable" title="Toggle Turntable">
+                            <i class="fas fa-sync"></i>
+                        </button>
+                    </div>
+                </div>
+                <div id="model-list" class="model-list"></div>
             </div>
-            <div class="control-group">
-                <button id="center-model" class="btn"><i class="fas fa-crosshairs"></i> Center</button>
-                <button id="toggle-floor" class="btn"><i class="fas fa-th"></i> Floor</button>
-                <button id="toggle-background" class="btn"><i class="fas fa-adjust"></i> Background</button>
-                <button id="toggle-sidebar" class="btn"><i class="fas fa-bars"></i> Controls</button>
-                <button id="toggle-turntable" class="btn"><i class="fas fa-sync"></i> Turntable</button>
-            </div>
-            <div id="model-list"></div>
         </div>
     </div>
     <footer>
