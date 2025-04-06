@@ -369,7 +369,9 @@ function getLoaderForFile(filename) {
         case 'glb':
             return new GLTFLoader();
         case '3dm':
-            return new Rhino3dmLoader();
+            const loader = new Rhino3dmLoader();
+            loader.setLibraryPath('https://cdn.jsdelivr.net/npm/rhino3dm@7.15.0/');
+            return loader;
         default:
             return null;
     }
@@ -475,10 +477,12 @@ function updateModelList() {
         
         const checkbox = document.createElement('input');
         checkbox.type = 'checkbox';
+        checkbox.id = `model-${index}-visibility`;
         checkbox.checked = model.visible;
         checkbox.addEventListener('change', () => toggleModelVisibility(index));
         
         const label = document.createElement('label');
+        label.htmlFor = `model-${index}-visibility`;
         label.textContent = model.name;
         label.addEventListener('click', () => selectModel(index));
         
