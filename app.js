@@ -3,6 +3,9 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
 import { STLLoader } from 'three/addons/loaders/STLLoader.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 
 // Initialize Three.js scene
 let scene, camera, renderer, controls;
@@ -14,6 +17,8 @@ let isDarkBackground = false;
 let isTurntableActive = false;
 let turntableClock = new THREE.Clock();
 let turntableSpeed = 0.5; // radians per second
+let composer;
+let bloomPass;
 
 // Material presets with outline
 const materialPresets = {
@@ -111,16 +116,35 @@ function init() {
     scene.background = new THREE.Color(0xf5f5f5);
 
     // Create camera with better initial position
-    camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
     camera.position.set(0, 3, 5);
     camera.lookAt(0, 0, 0);
 
     // Create renderer
-    renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer = new THREE.WebGLRenderer({ 
+        antialias: true,
+        alpha: true,
+        powerPreference: "high-performance"
+    });
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setPixelRatio(window.devicePixelRatio);
     renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     document.getElementById('viewer-container').appendChild(renderer.domElement);
+
+    // Setup post-processing
+    composer = new EffectComposer(renderer);
+    const renderPass = new RenderPass(scene, camera);
+    composer.addPass(renderPass);
+
+    // Add bloom effect
+    bloomPass = new UnrealBloomPass(
+        new THREE.Vector2(window.innerWidth, window.innerHeight),
+        0.5, // strength
+        0.4, // radius
+        0.85  // threshold
+    );
+    composer.addPass(bloomPass);
 
     // Add lights
     ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
@@ -165,11 +189,28 @@ function init() {
     controls.dampingFactor = 0.05;
     controls.zoomDampingFactor = 0.1;
 
+    // Add touch support
+    controls.touchDampingFactor = 0.1;
+    controls.touchZoomSpeed = 0.5;
+    controls.touchRotateSpeed = 0.5;
+    controls.touchPanSpeed = 0.5;
+
     // Add double-click handler for camera reset
     renderer.domElement.addEventListener('dblclick', (event) => {
         if (event.target === renderer.domElement) {
             resetCamera();
         }
+    });
+
+    // Add touch events for mobile
+    renderer.domElement.addEventListener('touchstart', (event) => {
+        if (event.touches.length === 2) {
+            controls.enableDamping = false;
+        }
+    });
+
+    renderer.domElement.addEventListener('touchend', () => {
+        controls.enableDamping = true;
     });
 
     // Setup event listeners
@@ -387,7 +428,9 @@ function loadModel(object, fileName) {
     const maxDim = Math.max(size.x, size.y, size.z);
     const scale = 1.5 / maxDim;
     
-    mesh.position.sub(center);
+    // Position the model
+    mesh.position.set(0, 0, 0); // Reset position first
+    mesh.position.sub(center.multiplyScalar(scale)); // Center the model
     mesh.scale.set(scale, scale, scale);
     
     // Position the model slightly above the ground plane
@@ -397,7 +440,8 @@ function loadModel(object, fileName) {
     models.push({
         mesh: mesh,
         name: fileName,
-        visible: true
+        visible: true,
+        selected: false
     });
 
     scene.add(mesh);
@@ -408,6 +452,11 @@ function loadModel(object, fileName) {
     // Hide drop zone if we have models
     if (models.length > 0) {
         document.getElementById('drop-zone').style.display = 'none';
+    }
+
+    // If this is the first model, center the view
+    if (models.length === 1) {
+        zoomToFit(mesh, camera, controls);
     }
 }
 
@@ -420,7 +469,6 @@ function updateModelList() {
     models.forEach((model, index) => {
         const item = document.createElement('div');
         item.className = `model-item ${model.selected ? 'selected' : ''}`;
-        item.addEventListener('click', () => selectModel(index));
         
         const checkbox = document.createElement('input');
         checkbox.type = 'checkbox';
@@ -429,33 +477,15 @@ function updateModelList() {
         
         const label = document.createElement('label');
         label.textContent = model.name;
+        label.addEventListener('click', () => selectModel(index));
         
-        const actions = document.createElement('div');
-        actions.className = 'model-item-actions';
-        
-        const materialBtn = document.createElement('button');
-        materialBtn.innerHTML = '<i class="fas fa-paint-brush"></i>';
-        materialBtn.title = 'Change Material';
-        materialBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            showMaterialDialog(index);
-        });
-        
-        const removeBtn = document.createElement('button');
-        removeBtn.className = 'remove-model';
-        removeBtn.innerHTML = '<i class="fas fa-times"></i>';
-        removeBtn.title = 'Remove Model';
-        removeBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            removeModel(index);
-        });
-        
-        actions.appendChild(materialBtn);
-        actions.appendChild(removeBtn);
+        const visibilityIcon = document.createElement('i');
+        visibilityIcon.className = `fas fa-eye${model.visible ? '' : '-slash'}`;
+        visibilityIcon.addEventListener('click', () => toggleModelVisibility(index));
         
         item.appendChild(checkbox);
         item.appendChild(label);
-        item.appendChild(actions);
+        item.appendChild(visibilityIcon);
         modelList.appendChild(item);
     });
 }
@@ -466,12 +496,45 @@ function selectModel(index) {
         model.selected = i === index;
         if (model.mesh instanceof THREE.Group) {
             model.mesh.traverse(child => {
-                if (child instanceof THREE.Mesh) {
-                    child.material.emissive.setHex(model.selected ? 0x333333 : 0x000000);
+                if (child instanceof THREE.Mesh && child.material) {
+                    // Add emissive glow to selected model
+                    if (model.selected) {
+                        if (child.material.emissive) {
+                            child.material.emissive.setHex(0x333333);
+                        } else {
+                            const newMaterial = child.material.clone();
+                            newMaterial.emissive = new THREE.Color(0x333333);
+                            child.material = newMaterial;
+                        }
+                        // Add bloom effect to selected model
+                        child.layers.enable(1);
+                    } else {
+                        if (child.material.emissive) {
+                            child.material.emissive.setHex(0x000000);
+                        }
+                        // Remove bloom effect
+                        child.layers.disable(1);
+                    }
                 }
             });
-        } else {
-            model.mesh.material.emissive.setHex(model.selected ? 0x333333 : 0x000000);
+        } else if (model.mesh.material) {
+            if (model.selected) {
+                if (model.mesh.material.emissive) {
+                    model.mesh.material.emissive.setHex(0x333333);
+                } else {
+                    const newMaterial = model.mesh.material.clone();
+                    newMaterial.emissive = new THREE.Color(0x333333);
+                    model.mesh.material = newMaterial;
+                }
+                // Add bloom effect
+                model.mesh.layers.enable(1);
+            } else {
+                if (model.mesh.material.emissive) {
+                    model.mesh.material.emissive.setHex(0x000000);
+                }
+                // Remove bloom effect
+                model.mesh.layers.disable(1);
+            }
         }
     });
     updateModelList();
@@ -669,7 +732,7 @@ function animate() {
     }
     
     controls.update();
-    renderer.render(scene, camera);
+    composer.render();
 }
 
 // Center all models
@@ -727,10 +790,32 @@ function toggleSidebar() {
 
 // Reset camera to default position
 function resetCamera() {
-    camera.position.set(0, 3, 5);
-    camera.lookAt(0, 0, 0);
-    controls.target.set(0, 0, 0);
-    controls.update();
+    const startPosition = camera.position.clone();
+    const startTarget = controls.target.clone();
+    const targetPosition = new THREE.Vector3(0, 3, 5);
+    const targetTarget = new THREE.Vector3(0, 0, 0);
+    const duration = 1000;
+    const startTime = Date.now();
+
+    function animateCamera() {
+        const elapsed = Date.now() - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        
+        // Ease in-out function for smooth animation
+        const easeProgress = progress < 0.5 
+            ? 2 * progress * progress 
+            : -1 + (4 - 2 * progress) * progress;
+
+        camera.position.lerpVectors(startPosition, targetPosition, easeProgress);
+        controls.target.lerpVectors(startTarget, targetTarget, easeProgress);
+        controls.update();
+
+        if (progress < 1) {
+            requestAnimationFrame(animateCamera);
+        }
+    }
+
+    animateCamera();
 }
 
 // Toggle turntable animation

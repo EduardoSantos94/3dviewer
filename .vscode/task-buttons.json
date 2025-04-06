@@ -1,0 +1,8 @@
+[
+  {
+    "task": "Git Commit and Push",
+    "text": "💾 Push",
+    "tooltip": "Stage, commit, and push via .bat",
+    "color": "#4CAF50"
+  }
+]

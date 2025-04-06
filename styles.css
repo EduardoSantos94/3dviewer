@@ -218,26 +218,73 @@ select, input[type="range"], input[type="color"] {
 .model-item {
     display: flex;
     align-items: center;
-    padding: 10px;
-    border-bottom: 1px solid #eee;
-    transition: background-color 0.3s ease;
+    padding: 8px;
+    margin: 4px 0;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.1);
+    transition: background-color 0.2s;
 }
 
 .model-item:hover {
-    background-color: #f5f5f5;
+    background: rgba(255, 255, 255, 0.2);
 }
 
 .model-item.selected {
-    background-color: #e3f2fd;
+    background: rgba(255, 255, 255, 0.3);
 }
 
 .model-item label {
-    flex-grow: 1;
-    margin: 0 10px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    flex: 1;
+    margin: 0 8px;
     cursor: pointer;
+    user-select: none;
+}
+
+.model-item i {
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 4px;
+    transition: background-color 0.2s;
+}
+
+.model-item i:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.model-item input[type="checkbox"] {
+    margin-right: 8px;
+}
+
+/* Hide the default checkbox */
+.model-item input[type="checkbox"] {
+    display: none;
+}
+
+/* Style the custom checkbox */
+.model-item input[type="checkbox"] + label:before {
+    content: '';
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    margin-right: 8px;
+    border: 2px solid #666;
+    border-radius: 3px;
+    vertical-align: middle;
+    cursor: pointer;
+}
+
+.model-item input[type="checkbox"]:checked + label:before {
+    background-color: #666;
+    border-color: #666;
+}
+
+/* Add a checkmark */
+.model-item input[type="checkbox"]:checked + label:after {
+    content: '✓';
+    position: absolute;
+    left: 4px;
+    color: white;
+    font-size: 12px;
 }
 
 .model-item-actions {
