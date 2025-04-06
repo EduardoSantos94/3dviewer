@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>3D Jewelry Viewer</title>
     <link rel="stylesheet" href="styles.css">
+    <script src="https://files.mcneel.com/rhino3dm/js/rhino3dm.js"></script>
     <script type="importmap">
     {
         "imports": {
@@ -18,31 +19,37 @@
 <body>
     <div class="container">
         <div id="viewer-container">
+            <!-- Loading Indicator -->
+            <div id="loading-indicator" class="loading-indicator">
+                <div class="loading-spinner"></div>
+                <p>Loading 3D viewer...</p>
+            </div>
+
             <!-- Frontpage -->
             <div id="frontpage" class="frontpage">
                 <div class="frontpage-content">
                     <h1>3D Jewelry Viewer</h1>
-                    <p>View and interact with your 3D jewelry models in stunning detail</p>
-                    <div class="cta-buttons">
-                        <button id="start-viewing" class="cta-button">
-                            <i class="fas fa-cube"></i> Start Viewing
-                        </button>
-                        <div class="supported-formats">
-                            <p>Supported formats: .3dm, .stl, .obj, .gltf, .glb</p>
-                        </div>
+                    <p>View and interact with your 3D jewelry models in high quality</p>
+                    <button id="start-viewing" class="cta-button">Start Viewing</button>
+                    <div class="supported-formats">
+                        <p>Supported formats:</p>
+                        <ul>
+                            <li>.3dm (Rhino)</li>
+                            <li>.stl</li>
+                            <li>.obj</li>
+                            <li>.gltf/.glb</li>
+                        </ul>
                     </div>
                 </div>
             </div>
 
             <!-- Drop Zone -->
-            <div id="drop-zone" class="drop-zone">
+            <div id="drop-zone" class="drop-zone" style="display: none;">
                 <i class="fas fa-cloud-upload-alt"></i>
-                <p>Drag & drop your 3D file here</p>
+                <p>Drag and drop your 3D files here</p>
                 <p>or</p>
-                <button id="add-model" class="add-model-btn">
-                    <i class="fas fa-plus"></i> Add Model
-                </button>
-                <input type="file" id="file-input" accept=".stl,.obj,.gltf,.glb,.3dm" multiple style="display: none;">
+                <button id="add-model" class="add-model-btn">Add Model</button>
+                <input type="file" id="file-input" accept=".3dm,.stl,.obj,.gltf,.glb" multiple style="display: none;">
             </div>
 
             <!-- Controls Panel -->

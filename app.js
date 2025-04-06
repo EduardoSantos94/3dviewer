@@ -20,13 +20,11 @@ let turntableClock = new THREE.Clock();
 let turntableSpeed = 0.5; // radians per second
 let composer;
 let bloomPass;
-
-// Initialize rhino3dm
-let rhino = null;
+let rhino3dmModule = null;
 
 // Function to check if rhino3dm is loaded
 function isRhino3dmLoaded() {
-    return typeof rhino3dm !== 'undefined';
+    return typeof rhino3dm !== 'undefined' && rhino3dm !== null;
 }
 
 // Function to wait for rhino3dm to load
@@ -35,9 +33,10 @@ async function waitForRhino3dm(maxAttempts = 50, interval = 100) {
         let attempts = 0;
         const check = () => {
             if (isRhino3dmLoaded()) {
+                console.log('rhino3dm loaded successfully');
                 resolve();
             } else if (attempts >= maxAttempts) {
-                reject(new Error('Failed to load rhino3dm'));
+                reject(new Error('Failed to load rhino3dm after ' + maxAttempts + ' attempts'));
             } else {
                 attempts++;
                 setTimeout(check, interval);
@@ -47,35 +46,70 @@ async function waitForRhino3dm(maxAttempts = 50, interval = 100) {
     });
 }
 
+// Show loading indicator
+function showLoadingIndicator() {
+    const loadingIndicator = document.getElementById('loading-indicator');
+    if (loadingIndicator) {
+        loadingIndicator.style.display = 'block';
+    }
+}
+
+// Hide loading indicator
+function hideLoadingIndicator() {
+    const loadingIndicator = document.getElementById('loading-indicator');
+    if (loadingIndicator) {
+        loadingIndicator.style.display = 'none';
+    }
+}
+
+// Show frontpage
+function showFrontpage() {
+    const frontpage = document.getElementById('frontpage');
+    if (frontpage) {
+        frontpage.style.display = 'block';
+    }
+}
+
 // Initialize the application
 async function initializeApp() {
     try {
-        // Wait for rhino3dm to be available
-        if (!isRhino3dmLoaded()) {
-            console.log('Waiting for rhino3dm to load...');
-            await waitForRhino3dm();
-        }
+        showLoadingIndicator();
+        console.log('Starting application initialization...');
 
-        // Initialize rhino3dm
-        rhino = await rhino3dm();
-        console.log('✅ Rhino3dm loaded');
-
-        // Initialize the rest of the application
+        // Initialize Three.js scene and components
         init();
         setupEventListeners();
         animate();
+
+        // Try to load rhino3dm
+        try {
+            console.log('Loading rhino3dm...');
+            rhino3dmModule = await rhino3dm();
+            console.log('✅ Rhino3dm loaded successfully');
+        } catch (error) {
+            console.error('Failed to load rhino3dm:', error);
+            // Continue without rhino3dm - other file formats will still work
+        }
+
+        // Hide loading indicator and show frontpage
+        hideLoadingIndicator();
+        showFrontpage();
     } catch (error) {
         console.error('Failed to initialize:', error);
+        hideLoadingIndicator();
         alert('Failed to initialize 3D viewer. Please refresh the page and ensure you have a stable internet connection.');
     }
 }
 
 // Start initialization when the page loads
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initializeApp);
-} else {
-    initializeApp();
-}
+document.addEventListener('DOMContentLoaded', () => {
+    console.log('DOM content loaded, starting initialization...');
+    initializeApp().catch(error => {
+        console.error('Initialization error:', error);
+        hideLoadingIndicator();
+        alert('Failed to initialize 3D viewer. Please refresh the page and ensure you have a stable internet connection.');
+    });
+});
 
 // Material presets with outline
 const materialPresets = {
@@ -424,10 +458,8 @@ function getLoaderForFile(filename) {
         case 'glb':
             return new GLTFLoader();
         case '3dm':
-            console.log('Creating Rhino3dmLoader');
-            const loader = new Rhino3dmLoader();
-            loader.setLibraryPath('https://files.mcneel.com/rhino3dm/js/');
-            return loader;
+            console.log('Using Rhino3dmLoader');
+            return rhino3dmModule;
         default:
             console.log('No loader found for extension:', extension);
             return null;
@@ -527,24 +559,23 @@ function convertRhinoMeshToThree(rhinoMesh) {
 
 // Handle files
 async function handleFiles(files) {
-    if (!rhino) {
-        console.error("Rhino3dm not initialized");
-        alert("3D viewer not fully initialized. Please refresh the page.");
-        return;
-    }
-
     for (let i = 0; i < files.length; i++) {
         const file = files[i];
         console.log('Processing file:', file.name);
         
         if (file.name.toLowerCase().endsWith('.3dm')) {
-            console.log('Loading 3DM file:', file.name);
+            // Check if rhino3dm is available
+            if (!rhino3dmModule) {
+                alert('Rhino3DM support is not available. Please try refreshing the page.');
+                continue;
+            }
+
+            // For 3DM files, use rhino3dm directly
             const reader = new FileReader();
-            
-            reader.onload = function(event) {
+            reader.onload = async function(event) {
                 try {
                     const buffer = new Uint8Array(event.target.result);
-                    const doc = rhino.File3dm.fromByteArray(buffer);
+                    const doc = rhino3dmModule.File3dm.fromByteArray(buffer);
                     
                     if (!doc) {
                         console.error('Failed to parse 3DM file:', file.name);
@@ -562,32 +593,28 @@ async function handleFiles(files) {
                         
                         if (geometry) {
                             try {
-                                if (geometry.objectType === rhino.ObjectType.Mesh) {
+                                if (geometry.objectType === rhino3dmModule.ObjectType.Mesh) {
                                     console.log('Processing Mesh geometry');
                                     const mesh = convertRhinoMeshToThree(geometry);
                                     if (mesh) {
                                         model.add(mesh);
                                     }
-                                } else if (geometry.objectType === rhino.ObjectType.Brep || 
-                                         geometry.objectType === rhino.ObjectType.Surface ||
-                                         geometry.objectType === rhino.ObjectType.SubD) {
+                                } else if (geometry.objectType === rhino3dmModule.ObjectType.Brep || 
+                                         geometry.objectType === rhino3dmModule.ObjectType.Surface ||
+                                         geometry.objectType === rhino3dmModule.ObjectType.SubD) {
                                     console.log('Processing Brep/Surface/SubD geometry');
-                                    // Create meshing parameters
-                                    const mp = new rhino.MeshingParameters();
-                                    // Adjust quality settings
+                                    const mp = new rhino3dmModule.MeshingParameters();
                                     mp.gridMinCount = 16;
                                     mp.gridMaxCount = 256;
                                     mp.gridAngle = 0;
                                     mp.gridAspectRatio = 1;
                                     mp.simplePlanes = false;
                                     mp.refineGrid = true;
-                                    mp.elementParams = null;
                                     
                                     let meshes = null;
                                     
-                                    if (geometry.objectType === rhino.ObjectType.Brep) {
+                                    if (geometry.objectType === rhino3dmModule.ObjectType.Brep) {
                                         console.log('Converting Brep to mesh');
-                                        // For Brep, we need to create a mesh directly
                                         const faces = geometry.faces();
                                         meshes = [];
                                         
@@ -601,13 +628,13 @@ async function handleFiles(files) {
                                         }
                                         
                                         faces.delete();
-                                    } else if (geometry.objectType === rhino.ObjectType.Surface) {
+                                    } else if (geometry.objectType === rhino3dmModule.ObjectType.Surface) {
                                         console.log('Converting Surface to mesh');
                                         const mesh = geometry.getMesh(mp);
                                         if (mesh) {
                                             meshes = [mesh];
                                         }
-                                    } else if (geometry.objectType === rhino.ObjectType.SubD) {
+                                    } else if (geometry.objectType === rhino3dmModule.ObjectType.SubD) {
                                         console.log('Converting SubD to mesh');
                                         const mesh = geometry.getMesh(mp);
                                         if (mesh) {
@@ -644,7 +671,6 @@ async function handleFiles(files) {
                         alert('No valid geometry found in the 3DM file.');
                     }
                     
-                    // Clean up
                     objects.delete();
                     doc.delete();
                     
@@ -661,23 +687,23 @@ async function handleFiles(files) {
             
             reader.readAsArrayBuffer(file);
         } else {
-            // Handle other file types as before
-            const reader = new FileReader();
-            reader.onload = function(event) {
-                const loader = getLoaderForFile(file.name);
-                if (loader) {
-                    loader.load(
-                        event.target.result,
-                        function(object) { loadModel(object, file.name); },
-                        undefined,
-                        function(error) { 
-                            console.error('Error loading model:', error);
-                            alert('Error loading model: ' + error.message);
-                        }
-                    );
+            // For other file types, use the appropriate loader
+            const loader = getLoaderForFile(file.name);
+            if (loader) {
+                try {
+                    const object = await new Promise((resolve, reject) => {
+                        const reader = new FileReader();
+                        reader.onload = function(event) {
+                            loader.load(event.target.result, resolve, undefined, reject);
+                        };
+                        reader.readAsDataURL(file);
+                    });
+                    loadModel(object, file.name);
+                } catch (error) {
+                    console.error('Error loading file:', file.name, error);
+                    alert(`Error loading file ${file.name}: ${error.message}`);
                 }
-            };
-            reader.readAsDataURL(file);
+            }
         }
     }
 }
