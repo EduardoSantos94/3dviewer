@@ -391,7 +391,7 @@ function loadModel(object, fileName) {
         outlineMesh.userData.isOutline = true; // Mark as outline mesh
         mesh.add(outlineMesh);
     } else if (object instanceof THREE.Group || object instanceof THREE.Mesh) {
-        // For OBJ and GLTF files
+        // For OBJ, GLTF, and 3DM files
         mesh = object;
         
         // Apply material to all meshes in the group
