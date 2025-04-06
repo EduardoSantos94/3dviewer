@@ -121,61 +121,58 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 });
 
-// Material presets with outline
+// Material presets with improved quality
 const materialPresets = {
     yellow: new THREE.MeshPhysicalMaterial({
         color: 0xffd700,
-        metalness: 1.0,
-        roughness: 0.2,
-        clearcoat: 1.0,
-        clearcoatRoughness: 0.1,
-        reflectivity: 1.0,
-        envMapIntensity: 1.0,
-        emissive: new THREE.Color(0x000000),
-        emissiveIntensity: 0.1
+        metalness: 0.7,
+        roughness: 0.3,
+        clearcoat: 0.4,
+        clearcoatRoughness: 0.2,
+        reflectivity: 0.8,
+        envMapIntensity: 0.7,
+        side: THREE.DoubleSide
     }),
     rose: new THREE.MeshPhysicalMaterial({
         color: 0xe6b3b3,
-        metalness: 1.0,
-        roughness: 0.2,
-        clearcoat: 1.0,
-        clearcoatRoughness: 0.1,
-        reflectivity: 1.0,
-        envMapIntensity: 1.0,
-        emissive: new THREE.Color(0x000000),
-        emissiveIntensity: 0.1
+        metalness: 0.7,
+        roughness: 0.3,
+        clearcoat: 0.4,
+        clearcoatRoughness: 0.2,
+        reflectivity: 0.8,
+        envMapIntensity: 0.7,
+        side: THREE.DoubleSide
     }),
     white: new THREE.MeshPhysicalMaterial({
         color: 0xffffff,
-        metalness: 1.0,
-        roughness: 0.2,
-        clearcoat: 1.0,
-        clearcoatRoughness: 0.1,
-        reflectivity: 1.0,
-        envMapIntensity: 1.0,
-        emissive: new THREE.Color(0x000000),
-        emissiveIntensity: 0.1
+        metalness: 0.7,
+        roughness: 0.3,
+        clearcoat: 0.4,
+        clearcoatRoughness: 0.2,
+        reflectivity: 0.8,
+        envMapIntensity: 0.7,
+        side: THREE.DoubleSide
     }),
     fastYellow: new THREE.MeshStandardMaterial({
         color: 0xffd700,
-        metalness: 0.8,
-        roughness: 0.3,
-        emissive: new THREE.Color(0x000000),
-        emissiveIntensity: 0.1
+        metalness: 0.9,
+        roughness: 0.1,
+        envMapIntensity: 2.0,
+        side: THREE.DoubleSide
     }),
     fastRose: new THREE.MeshStandardMaterial({
         color: 0xe6b8b7,
-        metalness: 0.8,
-        roughness: 0.3,
-        emissive: new THREE.Color(0x000000),
-        emissiveIntensity: 0.1
+        metalness: 0.9,
+        roughness: 0.1,
+        envMapIntensity: 2.0,
+        side: THREE.DoubleSide
     }),
     fastWhite: new THREE.MeshStandardMaterial({
         color: 0xffffff,
-        metalness: 0.8,
-        roughness: 0.3,
-        emissive: new THREE.Color(0x000000),
-        emissiveIntensity: 0.1
+        metalness: 0.9,
+        roughness: 0.1,
+        envMapIntensity: 2.0,
+        side: THREE.DoubleSide
     })
 };
 
@@ -226,31 +223,33 @@ function init() {
         logarithmicDepthBuffer: true
     });
     renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.0;
+    renderer.toneMappingExposure = 0.8;
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
     document.getElementById('viewer-container').appendChild(renderer.domElement);
 
-    // Setup post-processing
+    // Setup post-processing with improved settings
     composer = new EffectComposer(renderer);
     const renderPass = new RenderPass(scene, camera);
     composer.addPass(renderPass);
 
-    // Add bloom effect with improved settings
+    // Add subtle bloom for metallic highlights
     bloomPass = new UnrealBloomPass(
         new THREE.Vector2(window.innerWidth, window.innerHeight),
-        0.3, // strength
-        0.5, // radius
-        0.7  // threshold
+        0.2,  // strength
+        0.5,  // radius
+        0.8   // threshold
     );
     composer.addPass(bloomPass);
 
-    // Add lights with improved settings
+    // Studio lighting setup
     ambientLight = new THREE.AmbientLight(0xffffff, 0.3);
     scene.add(ambientLight);
 
+    // Key light
     directionalLight = new THREE.DirectionalLight(0xffffff, 0.7);
     directionalLight.position.set(5, 5, 5);
     directionalLight.castShadow = true;
@@ -261,35 +260,52 @@ function init() {
     directionalLight.shadow.bias = -0.0001;
     scene.add(directionalLight);
 
-    // Add fill lights for better material rendering
-    const fillLight1 = new THREE.DirectionalLight(0xffffff, 0.3);
-    fillLight1.position.set(-5, 2, 2);
-    scene.add(fillLight1);
+    // Fill light
+    const fillLight = new THREE.DirectionalLight(0xffffff, 0.3);
+    fillLight.position.set(-5, 2, 2);
+    scene.add(fillLight);
 
-    const fillLight2 = new THREE.DirectionalLight(0xffffff, 0.3);
-    fillLight2.position.set(5, -2, -2);
-    scene.add(fillLight2);
+    // Rim light for edge definition
+    const rimLight = new THREE.DirectionalLight(0xffffff, 0.2);
+    rimLight.position.set(0, -5, -5);
+    scene.add(rimLight);
 
-    // Add environment map for better reflections
-    const envMapLoader = new THREE.CubeTextureLoader();
-    const envMap = envMapLoader.load([
-        'https://threejs.org/examples/textures/cube/SwedishRoyalCastle/px.jpg',
-        'https://threejs.org/examples/textures/cube/SwedishRoyalCastle/nx.jpg',
-        'https://threejs.org/examples/textures/cube/SwedishRoyalCastle/py.jpg',
-        'https://threejs.org/examples/textures/cube/SwedishRoyalCastle/ny.jpg',
-        'https://threejs.org/examples/textures/cube/SwedishRoyalCastle/pz.jpg',
-        'https://threejs.org/examples/textures/cube/SwedishRoyalCastle/nz.jpg'
-    ]);
+    // Create studio environment
+    const pmremGenerator = new THREE.PMREMGenerator(renderer);
+    pmremGenerator.compileEquirectangularShader();
+
+    // Create a simple gradient environment
+    const canvas = document.createElement('canvas');
+    canvas.width = 1024;
+    canvas.height = 512;
+    const context = canvas.getContext('2d');
+    const gradient = context.createLinearGradient(0, 0, 0, canvas.height);
+    gradient.addColorStop(0, '#ffffff');
+    gradient.addColorStop(1, '#e0e0e0');
+    context.fillStyle = gradient;
+    context.fillRect(0, 0, canvas.width, canvas.height);
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.mapping = THREE.EquirectangularReflectionMapping;
+    
+    const envMap = pmremGenerator.fromEquirectangular(texture).texture;
     scene.environment = envMap;
+    scene.background = new THREE.Color(0xf5f5f5); // Keep neutral background
 
-    // Add ground plane
+    texture.dispose();
+    pmremGenerator.dispose();
+
+    // Add ground plane with shadow and reflection
     const planeGeometry = new THREE.PlaneGeometry(100, 100);
     const planeMaterial = new THREE.MeshStandardMaterial({
-        color: 0xcccccc,
+        color: 0xf0f0f0,
+        metalness: 0.0,
+        roughness: 0.7,
         side: THREE.DoubleSide
     });
     groundPlane = new THREE.Mesh(planeGeometry, planeMaterial);
     groundPlane.rotation.x = -Math.PI / 2;
+    groundPlane.position.y = -0.001;
     groundPlane.receiveShadow = true;
     scene.add(groundPlane);
 
@@ -371,17 +387,35 @@ function setupEventListeners() {
     // Window resize
     window.addEventListener('resize', onWindowResize);
 
-    // File input
+    // File input handling
     const fileInput = document.getElementById('file-input');
     const addModelBtn = document.getElementById('add-model');
     
     if (fileInput) {
-        fileInput.addEventListener('change', handleFileSelect);
+        // Remove any existing listeners
+        const newFileInput = fileInput.cloneNode(true);
+        fileInput.parentNode.replaceChild(newFileInput, fileInput);
+        
+        newFileInput.addEventListener('change', (event) => {
+            console.log('File input change event triggered');
+            const files = event.target.files;
+            if (files && files.length > 0) {
+                handleFiles(files);
+            }
+        });
     }
 
     if (addModelBtn) {
-        addModelBtn.addEventListener('click', () => {
-            fileInput.click();
+        // Remove any existing listeners
+        const newAddModelBtn = addModelBtn.cloneNode(true);
+        addModelBtn.parentNode.replaceChild(newAddModelBtn, addModelBtn);
+        
+        newAddModelBtn.addEventListener('click', () => {
+            console.log('Add model button clicked');
+            const fileInput = document.getElementById('file-input');
+            if (fileInput) {
+                fileInput.click();
+            }
         });
     }
 
@@ -478,7 +512,22 @@ function getLoaderForFile(filename) {
     }
 }
 
-// Handle files with proper rhino3dm checking
+// Update meshing parameters for better quality
+function getMeshingParameters(rhino) {
+    const mp = new rhino.MeshingParameters();
+    mp.gridMinCount = 50;      // Increase from 16 for better detail
+    mp.gridMaxCount = 512;     // Increase from 256 for better detail
+    mp.gridAngle = 15;         // Decrease for smoother curves
+    mp.gridAspectRatio = 1.5;  // Adjust for better mesh quality
+    mp.simplePlanes = false;   // Don't simplify planar surfaces
+    mp.refineGrid = true;      // Enable grid refinement
+    mp.simplifyMesh = false;   // Don't simplify the resulting mesh
+    mp.packNormals = true;     // Pack normals for better quality
+    mp.tolerance = 0.01;       // Set tolerance for better accuracy
+    return mp;
+}
+
+// Update file handling to ensure single-click works
 async function handleFiles(files) {
     if (!files || files.length === 0) return;
 
@@ -490,7 +539,6 @@ async function handleFiles(files) {
         hideFrontpage();
 
         if (extension === '3dm') {
-            // Check if rhino is initialized
             if (!rhino) {
                 throw new Error('rhino3dm is not initialized. Please refresh the page and try again.');
             }
@@ -509,6 +557,9 @@ async function handleFiles(files) {
                 const group = new THREE.Group();
                 let geometryFound = false;
 
+                // Get improved meshing parameters
+                const mp = getMeshingParameters(rhino);
+
                 for (let i = 0; i < objects.count; i++) {
                     const obj = objects.get(i);
                     const geometry = obj.geometry();
@@ -525,14 +576,7 @@ async function handleFiles(files) {
                             } else if (geometry.objectType === rhino.ObjectType.Brep || 
                                      geometry.objectType === rhino.ObjectType.Surface ||
                                      geometry.objectType === rhino.ObjectType.SubD) {
-                                console.log('Processing Brep/Surface/SubD geometry');
-                                const mp = new rhino.MeshingParameters();
-                                mp.gridMinCount = 16;
-                                mp.gridMaxCount = 256;
-                                mp.gridAngle = 0;
-                                mp.gridAspectRatio = 1;
-                                mp.simplePlanes = false;
-                                mp.refineGrid = true;
+                                console.log(`Processing ${geometry.objectType} geometry`);
                                 
                                 let meshes = null;
 
@@ -571,8 +615,6 @@ async function handleFiles(files) {
                                         }
                                     });
                                 }
-                                
-                                mp.delete();
                             }
                             geometry.delete();
                         } catch (error) {
@@ -582,11 +624,29 @@ async function handleFiles(files) {
                     obj.delete();
                 }
 
+                mp.delete();
                 objects.delete();
                 doc.delete();
 
                 if (geometryFound) {
                     loadModel(group, file.name);
+                    
+                    // Ensure controls panel and center button are visible
+                    const controlsPanel = document.querySelector('.controls-panel');
+                    if (controlsPanel) {
+                        controlsPanel.style.display = 'block';
+                        
+                        // Make sure center button exists and is visible
+                        const centerBtn = document.getElementById('center-model');
+                        if (!centerBtn) {
+                            const centerBtn = document.createElement('button');
+                            centerBtn.id = 'center-model';
+                            centerBtn.innerHTML = '<i class="fas fa-compress-arrows-alt"></i>';
+                            centerBtn.title = 'Center Model';
+                            centerBtn.addEventListener('click', centerModel);
+                            controlsPanel.appendChild(centerBtn);
+                        }
+                    }
                 } else {
                     throw new Error('No valid geometry found in the 3DM file');
                 }
@@ -629,15 +689,26 @@ async function handleFiles(files) {
     }
 }
 
+// Update convertRhinoMeshToThree function for better material handling
 function convertRhinoMeshToThree(rhinoMesh) {
     const vertices = rhinoMesh.vertices();
     const faces = rhinoMesh.faces();
     
+    if (!vertices || !faces || vertices.count === 0 || faces.count === 0) {
+        console.warn('Invalid mesh data:', { vertexCount: vertices?.count, faceCount: faces?.count });
+        return null;
+    }
+    
     const geometry = new THREE.BufferGeometry();
     const positions = new Float32Array(vertices.count * 3);
     
+    // Get vertices
     for (let i = 0; i < vertices.count; i++) {
         const vertex = vertices.get(i);
+        if (!vertex || vertex.length !== 3) {
+            console.warn('Invalid vertex data at index', i);
+            continue;
+        }
         positions[i * 3] = vertex[0];
         positions[i * 3 + 1] = vertex[1];
         positions[i * 3 + 2] = vertex[2];
@@ -645,24 +716,44 @@ function convertRhinoMeshToThree(rhinoMesh) {
     
     geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
     
+    // Get faces
     const indices = [];
     for (let i = 0; i < faces.count; i++) {
         const face = faces.get(i);
+        if (!face || face.length < 3) {
+            console.warn('Invalid face data at index', i);
+            continue;
+        }
         indices.push(face[0], face[1], face[2]);
+    }
+    
+    if (indices.length === 0) {
+        console.warn('No valid faces found in mesh');
+        return null;
     }
     
     geometry.setIndex(indices);
     geometry.computeVertexNormals();
     
-    return new THREE.Mesh(
+    // Create mesh with improved material settings
+    const mesh = new THREE.Mesh(
         geometry,
-        new THREE.MeshStandardMaterial({
-            color: 0x808080,
-            metalness: 0.5,
-            roughness: 0.5,
+        new THREE.MeshPhysicalMaterial({
+            color: 0xffd700,
+            metalness: 0.7,
+            roughness: 0.3,
+            clearcoat: 0.4,
+            clearcoatRoughness: 0.2,
+            reflectivity: 0.8,
+            envMapIntensity: 0.7,
             side: THREE.DoubleSide
         })
     );
+    
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    
+    return mesh;
 }
 
 // Load model into scene
@@ -1002,11 +1093,18 @@ function handleClick(event) {
     }
 }
 
-// Handle window resize
+// Handle window resize with improved handling
 function onWindowResize() {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
+    
     renderer.setSize(window.innerWidth, window.innerHeight);
+    composer.setSize(window.innerWidth, window.innerHeight);
+    
+    // Update pixel ratio on resize
+    const pixelRatio = Math.min(window.devicePixelRatio, 2);
+    renderer.setPixelRatio(pixelRatio);
+    composer.setPixelRatio(pixelRatio);
 }
 
 // Animation loop
@@ -1221,4 +1319,17 @@ function zoomToFit(object, camera, controls) {
     }
 
     animateCamera();
+}
+
+// Handle drop events
+function handleDrop(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const dt = e.dataTransfer;
+    const files = dt.files;
+
+    if (files && files.length > 0) {
+        handleFiles(files);
+    }
 }
