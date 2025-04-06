@@ -11,6 +11,9 @@ let groundPlane = null;
 let selectedObject = null;
 let ambientLight, directionalLight;
 let isDarkBackground = false;
+let isTurntableActive = false;
+let turntableClock = new THREE.Clock();
+let turntableSpeed = 0.5; // radians per second
 
 // Material presets with outline
 const materialPresets = {
@@ -150,6 +153,19 @@ function init() {
     controls.panSpeed = 0.5;
     controls.rotateSpeed = 0.5;
     controls.zoomSpeed = 0.5;
+    controls.screenSpacePanning = true;
+    controls.mouseButtons = {
+        LEFT: THREE.MOUSE.ROTATE,
+        MIDDLE: THREE.MOUSE.DOLLY,
+        RIGHT: THREE.MOUSE.PAN
+    };
+
+    // Add double-click handler for camera reset
+    renderer.domElement.addEventListener('dblclick', (event) => {
+        if (event.target === renderer.domElement) {
+            resetCamera();
+        }
+    });
 
     // Setup event listeners
     setupEventListeners();
@@ -218,6 +234,17 @@ function setupEventListeners() {
     if (toggleFloorBtn) toggleFloorBtn.addEventListener('click', toggleFloor);
     if (toggleBackgroundBtn) toggleBackgroundBtn.addEventListener('click', toggleBackground);
     if (toggleSidebarBtn) toggleSidebarBtn.addEventListener('click', toggleSidebar);
+
+    // Add turntable button event listener
+    const toggleTurntableBtn = document.getElementById('toggle-turntable');
+    if (toggleTurntableBtn) {
+        toggleTurntableBtn.addEventListener('click', () => {
+            if (selectedObject) {
+                toggleTurntable();
+                toggleTurntableBtn.classList.toggle('active', isTurntableActive);
+            }
+        });
+    }
 
     // Click handling for object selection
     renderer.domElement.addEventListener('click', handleClick);
@@ -596,17 +623,22 @@ function handleClick(event) {
     if (intersects.length > 0) {
         const selected = intersects[0].object;
         
-        // Remove previous selection
-        if (selectedObject) {
-            // outlineEffect.selectedObjects = [];
+        // Find the parent model in our models array
+        let parentModel = null;
+        for (const model of models) {
+            if (model.mesh === selected || model.mesh.children.includes(selected)) {
+                parentModel = model.mesh;
+                break;
+            }
         }
         
-        // Set new selection
-        selectedObject = selected;
-        // outlineEffect.selectedObjects = [selected];
+        if (parentModel) {
+            selectedObject = parentModel;
+            // Stop turntable if it was active
+            isTurntableActive = false;
+            turntableClock.stop();
+        }
     } else {
-        // Clear selection if clicking empty space
-        // outlineEffect.selectedObjects = [];
         selectedObject = null;
     }
 }
@@ -621,6 +653,13 @@ function onWindowResize() {
 // Animation loop
 function animate() {
     requestAnimationFrame(animate);
+    
+    // Update turntable animation if active
+    if (isTurntableActive && selectedObject) {
+        const delta = turntableClock.getDelta();
+        selectedObject.rotation.y += turntableSpeed * delta;
+    }
+    
     controls.update();
     renderer.render(scene, camera);
 }
@@ -678,6 +717,24 @@ function toggleSidebar() {
     const controlsPanel = document.querySelector('.controls-panel');
     if (controlsPanel) {
         controlsPanel.classList.toggle('hidden');
+    }
+}
+
+// Reset camera to default position
+function resetCamera() {
+    camera.position.set(0, 3, 5);
+    camera.lookAt(0, 0, 0);
+    controls.target.set(0, 0, 0);
+    controls.update();
+}
+
+// Toggle turntable animation
+function toggleTurntable() {
+    isTurntableActive = !isTurntableActive;
+    if (isTurntableActive) {
+        turntableClock.start();
+    } else {
+        turntableClock.stop();
     }
 }
 
