@@ -363,7 +363,15 @@ function convertRhinoMeshToThree(rhinoMesh) {
 
         for (let i = 0; i < verts.count; i++) {
             const pt = verts.get(i);
-            if (pt && typeof pt.x === 'number' && typeof pt.y === 'number' && typeof pt.z === 'number') {
+            // Handle both array and object vertex formats
+            if (Array.isArray(pt)) {
+                if (pt.length >= 3 && pt.every(coord => typeof coord === 'number')) {
+                    vertices.push(pt[0], pt[1], pt[2]);
+                } else {
+                    console.error('Invalid array vertex data at index', i, pt);
+                    return null;
+                }
+            } else if (pt && typeof pt.x === 'number' && typeof pt.y === 'number' && typeof pt.z === 'number') {
                 vertices.push(pt.x, pt.y, pt.z);
             } else {
                 console.error('Invalid vertex data at index', i, pt);
@@ -379,8 +387,24 @@ function convertRhinoMeshToThree(rhinoMesh) {
 
         for (let i = 0; i < faces.count; i++) {
             const face = faces.get(i);
-            if (face && typeof face.a === 'number' && typeof face.b === 'number' && typeof face.c === 'number') {
+            // Handle both array and object face formats
+            if (Array.isArray(face)) {
+                if (face.length >= 3 && face.every(idx => typeof idx === 'number')) {
+                    indices.push(face[0], face[1], face[2]);
+                    // Handle quad faces if present
+                    if (face.length === 4) {
+                        indices.push(face[2], face[3], face[0]);
+                    }
+                } else {
+                    console.error('Invalid array face data at index', i, face);
+                    return null;
+                }
+            } else if (face && typeof face.a === 'number' && typeof face.b === 'number' && typeof face.c === 'number') {
                 indices.push(face.a, face.b, face.c);
+                // Handle quad faces if present
+                if (typeof face.d === 'number' && face.d !== face.c) {
+                    indices.push(face.c, face.d, face.a);
+                }
             } else {
                 console.error('Invalid face data at index', i, face);
                 return null;
