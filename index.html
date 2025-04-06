@@ -6,7 +6,7 @@
     <title>3D Jewelry Viewer</title>
     <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <script src="https://unpkg.com/rhino3dm@latest/rhino3dm.min.js"></script>
+    <script src="https://unpkg.com/rhino3dm@latest/rhino3dm.min.js?v=1"></script>
     <script type="importmap">
         {
             "imports": {
@@ -23,7 +23,7 @@
             <p>Drag and drop 3D files here</p>
             <p>or</p>
             <label class="btn">Choose File
-                <input type="file" id="file-input" accept="model/3dm,.3dm,.stl,.obj,.gltf,.glb" multiple style="display: none;">
+                <input type="file" id="file-input" accept=".3dm,model/3dm,.stl,.obj,.gltf,.glb" multiple style="display: none;">
             </label>
         </div>
         <div class="controls-panel">
