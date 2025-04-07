@@ -606,6 +606,7 @@ footer a:hover {
     flex: 1;
     position: relative;
     height: 100%;
+    background-color: #f5f5f5;
 }
 
 .ui-sidebar {
@@ -789,4 +790,180 @@ footer {
     .viewer-area {
         height: 60vh;
     }
+}
+
+/* Update button styles for a more modern look */
+.controls-panel button {
+    background-color: #f8f8f8;
+    border: none;
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin: 5px;
+    font-size: 14px;
+    color: #333;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    transition: all 0.2s ease;
+    cursor: pointer;
+}
+
+.controls-panel button:hover {
+    background-color: #fff;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    transform: translateY(-1px);
+}
+
+.controls-panel button:active {
+    transform: translateY(1px);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+}
+
+.controls-panel button i {
+    margin-right: 5px;
+}
+
+/* Fix brightness issues by adjusting materials/lighting */
+.viewer-area {
+    background-color: #f5f5f5;
+}
+
+/* Control sliders with a more modern look */
+input[type="range"] {
+    -webkit-appearance: none;
+    width: 100%;
+    height: 4px;
+    border-radius: 2px;
+    background: #ddd;
+    outline: none;
+    margin: 10px 0;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #4285f4;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+input[type="range"]::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #4285f4;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+input[type="range"]::-webkit-slider-thumb:hover {
+    background: #5c9aff;
+    box-shadow: 0 0 0 8px rgba(66, 133, 244, 0.15);
+}
+
+input[type="range"]::-moz-range-thumb:hover {
+    background: #5c9aff;
+    box-shadow: 0 0 0 8px rgba(66, 133, 244, 0.15);
+}
+
+/* Control buttons grid layout */
+.control-buttons {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: 15px;
+}
+
+/* Fix duplicate models header */
+.ui-sidebar h3 {
+    margin-top: 20px;
+    margin-bottom: 10px;
+    font-size: 18px;
+    font-weight: 500;
+    color: #333;
+    border-bottom: 1px solid #eaeaea;
+    padding-bottom: 8px;
+}
+
+/* Style select dropdowns for material selection */
+select {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    background-color: white;
+    font-size: 14px;
+    cursor: pointer;
+    appearance: none;
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23333' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right 8px center;
+    background-size: 16px;
+}
+
+select:hover {
+    border-color: #aaa;
+}
+
+select:focus {
+    outline: none;
+    border-color: #4285f4;
+    box-shadow: 0 0 0 3px rgba(66, 133, 244, 0.15);
+}
+
+/* Add styles for button states */
+.controls-panel button.active {
+    background-color: #4285f4;
+    color: white;
+}
+
+/* Improve model list appearance */
+.model-item {
+    background: white;
+    border-radius: 8px;
+    padding: 8px 12px;
+    margin-bottom: 8px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    transition: all 0.2s ease;
+}
+
+.model-item:hover {
+    box-shadow: 0 2px 5px rgba(0,0,0,0.15);
+}
+
+.model-item.selected {
+    border-left: 3px solid #4285f4;
+    background-color: #f0f7ff;
+}
+
+.model-action-btn {
+    background: transparent;
+    border: none;
+    padding: 4px 8px;
+    color: #666;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.model-action-btn:hover {
+    background-color: #f5f5f5;
+    color: #333;
+}
+
+.delete-btn:hover {
+    color: #d93025;
+}
+
+/* Add this to make sure we don't have duplicate Models headers */
+.model-list > h3:first-of-type {
+    display: block;
+}
+
+.model-list > h3:not(:first-of-type) {
+    display: none;
 } 

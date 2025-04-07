@@ -11,6 +11,7 @@ import { Rhino3dmLoader } from 'three/addons/loaders/3DMLoader.js';
 // Initialize Three.js scene
 let scene, camera, renderer, controls;
 let models = []; // Array to store multiple models
+let loadedMeshes = []; // Array to track all meshes for disposal
 let groundPlane = null;
 let selectedObject = null;
 let ambientLight, directionalLight;
@@ -140,57 +141,36 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 });
 
-// Improved material settings for better rendering quality
+// Update material presets for better quality
 const materialPresets = {
     yellow: new THREE.MeshPhysicalMaterial({
         color: 0xffd700,
-        metalness: 0.85,
-        roughness: 0.12,
-        clearcoat: 0.6,
+        metalness: 0.9,
+        roughness: 0.1,
+        clearcoat: 1.0,
         clearcoatRoughness: 0.1,
-        reflectivity: 0.9,
-        envMapIntensity: 1.2,
+        reflectivity: 1.0,
+        envMapIntensity: 2.0,
         side: THREE.DoubleSide
     }),
     rose: new THREE.MeshPhysicalMaterial({
         color: 0xe6b3b3,
-        metalness: 0.85,
-        roughness: 0.12,
-        clearcoat: 0.6,
+        metalness: 0.9,
+        roughness: 0.1,
+        clearcoat: 1.0,
         clearcoatRoughness: 0.1,
-        reflectivity: 0.9,
-        envMapIntensity: 1.2,
+        reflectivity: 1.0,
+        envMapIntensity: 2.0,
         side: THREE.DoubleSide
     }),
     white: new THREE.MeshPhysicalMaterial({
         color: 0xffffff,
-        metalness: 0.85,
-        roughness: 0.12,
-        clearcoat: 0.6,
+        metalness: 0.9,
+        roughness: 0.1,
+        clearcoat: 1.0,
         clearcoatRoughness: 0.1,
-        reflectivity: 0.9,
-        envMapIntensity: 1.2,
-        side: THREE.DoubleSide
-    }),
-    fastYellow: new THREE.MeshStandardMaterial({
-        color: 0xffd700,
-        metalness: 0.95,
-        roughness: 0.05,
-        envMapIntensity: 1.5,
-        side: THREE.DoubleSide
-    }),
-    fastRose: new THREE.MeshStandardMaterial({
-        color: 0xe6b8b7,
-        metalness: 0.95,
-        roughness: 0.05,
-        envMapIntensity: 1.5,
-        side: THREE.DoubleSide
-    }),
-    fastWhite: new THREE.MeshStandardMaterial({
-        color: 0xffffff,
-        metalness: 0.95,
-        roughness: 0.05,
-        envMapIntensity: 1.5,
+        reflectivity: 1.0,
+        envMapIntensity: 2.0,
         side: THREE.DoubleSide
     })
 };
@@ -223,15 +203,41 @@ const outlineMaterials = {
     })
 };
 
+// Function to clear the scene
+function ClearScene() {
+  loadedMeshes.forEach((mesh) => {
+    scene.remove(mesh);
+    if (mesh.geometry) mesh.geometry.dispose();
+    if (mesh.material) {
+      if (Array.isArray(mesh.material)) {
+        mesh.material.forEach(mat => mat.dispose());
+      } else {
+        mesh.material.dispose();
+      }
+    }
+  });
+  loadedMeshes = [];
+  models = [];
+  selectedObject = null;
+  console.log("🧹 Scene cleared");
+}
+
+// Function to add a model to the scene
+function AddModelToScene(mesh) {
+  scene.add(mesh);
+  loadedMeshes.push(mesh);
+  console.log("📦 Mesh added:", mesh.name || "Unnamed");
+}
+
 // Initialize the scene
-function init() {
+async function init() {
     // Create scene
     scene = new THREE.Scene();
     scene.background = new THREE.Color(0xf5f5f5);
 
     // Create camera with better initial position
     camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
-    camera.position.set(0, 3, 5);
+    camera.position.set(5, 5, 5);
     camera.lookAt(0, 0, 0);
 
     // Create renderer with improved settings
@@ -246,31 +252,31 @@ function init() {
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 0.75; // Slightly reduced for better dynamic range
+    renderer.toneMappingExposure = 0.8;
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     document.getElementById('viewer-container').appendChild(renderer.domElement);
 
-    // Setup post-processing with improved settings
-    composer = new EffectComposer(renderer);
-    const renderPass = new RenderPass(scene, camera);
-    composer.addPass(renderPass);
+    // Setup orbit controls
+    controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+    controls.screenSpacePanning = true;
+    controls.minDistance = 1;
+    controls.maxDistance = 50;
+    controls.maxPolarAngle = Math.PI / 1.5;
+    controls.target.set(0, 0, 0);
 
-    // Add subtle bloom for metallic highlights
-    bloomPass = new UnrealBloomPass(
-        new THREE.Vector2(window.innerWidth, window.innerHeight),
-        0.3,  // strength - slightly increased
-        0.4,  // radius - slightly decreased
-        0.7   // threshold
-    );
-    composer.addPass(bloomPass);
-
-    // Studio lighting setup - improved for jewelry
-    ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
-    scene.add(ambientLight);
-
-    // Key light - brighter and slightly repositioned
-    directionalLight = new THREE.DirectionalLight(0xffffff, 0.9);
-    directionalLight.position.set(5, 8, 5);
+    await loadEnvironmentMap();
+    
+    // Studio lighting setup
+    const hemiLight = new THREE.HemisphereLight(0xffffff, 0xffffff, 0.6);
+    hemiLight.color.setHSL(0.6, 1, 0.6);
+    hemiLight.groundColor.setHSL(0.095, 1, 0.75);
+    hemiLight.position.set(0, 50, 0);
+    scene.add(hemiLight);
+    
+    directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    directionalLight.position.set(0, 10, 10);
     directionalLight.castShadow = true;
     directionalLight.shadow.mapSize.width = 2048;
     directionalLight.shadow.mapSize.height = 2048;
@@ -278,143 +284,55 @@ function init() {
     directionalLight.shadow.camera.far = 500;
     directionalLight.shadow.bias = -0.0001;
     scene.add(directionalLight);
-
-    // Fill light - adjusted for better modeling
-    const fillLight = new THREE.DirectionalLight(0xffffff, 0.5);
-    fillLight.position.set(-5, 3, 2);
-    scene.add(fillLight);
-
-    // Rim light for edge definition - increased intensity
-    const rimLight = new THREE.DirectionalLight(0xffffff, 0.4);
-    rimLight.position.set(0, -3, -5);
-    scene.add(rimLight);
-
-    // Create studio environment
-    const pmremGenerator = new THREE.PMREMGenerator(renderer);
-    pmremGenerator.compileEquirectangularShader();
-
-    // Create a higher quality gradient environment
-    const canvas = document.createElement('canvas');
-    canvas.width = 2048; // Increased for better quality
-    canvas.height = 1024;
-    const context = canvas.getContext('2d');
     
-    // Create a more sophisticated gradient for better reflections
-    const gradient = context.createRadialGradient(
-        canvas.width / 2, canvas.height / 2, 0,
-        canvas.width / 2, canvas.height / 2, canvas.width / 2
-    );
-    gradient.addColorStop(0, '#ffffff');
-    gradient.addColorStop(0.5, '#f5f5f5');
-    gradient.addColorStop(1, '#e0e0e0');
-    context.fillStyle = gradient;
-    context.fillRect(0, 0, canvas.width, canvas.height);
-
-    const texture = new THREE.CanvasTexture(canvas);
-    texture.mapping = THREE.EquirectangularReflectionMapping;
+    const fillLight1 = new THREE.DirectionalLight(0xffffff, 0.4);
+    fillLight1.position.set(-10, 5, -10);
+    scene.add(fillLight1);
     
-    const envMap = pmremGenerator.fromEquirectangular(texture).texture;
-    scene.environment = envMap;
-    scene.background = new THREE.Color(0xf5f5f5); // Keep neutral background
+    const fillLight2 = new THREE.DirectionalLight(0xffffff, 0.4);
+    fillLight2.position.set(10, -5, -10);
+    scene.add(fillLight2);
+    
+    ambientLight = new THREE.AmbientLight(0x404040, 0.3);
+    scene.add(ambientLight);
 
-    texture.dispose();
-    pmremGenerator.dispose();
-
-    // Add ground plane with shadow and reflection
-    const planeGeometry = new THREE.PlaneGeometry(100, 100);
+    // Add floor grid - hidden by default
+    const gridHelper = new THREE.GridHelper(20, 20);
+    gridHelper.visible = false;
+    scene.add(gridHelper);
+    
+    // Add ground plane - hidden by default
+    const planeGeometry = new THREE.PlaneGeometry(40, 40);
     const planeMaterial = new THREE.MeshStandardMaterial({
-        color: 0xf0f0f0,
-        metalness: 0.1, // Slight metalness for subtle reflections
-        roughness: 0.8,
+        color: 0xffffff,
+        roughness: 0.7,
+        metalness: 0.0,
         side: THREE.DoubleSide
     });
     groundPlane = new THREE.Mesh(planeGeometry, planeMaterial);
-    groundPlane.rotation.x = -Math.PI / 2;
-    groundPlane.position.y = -0.001;
+    groundPlane.rotation.x = Math.PI / 2;
+    groundPlane.position.y = -0.02;
     groundPlane.receiveShadow = true;
+    groundPlane.visible = false;
     scene.add(groundPlane);
 
-    // Add orbit controls with improved settings
-    controls = new OrbitControls(camera, renderer.domElement);
-    controls.enableDamping = true;
-    controls.dampingFactor = 0.05;
-    controls.minDistance = 0.5;
-    controls.maxDistance = 1000;
-    controls.maxPolarAngle = Math.PI; // Allow full 360-degree rotation
-    controls.minPolarAngle = 0; // Allow viewing from below
-    controls.enablePan = true;
-    controls.enableRotate = true;
-    controls.panSpeed = 0.5;
-    controls.rotateSpeed = 0.5;
-    controls.zoomSpeed = 0.5;
-    controls.screenSpacePanning = true;
-    controls.mouseButtons = {
-        LEFT: THREE.MOUSE.ROTATE,
-        MIDDLE: THREE.MOUSE.DOLLY,
-        RIGHT: THREE.MOUSE.PAN
-    };
-
-    // Add smooth zooming with inertia
-    controls.enableDamping = true;
-    controls.dampingFactor = 0.05;
-    controls.zoomDampingFactor = 0.1;
-
-    // Add touch support
-    controls.touchDampingFactor = 0.1;
-    controls.touchZoomSpeed = 0.5;
-    controls.touchRotateSpeed = 0.5;
-    controls.touchPanSpeed = 0.5;
-
-    // Add double-click handler for camera reset
-    renderer.domElement.addEventListener('dblclick', (event) => {
-        if (event.target === renderer.domElement) {
-            resetCamera();
-        }
-    });
-
-    // Add touch events for mobile
-    renderer.domElement.addEventListener('touchstart', (event) => {
-        if (event.touches.length === 2) {
-            controls.enableDamping = false;
-        }
-    });
-
-    renderer.domElement.addEventListener('touchend', () => {
-        controls.enableDamping = true;
-    });
-
-    // Setup event listeners
+    // Setup window resize handler
+    window.addEventListener('resize', onWindowResize);
+    
+    // Setup event listeners after renderer is created
     setupEventListeners();
 
     // Start animation loop
     animate();
-
-    // Add event listener for the start viewing button
-    const startViewingBtn = document.getElementById('start-viewing');
-    if (startViewingBtn) {
-        startViewingBtn.addEventListener('click', () => {
-            document.getElementById('frontpage').style.display = 'none';
-            document.getElementById('drop-zone').style.display = 'flex';
-        });
-    }
-
-    // Add event listener for the add model button
-    const addModelBtn = document.getElementById('add-model');
-    if (addModelBtn) {
-        addModelBtn.addEventListener('click', () => {
-            document.getElementById('file-input').click();
-        });
-    }
 }
 
-// Setup event listeners with improved turntable support
+// Update the setupEventListeners function to properly handle file selection
 function setupEventListeners() {
     // Add model button in sidebar
     const addModelBtn = document.getElementById('add-model');
     if (addModelBtn) {
         addModelBtn.addEventListener('click', () => {
-            const fileInput = document.getElementById('file-input');
-            fileInput.click();
+            document.getElementById('file-input').click();
         });
     }
     
@@ -431,26 +349,20 @@ function setupEventListeners() {
     const dropZoneBtn = document.querySelector('.drop-zone .add-model-btn');
     if (dropZoneBtn) {
         dropZoneBtn.addEventListener('click', () => {
-            const fileInput = document.getElementById('file-input');
-            fileInput.click();
+            document.getElementById('file-input').click();
         });
     }
-    
+
     // File input change event
     const fileInput = document.getElementById('file-input');
     if (fileInput) {
-        let isProcessing = false;
-        fileInput.addEventListener('change', async (e) => {
-            if (isProcessing) return;
+        fileInput.addEventListener('change', (e) => {
             if (e.target.files.length > 0) {
-                isProcessing = true;
-                console.log('Files selected:', e.target.files);
-                await handleFiles(e.target.files);
-                hideFrontpage();
-                document.getElementById('drop-zone').style.display = 'none';
-                isProcessing = false;
-                // Clear the input to allow selecting the same file again
-                fileInput.value = '';
+                handleFiles(e.target.files);
+                // Reset the input value after a short delay
+                setTimeout(() => {
+                    e.target.value = '';
+                }, 100);
             }
         });
     }
@@ -491,7 +403,7 @@ function setupEventListeners() {
     // Control buttons
     const centerBtn = document.getElementById('center-model');
     if (centerBtn) {
-        centerBtn.addEventListener('click', centerModel);
+        centerBtn.addEventListener('click', centerSelectedModel);
     }
 
     const turntableBtn = document.getElementById('toggle-turntable');
@@ -507,6 +419,17 @@ function setupEventListeners() {
     const backgroundBtn = document.getElementById('toggle-background');
     if (backgroundBtn) {
         backgroundBtn.addEventListener('click', toggleBackground);
+    }
+    
+    // Set up sliders for controlling lights
+    const ambientLightSlider = document.getElementById('ambient-light');
+    if (ambientLightSlider) {
+        ambientLightSlider.addEventListener('input', handleAmbientLightChange);
+    }
+    
+    const directionalLightSlider = document.getElementById('directional-light');
+    if (directionalLightSlider) {
+        directionalLightSlider.addEventListener('input', handleDirectionalLightChange);
     }
 }
 
@@ -549,17 +472,18 @@ function getLoaderForFile(filename) {
 // Update meshing parameters for better quality
 function getMeshingParameters(rhino) {
     const mp = new rhino.MeshingParameters();
-    mp.gridMinCount = 100;      // Increase for better detail
-    mp.gridMaxCount = 1000;     // Increase for better detail
-    mp.gridAngle = 10;         // Decrease for smoother curves
-    mp.gridAspectRatio = 1.0;  // Keep aspect ratio uniform
+    mp.gridMinCount = 400;      // Increased for better detail
+    mp.gridMaxCount = 2000;     // Increased for higher quality
+    mp.gridAngle = 3;          // Decreased for smoother curves
+    mp.gridAspectRatio = 0.1;  // Decreased for more uniform mesh
     mp.simplePlanes = false;   // Don't simplify planar surfaces
     mp.refineGrid = true;      // Enable grid refinement
     mp.simplifyMesh = false;   // Don't simplify the resulting mesh
     mp.packNormals = true;     // Pack normals for better quality
-    mp.tolerance = 0.001;      // Increase accuracy
-    mp.minimumEdgeLength = 0.0001; // Better edge detail
-    mp.maximumEdgeLength = 0.1;   // Limit long edges
+    mp.tolerance = 0.00001;    // Increased accuracy
+    mp.minimumEdgeLength = 0.00001; // Better edge detail
+    mp.maximumEdgeLength = 0.05;    // Limit long edges
+    mp.refineAngle = 3;            // Lower value for better refinement
     return mp;
 }
 
@@ -634,7 +558,7 @@ function toggleTurntable() {
     }
 }
 
-// Update existing handleFiles function to use new loadFile function
+// Simplify the handleFiles function to prevent duplicates
 async function handleFiles(files) {
     if (!files || files.length === 0) return;
 
@@ -642,38 +566,30 @@ async function handleFiles(files) {
         showLoadingIndicator();
         hideFrontpage();
         
-        let successCount = 0;
-        
-        // Process each file sequentially to avoid memory issues
+        // Clear scene before loading new files
+        if (document.getElementById('drop-zone').style.display !== 'none') {
+            ClearScene();
+        }
+
         for (let i = 0; i < files.length; i++) {
             const file = files[i];
             console.log(`Processing file ${i + 1}/${files.length}: ${file.name}`);
             
             try {
-                // Use the new loadFile function to process the file
                 await loadFile(file);
-                successCount++;
             } catch (error) {
                 console.error(`Error processing file ${file.name}:`, error);
                 alert(`Failed to process ${file.name}: ${error.message}`);
             }
         }
-        
-        // Update UI after all files are processed
-        if (successCount > 0) {
+
+        // Update UI after files are processed
+        if (models.length > 0) {
             document.querySelector('.controls-panel').style.display = 'block';
             document.querySelector('.model-list').style.display = 'block';
             document.getElementById('drop-zone').style.display = 'none';
-            
-            // Center and fit all models
             centerModel();
-            
-            console.log(`Successfully loaded ${successCount} out of ${files.length} files`);
         } else {
-            console.error('No files were successfully loaded');
-            alert('No files were successfully loaded. Please try different files.');
-            
-            // Show drop zone if no files were loaded
             document.getElementById('drop-zone').style.display = 'flex';
         }
     } catch (error) {
@@ -684,27 +600,15 @@ async function handleFiles(files) {
     }
 }
 
-// Create new loadFile function that handles all file types and prevents duplicates
+// Ensure the loadFile function is correctly loading files
 async function loadFile(file) {
-    // Generate a unique ID for this file to prevent duplicates
-    const fileId = `${file.name}_${file.size}_${file.lastModified}`;
-    console.log(`[loadFile] Starting to load file: ${file.name} (ID: ${fileId})`);
-    
-    // Check if file with same ID is already loaded
-    const existingModelIndex = models.findIndex(model => model.fileId === fileId);
-    if (existingModelIndex >= 0) {
-        console.log(`[loadFile] File already loaded, removing existing model: ${file.name}`);
-        // Remove the existing model before loading again
-        scene.remove(models[existingModelIndex].mesh);
-        models.splice(existingModelIndex, 1);
-    }
+    console.log(`[loadFile] Starting to load file: ${file.name}`);
     
     const extension = file.name.split('.').pop().toLowerCase();
     console.log(`[loadFile] File extension: ${extension}`);
     
     let result;
     
-    // Process file based on extension
     if (extension === '3dm') {
         console.log(`[loadFile] Processing 3DM file`);
         result = await process3DMFile(file);
@@ -715,102 +619,15 @@ async function loadFile(file) {
         throw new Error(`Unsupported file type: ${extension}`);
     }
     
-    // Store file ID with the model to prevent duplicates
-    result.userData = result.userData || {};
-    result.userData.fileId = fileId;
+    if (!result) {
+        throw new Error(`Failed to process ${file.name}`);
+    }
     
     // Load the model into the scene
-    loadModel(result, file.name, fileId);
+    loadModel(result, file.name);
     
     console.log(`[loadFile] Successfully loaded: ${file.name}`);
     return result;
-}
-
-// Update loadModel function to store fileId
-function loadModel(object, fileName, fileId) {
-    let mesh;
-    
-    console.log(`[loadModel] Loading model: ${fileName} (ID: ${fileId})`);
-    
-    // Handle different types of loaded objects
-    if (object instanceof THREE.BufferGeometry) {
-        // For STL files
-        const material = materialPresets.yellow.clone();
-        mesh = new THREE.Mesh(object, material);
-        
-        // Create outline mesh
-        const outlineMesh = new THREE.Mesh(object, outlineMaterials.yellow.clone());
-        outlineMesh.scale.set(1.02, 1.02, 1.02);
-        outlineMesh.userData.isOutline = true;
-        mesh.add(outlineMesh);
-    } else if (object instanceof THREE.Group || object instanceof THREE.Mesh) {
-        mesh = object;
-        
-        if (mesh instanceof THREE.Group) {
-            mesh.traverse(child => {
-                if (child instanceof THREE.Mesh && !child.userData.isOutline) {
-                    const material = materialPresets.yellow.clone();
-                    child.material = material;
-                    
-                    const outlineMesh = new THREE.Mesh(child.geometry, outlineMaterials.yellow.clone());
-                    outlineMesh.scale.set(1.02, 1.02, 1.02);
-                    outlineMesh.userData.isOutline = true;
-                    child.add(outlineMesh);
-                }
-            });
-        } else {
-            const material = materialPresets.yellow.clone();
-            mesh.material = material;
-            
-            const outlineMesh = new THREE.Mesh(mesh.geometry, outlineMaterials.yellow.clone());
-            outlineMesh.scale.set(1.02, 1.02, 1.02);
-            outlineMesh.userData.isOutline = true;
-            mesh.add(outlineMesh);
-        }
-    } else {
-        console.error('Unsupported object type:', object);
-        return;
-    }
-
-    // Center and scale the model
-    const box = new THREE.Box3().setFromObject(mesh);
-    const center = box.getCenter(new THREE.Vector3());
-    const size = box.getSize(new THREE.Vector3());
-    
-    const maxDim = Math.max(size.x, size.y, size.z);
-    const scale = 1.5 / maxDim;
-    
-    mesh.position.set(0, 0, 0);
-    mesh.position.sub(center.multiplyScalar(scale));
-    mesh.scale.set(scale, scale, scale);
-    mesh.position.y = -box.min.y * scale + 0.5;
-
-    // Add to models array with fileId
-    models.push({
-        mesh: mesh,
-        name: fileName,
-        fileId: fileId,
-        visible: true,
-        selected: false
-    });
-
-    scene.add(mesh);
-    console.log(`[loadModel] Added model to scene: ${fileName}`);
-    
-    // Update model list in UI
-    updateModelList();
-    
-    // Show UI elements only after the first model is loaded
-    if (models.length === 1) {
-        document.querySelector('.controls-panel').style.display = 'block';
-        document.querySelector('.model-list').style.display = 'block';
-        document.getElementById('drop-zone').style.display = 'none';
-        document.getElementById('frontpage').style.display = 'none';
-        
-        zoomToFit(mesh, camera, controls);
-        controls.enableRotate = true;
-        controls.update();
-    }
 }
 
 // Update the processOtherFile function to return the object rather than calling loadModel
@@ -932,74 +749,75 @@ async function convertRhinoGeometryToMesh(geometry, mp, rhino) {
     return meshes;
 }
 
-// Improved mesh conversion for better quality
+// Update convertRhinoMeshToThree for better quality
 function convertRhinoMeshToThree(rhinoMesh) {
+    if (!rhinoMesh) return null;
+
     const vertices = rhinoMesh.vertices();
     const faces = rhinoMesh.faces();
+    const normals = rhinoMesh.normals();
     
     if (!vertices || !faces || vertices.count === 0 || faces.count === 0) {
-        console.warn('Invalid mesh data:', { vertexCount: vertices?.count, faceCount: faces?.count });
+        console.warn('Invalid mesh data');
         return null;
     }
     
-    // Create geometry with proper attributes
     const geometry = new THREE.BufferGeometry();
     const positions = new Float32Array(vertices.count * 3);
+    const normalArray = new Float32Array(vertices.count * 3);
+    const indices = [];
     
-    // Get vertices
+    // Get vertices with higher precision
     for (let i = 0; i < vertices.count; i++) {
         const vertex = vertices.get(i);
-        if (!vertex || vertex.length !== 3) {
-            console.warn('Invalid vertex data at index', i);
-            continue;
-        }
         positions[i * 3] = vertex[0];
         positions[i * 3 + 1] = vertex[1];
         positions[i * 3 + 2] = vertex[2];
+        
+        // Get vertex normals if available
+        if (normals) {
+            const normal = normals.get(i);
+            normalArray[i * 3] = normal[0];
+            normalArray[i * 3 + 1] = normal[1];
+            normalArray[i * 3 + 2] = normal[2];
+        }
+    }
+    
+    // Get faces with proper winding order
+    for (let i = 0; i < faces.count; i++) {
+        const face = faces.get(i);
+        if (face[2] !== face[3]) {
+            // Triangle face
+            indices.push(face[0], face[1], face[2]);
+        } else {
+            // Quad face - split into two triangles
+            indices.push(face[0], face[1], face[2]);
+            indices.push(face[0], face[2], face[3]);
+        }
     }
     
     geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-    
-    // Get faces and create index array for triangles
-    const indices = [];
-    for (let i = 0; i < faces.count; i++) {
-        const face = faces.get(i);
-        if (!face || face.length < 3) {
-            console.warn('Invalid face data at index', i);
-            continue;
-        }
-        indices.push(face[0], face[1], face[2]);
+    if (normals) {
+        geometry.setAttribute('normal', new THREE.BufferAttribute(normalArray, 3));
+    } else {
+        geometry.computeVertexNormals();
     }
-    
-    if (indices.length === 0) {
-        console.warn('No valid faces found in mesh');
-        return null;
-    }
-    
-    // Set indices and compute normals for smooth shading
     geometry.setIndex(indices);
-    geometry.computeVertexNormals();
     
-    // Only compute tangents if we have UV coordinates
-    try {
-        if (geometry.attributes.uv) {
-            geometry.computeTangents();
-        }
-    } catch (e) {
-        console.warn('Could not compute tangents:', e.message);
-    }
+    // Compute tangents for better material rendering
+    geometry.computeTangents();
     
     // Create mesh with high quality material
     const mesh = new THREE.Mesh(
         geometry,
         new THREE.MeshPhysicalMaterial({
             color: 0xffd700,
-            metalness: 0.85,
-            roughness: 0.12,
-            clearcoat: 0.6,
+            metalness: 0.9,
+            roughness: 0.1,
+            clearcoat: 1.0,
             clearcoatRoughness: 0.1,
-            reflectivity: 0.9,
-            envMapIntensity: 1.2,
+            reflectivity: 1.0,
+            envMapIntensity: 2.0,
             side: THREE.DoubleSide
         })
     );
@@ -1012,128 +830,67 @@ function convertRhinoMeshToThree(rhinoMesh) {
 
 // Update model list in UI with improved multiple model handling
 function updateModelList() {
-    const modelList = document.getElementById('model-list');
-    if (!modelList) return;
-
-    modelList.innerHTML = '<h3>Models</h3>';
-    
-    if (models.length === 0) {
-        const emptyMessage = document.createElement('div');
-        emptyMessage.className = 'empty-model-list';
-        emptyMessage.textContent = 'No models loaded. Click "Add Model" to get started.';
-        modelList.appendChild(emptyMessage);
-        return;
-    }
-
-    models.forEach((model, index) => {
-        const item = document.createElement('div');
-        item.className = `model-item ${model.selected ? 'selected' : ''}`;
-        
-        const label = document.createElement('label');
-        label.className = 'model-label';
-        
-        const checkbox = document.createElement('input');
-        checkbox.type = 'checkbox';
-        checkbox.checked = model.visible;
-        checkbox.addEventListener('change', () => toggleModelVisibility(index));
-        
-        const nameSpan = document.createElement('span');
-        nameSpan.textContent = model.name;
-        nameSpan.addEventListener('click', () => selectModel(index));
-        
-        const controlsDiv = document.createElement('div');
-        controlsDiv.className = 'model-controls';
-        
-        // Visibility toggle
-        const visibilityBtn = document.createElement('button');
-        visibilityBtn.className = 'model-btn visibility-btn';
-        visibilityBtn.innerHTML = `<i class="fas fa-eye${model.visible ? '' : '-slash'}"></i>`;
-        visibilityBtn.title = model.visible ? 'Hide' : 'Show';
-        visibilityBtn.addEventListener('click', () => toggleModelVisibility(index));
-        
-        // Material options
-        const materialBtn = document.createElement('button');
-        materialBtn.className = 'model-btn material-btn';
-        materialBtn.innerHTML = `<i class="fas fa-palette"></i>`;
-        materialBtn.title = 'Change Material';
-        materialBtn.addEventListener('click', () => showMaterialDialog(index));
-        
-        // Delete button
-        const deleteBtn = document.createElement('button');
-        deleteBtn.className = 'model-btn delete-btn';
-        deleteBtn.innerHTML = `<i class="fas fa-trash"></i>`;
-        deleteBtn.title = 'Remove Model';
-        deleteBtn.addEventListener('click', () => {
-            if (confirm(`Are you sure you want to remove "${model.name}"?`)) {
-                removeModel(index);
-            }
-        });
-        
-        // Add all buttons to controls
-        controlsDiv.appendChild(visibilityBtn);
-        controlsDiv.appendChild(materialBtn);
-        controlsDiv.appendChild(deleteBtn);
-        
-        // Assemble the item
-        label.appendChild(checkbox);
-        label.appendChild(nameSpan);
-        item.appendChild(label);
-        item.appendChild(controlsDiv);
-        modelList.appendChild(item);
-    });
-    
-    // Add "Add More Models" button at the bottom
-    const addMoreBtn = document.createElement('button');
-    addMoreBtn.className = 'add-more-models-btn';
-    addMoreBtn.innerHTML = '<i class="fas fa-plus"></i> Add More Models';
-    addMoreBtn.addEventListener('click', () => {
-        document.getElementById('file-input').click();
-    });
-    
-    modelList.appendChild(addMoreBtn);
+    updateModelListInSidebar();
 }
 
 // Select a model
 function selectModel(index) {
-    models.forEach((model, i) => {
-        model.selected = i === index;
+    // Deselect all models first
+    models.forEach(model => {
+        model.selected = false;
         
         const handleMesh = (mesh) => {
             if (mesh instanceof THREE.Mesh && !mesh.userData.isOutline) {
-                // Create a new material instance to avoid sharing uniforms
-                const baseMaterial = materialPresets[mesh.material.userData.materialType || 'yellow'];
-                const newMaterial = new THREE.MeshStandardMaterial({
-                    color: baseMaterial.color,
-                    metalness: baseMaterial.metalness,
-                    roughness: baseMaterial.roughness,
-                    emissive: model.selected ? new THREE.Color(0x333333) : new THREE.Color(0x000000),
-                    emissiveIntensity: 0.1
-                });
-                
-                // Store the material type for future reference
-                newMaterial.userData.materialType = mesh.material.userData.materialType || 'yellow';
-                
-                // Apply the new material
-                mesh.material = newMaterial;
-                
-                // Handle bloom effect
-                if (model.selected) {
-                    mesh.layers.enable(1);
-                } else {
-                    mesh.layers.disable(1);
+                if (mesh.material) {
+                    mesh.material.emissive = new THREE.Color(0x000000);
+                    mesh.material.emissiveIntensity = 0;
+                    mesh.material.needsUpdate = true;
                 }
             }
         };
-
-        // Apply to all meshes in the model
+        
         if (model.mesh instanceof THREE.Group) {
             model.mesh.traverse(handleMesh);
         } else if (model.mesh instanceof THREE.Mesh) {
             handleMesh(model.mesh);
         }
     });
-
-    // Update the model list in UI
+    
+    // Then select the clicked model
+    if (index >= 0 && index < models.length) {
+        models[index].selected = true;
+        selectedObject = models[index].mesh;
+        
+        // Highlight the selected model with a slight emissive glow
+        const handleMesh = (mesh) => {
+            if (mesh instanceof THREE.Mesh && !mesh.userData.isOutline) {
+                if (mesh.material) {
+                    mesh.material.emissive = new THREE.Color(0x222222);
+                    mesh.material.emissiveIntensity = 0.2;
+                    mesh.material.needsUpdate = true;
+                }
+            }
+        };
+        
+        if (selectedObject instanceof THREE.Group) {
+            selectedObject.traverse(handleMesh);
+        } else if (selectedObject instanceof THREE.Mesh) {
+            handleMesh(selectedObject);
+        }
+        
+        // Center camera on selected model
+        zoomToFit(selectedObject, camera, controls);
+        
+        // Update material selector to show the current material
+        const materialSelect = document.getElementById('material-select');
+        if (materialSelect && models[index].materialType) {
+            materialSelect.value = models[index].materialType;
+        }
+    } else {
+        selectedObject = null;
+    }
+    
+    // Update model list to reflect selection changes
     updateModelList();
 }
 
@@ -1181,55 +938,83 @@ function showMaterialDialog(index) {
 
 // Apply material to a specific model
 function applyMaterialToModel(index, materialType) {
-    const model = models[index];
-    if (!model) return;
-
-    const baseMaterial = materialPresets[materialType];
+    if (index < 0 || index >= models.length) return;
     
-    const handleMesh = (mesh) => {
-        if (mesh instanceof THREE.Mesh && !mesh.userData.isOutline) {
-            const newMaterial = new THREE.MeshStandardMaterial({
-                color: baseMaterial.color,
-                metalness: baseMaterial.metalness,
-                roughness: baseMaterial.roughness,
-                emissive: model.selected ? new THREE.Color(0x333333) : new THREE.Color(0x000000),
-                emissiveIntensity: 0.1
-            });
-            
-            // Store the material type
-            newMaterial.userData.materialType = materialType;
-            mesh.material = newMaterial;
-        }
-    };
-
-    if (model.mesh instanceof THREE.Group) {
-        model.mesh.traverse(handleMesh);
-    } else if (model.mesh instanceof THREE.Mesh) {
-        handleMesh(model.mesh);
-    }
+    const model = models[index];
+    applyMaterial(model.mesh, materialType);
+    
+    // Update the model's material type for future reference
+    model.materialType = materialType;
 }
 
 // Toggle model visibility
 function toggleModelVisibility(index) {
     if (index >= 0 && index < models.length) {
-        models[index].visible = !models[index].visible;
-        models[index].mesh.visible = models[index].visible;
+        const model = models[index];
+        model.visible = !model.visible;
+        model.mesh.visible = model.visible;
         
-        updateModelList(); // Update the model list UI
+        // Update model list to reflect visibility changes
+        updateModelList();
     }
 }
 
 // Remove model
 function removeModel(index) {
     if (models[index]) {
-        scene.remove(models[index].mesh);
+        const mesh = models[index].mesh;
+        
+        // Remove from scene
+        scene.remove(mesh);
+        
+        // Remove from loadedMeshes array
+        const meshIndex = loadedMeshes.indexOf(mesh);
+        if (meshIndex !== -1) {
+            loadedMeshes.splice(meshIndex, 1);
+        }
+        
+        // Properly dispose resources
+        if (mesh instanceof THREE.Mesh) {
+            if (mesh.geometry) mesh.geometry.dispose();
+            if (mesh.material) {
+                if (Array.isArray(mesh.material)) {
+                    mesh.material.forEach(mat => mat.dispose());
+                } else {
+                    mesh.material.dispose();
+                }
+            }
+        } else if (mesh instanceof THREE.Group) {
+            mesh.traverse(child => {
+                if (child instanceof THREE.Mesh) {
+                    if (child.geometry) child.geometry.dispose();
+                    if (child.material) {
+                        if (Array.isArray(child.material)) {
+                            child.material.forEach(mat => mat.dispose());
+                        } else {
+                            child.material.dispose();
+                        }
+                    }
+                }
+            });
+        }
+        
+        // Remove from models array
         models.splice(index, 1);
-        updateModelList();
+        
+        // Reset selected object if it was selected
+        if (selectedObject === mesh) {
+            selectedObject = null;
+        }
+        
+        // Update UI using updateModelListInSidebar
+        updateModelListInSidebar();
         
         // Show drop zone if no models left
         if (models.length === 0) {
             document.getElementById('drop-zone').style.display = 'flex';
         }
+        
+        console.log(`Removed model: ${mesh.name || "Unnamed"}`);
     }
 }
 
@@ -1409,23 +1194,23 @@ function centerModel() {
         targetObject = selectedObject;
     } else {
         // Otherwise center on all models
-        const combinedBox = new THREE.Box3();
-        models.forEach(model => {
-            const box = new THREE.Box3().setFromObject(model.mesh);
-            combinedBox.union(box);
-        });
+    const combinedBox = new THREE.Box3();
+    models.forEach(model => {
+        const box = new THREE.Box3().setFromObject(model.mesh);
+        combinedBox.union(box);
+    });
 
-        const center = combinedBox.getCenter(new THREE.Vector3());
-        const size = combinedBox.getSize(new THREE.Vector3());
-        const maxDim = Math.max(size.x, size.y, size.z);
-        const scale = 1.5 / maxDim;
+    const center = combinedBox.getCenter(new THREE.Vector3());
+    const size = combinedBox.getSize(new THREE.Vector3());
+    const maxDim = Math.max(size.x, size.y, size.z);
+    const scale = 1.5 / maxDim;
 
-        // Center and scale all models
-        models.forEach(model => {
-            model.mesh.position.sub(center);
-            model.mesh.scale.set(scale, scale, scale);
-            model.mesh.position.y = -combinedBox.min.y * scale + 0.5;
-        });
+    // Center and scale all models
+    models.forEach(model => {
+        model.mesh.position.sub(center);
+        model.mesh.scale.set(scale, scale, scale);
+        model.mesh.position.y = -combinedBox.min.y * scale + 0.5;
+    });
 
         targetObject = models[0].mesh;
     }
@@ -1544,76 +1329,99 @@ function zoomToFit(object, camera, controls) {
     animateCamera();
 }
 
-// Handle drop events
-function handleDrop(event) {
-    preventDefaults(event);
-    unhighlight();
+// Add the missing loadModel function
+function loadModel(object, fileName) {
+    let mesh;
     
-    const dt = event.dataTransfer;
-    const files = dt.files;
+    console.log(`[loadModel] Loading model: ${fileName}`);
     
-    if (files.length > 0) {
-        console.log(`[handleDrop] Received ${files.length} files via drag-and-drop`);
-        // Use setTimeout to avoid event propagation issues
-        setTimeout(() => {
-            handleFiles(files);
-        }, 100);
-    }
-}
-
-// Add function to update model list with consistent sidebar appearance
-function updateModelListInSidebar() {
-    const modelListElement = document.getElementById('model-list');
-    if (!modelListElement) return;
-    
-    modelListElement.innerHTML = '';
-    
-    if (models.length === 0) {
-        const emptyMessage = document.createElement('div');
-        emptyMessage.className = 'empty-model-list';
-        emptyMessage.textContent = 'No models loaded';
-        modelListElement.appendChild(emptyMessage);
+    // Handle different types of loaded objects
+    if (object instanceof THREE.BufferGeometry) {
+        // For STL files
+        const material = materialPresets.yellow.clone();
+        mesh = new THREE.Mesh(object, material);
+        mesh.name = fileName;
+        
+        // Create outline mesh
+        const outlineMesh = new THREE.Mesh(object, outlineMaterials.yellow.clone());
+        outlineMesh.scale.set(1.02, 1.02, 1.02);
+        outlineMesh.userData.isOutline = true;
+        mesh.add(outlineMesh);
+    } else if (object instanceof THREE.Group || object instanceof THREE.Mesh) {
+        mesh = object;
+        mesh.name = fileName;
+        
+        if (mesh instanceof THREE.Group) {
+            mesh.traverse(child => {
+                if (child instanceof THREE.Mesh && !child.userData.isOutline) {
+                    const material = materialPresets.yellow.clone();
+                    child.material = material;
+                    
+                    // Create outline mesh only if not too many children (prevent performance issues)
+                    if (mesh.children.length < 100) {
+                        const outlineMesh = new THREE.Mesh(child.geometry, outlineMaterials.yellow.clone());
+                        outlineMesh.scale.set(1.02, 1.02, 1.02);
+                        outlineMesh.userData.isOutline = true;
+                        child.add(outlineMesh);
+                    }
+                }
+            });
+        } else {
+            const material = materialPresets.yellow.clone();
+            mesh.material = material;
+            
+            const outlineMesh = new THREE.Mesh(mesh.geometry, outlineMaterials.yellow.clone());
+            outlineMesh.scale.set(1.02, 1.02, 1.02);
+            outlineMesh.userData.isOutline = true;
+            mesh.add(outlineMesh);
+        }
+    } else {
+        console.error('Unsupported object type:', object);
         return;
     }
+
+    // Center and scale the model
+    const box = new THREE.Box3().setFromObject(mesh);
+    const center = box.getCenter(new THREE.Vector3());
+    const size = box.getSize(new THREE.Vector3());
     
-    models.forEach((model, index) => {
-        const item = document.createElement('div');
-        item.className = `model-item ${model.selected ? 'selected' : ''}`;
-        
-        const label = document.createElement('div');
-        label.className = 'model-label';
-        
-        const checkbox = document.createElement('input');
-        checkbox.type = 'checkbox';
-        checkbox.checked = model.visible;
-        checkbox.addEventListener('change', () => toggleModelVisibility(index));
-        
-        const nameSpan = document.createElement('span');
-        nameSpan.textContent = model.name;
-        nameSpan.addEventListener('click', () => selectModel(index));
-        
-        const actions = document.createElement('div');
-        actions.className = 'model-actions';
-        
-        const deleteBtn = document.createElement('button');
-        deleteBtn.className = 'model-action-btn delete-btn';
-        deleteBtn.innerHTML = '<i class="fas fa-trash"></i>';
-        deleteBtn.title = 'Remove model';
-        deleteBtn.addEventListener('click', () => removeModel(index));
-        
-        label.appendChild(checkbox);
-        label.appendChild(nameSpan);
-        
-        actions.appendChild(deleteBtn);
-        
-        item.appendChild(label);
-        item.appendChild(actions);
-        
-        modelListElement.appendChild(item);
+    const maxDim = Math.max(size.x, size.y, size.z);
+    const scale = 1.5 / maxDim;
+    
+    mesh.position.set(0, 0, 0);
+    mesh.position.sub(center.multiplyScalar(scale));
+    mesh.scale.set(scale, scale, scale);
+    mesh.position.y = -box.min.y * scale + 0.5;
+
+    // Add to models array
+    models.push({
+        mesh: mesh,
+        name: fileName,
+        visible: true,
+        selected: false
     });
+
+    // Use AddModelToScene instead of direct scene.add
+    AddModelToScene(mesh);
+    console.log(`[loadModel] Added model to scene: ${fileName}`);
+    
+    // Use updateModelListInSidebar instead of updateModelList
+    updateModelListInSidebar();
+    
+    // Show UI elements only after the first model is loaded
+    if (models.length === 1) {
+        document.querySelector('.controls-panel').style.display = 'block';
+        document.querySelector('.model-list').style.display = 'block';
+        document.getElementById('drop-zone').style.display = 'none';
+        document.getElementById('frontpage').style.display = 'none';
+        
+        zoomToFit(mesh, camera, controls);
+        controls.enableRotate = true;
+        controls.update();
+    }
 }
 
-// Fix the missing centerSelectedModel function
+// Add centerSelectedModel function back
 function centerSelectedModel() {
     if (models.length === 0) {
         console.warn('No models available to center');
@@ -1630,7 +1438,7 @@ function centerSelectedModel() {
     }
 }
 
-// Add this function if it doesn't exist
+// Add applyMaterial function back
 function applyMaterial(mesh, materialType) {
     if (!mesh || !materialPresets[materialType]) {
         console.warn('Invalid mesh or material type:', { mesh, materialType });
@@ -1659,4 +1467,156 @@ function applyMaterial(mesh, materialType) {
     }
     
     console.log(`Applied ${materialType} material to mesh`);
+}
+
+// Add back updateModelListInSidebar function
+function updateModelListInSidebar() {
+    const modelListElement = document.getElementById('model-list');
+    if (!modelListElement) return;
+    
+    // Clear existing content and add just one h3 heading
+    modelListElement.innerHTML = '<h3>Models</h3>';
+    
+    if (models.length === 0) {
+        const emptyMessage = document.createElement('div');
+        emptyMessage.className = 'empty-model-list';
+        emptyMessage.textContent = 'No models loaded. Click "Add Model" to get started.';
+        modelListElement.appendChild(emptyMessage);
+        return;
+    }
+    
+    models.forEach((model, index) => {
+        const item = document.createElement('div');
+        item.className = `model-item ${model.selected ? 'selected' : ''}`;
+        
+        const label = document.createElement('label');
+        label.className = 'model-label';
+        
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.checked = model.visible;
+        checkbox.addEventListener('change', () => toggleModelVisibility(index));
+        
+        const nameSpan = document.createElement('span');
+        nameSpan.textContent = model.name;
+        nameSpan.addEventListener('click', () => selectModel(index));
+        
+        const controlsDiv = document.createElement('div');
+        controlsDiv.className = 'model-controls';
+        
+        // Visibility toggle
+        const visibilityBtn = document.createElement('button');
+        visibilityBtn.className = 'model-btn visibility-btn';
+        visibilityBtn.innerHTML = `<i class="fas fa-eye${model.visible ? '' : '-slash'}"></i>`;
+        visibilityBtn.title = model.visible ? 'Hide' : 'Show';
+        visibilityBtn.addEventListener('click', () => toggleModelVisibility(index));
+        
+        // Material options
+        const materialBtn = document.createElement('button');
+        materialBtn.className = 'model-btn material-btn';
+        materialBtn.innerHTML = `<i class="fas fa-palette"></i>`;
+        materialBtn.title = 'Change Material';
+        materialBtn.addEventListener('click', () => showMaterialDialog(index));
+        
+        // Delete button
+        const deleteBtn = document.createElement('button');
+        deleteBtn.className = 'model-btn delete-btn';
+        deleteBtn.innerHTML = `<i class="fas fa-trash"></i>`;
+        deleteBtn.title = 'Remove Model';
+        deleteBtn.addEventListener('click', () => {
+            if (confirm(`Are you sure you want to remove "${model.name}"?`)) {
+                removeModel(index);
+            }
+        });
+        
+        // Add all buttons to controls
+        controlsDiv.appendChild(visibilityBtn);
+        controlsDiv.appendChild(materialBtn);
+        controlsDiv.appendChild(deleteBtn);
+        
+        // Assemble the item
+        label.appendChild(checkbox);
+        label.appendChild(nameSpan);
+        item.appendChild(label);
+        item.appendChild(controlsDiv);
+        modelListElement.appendChild(item);
+    });
+    
+    // Add "Add More Models" button at the bottom
+    const addMoreBtn = document.createElement('button');
+    addMoreBtn.className = 'add-more-models-btn';
+    addMoreBtn.innerHTML = '<i class="fas fa-plus"></i> Add More Models';
+    addMoreBtn.addEventListener('click', () => {
+        document.getElementById('file-input').click();
+    });
+    
+    modelListElement.appendChild(addMoreBtn);
+}
+
+// Create default environment map for better reflections
+function createDefaultEnvironment() {
+    const pmremGenerator = new THREE.PMREMGenerator(renderer);
+    pmremGenerator.compileEquirectangularShader();
+    
+    // Create a simple scene with gradient sky
+    const skyScene = new THREE.Scene();
+    const skyGeometry = new THREE.SphereGeometry(10, 32, 32);
+    const skyMaterial = new THREE.ShaderMaterial({
+        uniforms: {
+            topColor: { value: new THREE.Color(0x0077ff) },
+            bottomColor: { value: new THREE.Color(0xffffff) },
+            offset: { value: 33 },
+            exponent: { value: 0.6 }
+        },
+        vertexShader: `
+            varying vec3 vWorldPosition;
+            void main() {
+                vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+                vWorldPosition = worldPosition.xyz;
+                gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+            }
+        `,
+        fragmentShader: `
+            uniform vec3 topColor;
+            uniform vec3 bottomColor;
+            uniform float offset;
+            uniform float exponent;
+            varying vec3 vWorldPosition;
+            void main() {
+                float h = normalize(vWorldPosition + offset).y;
+                gl_FragColor = vec4(mix(bottomColor, topColor, max(pow(max(h, 0.0), exponent), 0.0)), 1.0);
+            }
+        `,
+        side: THREE.BackSide
+    });
+    
+    const sky = new THREE.Mesh(skyGeometry, skyMaterial);
+    skyScene.add(sky);
+    
+    // Generate environment map from sky scene
+    const envMap = pmremGenerator.fromScene(skyScene).texture;
+    pmremGenerator.dispose();
+    skyScene.remove(sky);
+    sky.geometry.dispose();
+    sky.material.dispose();
+    
+    return envMap;
+}
+
+// Update environment map loading
+async function loadEnvironmentMap() {
+    try {
+        // Create default environment map
+        const envMap = createDefaultEnvironment();
+        scene.environment = envMap;
+        scene.background = new THREE.Color(0xf0f0f0);
+        
+        // Update material presets with environment map
+        Object.values(materialPresets).forEach(material => {
+            material.envMap = envMap;
+            material.needsUpdate = true;
+        });
+    } catch (error) {
+        console.warn('Failed to create environment map:', error);
+    }
 }
