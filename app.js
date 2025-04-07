@@ -409,114 +409,104 @@ function init() {
 
 // Setup event listeners with improved turntable support
 function setupEventListeners() {
-    // Window resize
-    window.addEventListener('resize', onWindowResize);
-
-    // File input handling
-    const fileInput = document.getElementById('file-input');
+    // Add model button in sidebar
     const addModelBtn = document.getElementById('add-model');
-    
-    if (fileInput) {
-        // Remove any existing listeners
-        const newFileInput = fileInput.cloneNode(true);
-        fileInput.parentNode.replaceChild(newFileInput, fileInput);
-        
-        // Allow multiple file selection
-        newFileInput.setAttribute('multiple', 'multiple');
-        
-        newFileInput.addEventListener('change', (event) => {
-            console.log('File input change event triggered');
-            const files = event.target.files;
-            if (files && files.length > 0) {
-                handleFiles(files);
-                // Clear the input to allow selecting the same file again
-                newFileInput.value = '';
-            }
-        });
-    }
-
     if (addModelBtn) {
-        // Remove any existing listeners
-        const newAddModelBtn = addModelBtn.cloneNode(true);
-        addModelBtn.parentNode.replaceChild(newAddModelBtn, addModelBtn);
-        
-        newAddModelBtn.addEventListener('click', () => {
-            console.log('Add model button clicked');
+        addModelBtn.addEventListener('click', () => {
             const fileInput = document.getElementById('file-input');
-            if (fileInput) {
-                fileInput.click();
+            fileInput.click();
+        });
+    }
+    
+    // Start viewing button on frontpage
+    const startViewingBtn = document.getElementById('start-viewing');
+    if (startViewingBtn) {
+        startViewingBtn.addEventListener('click', () => {
+            hideFrontpage();
+            document.getElementById('drop-zone').style.display = 'flex';
+        });
+    }
+    
+    // Drop zone select files button
+    const dropZoneBtn = document.querySelector('.drop-zone .add-model-btn');
+    if (dropZoneBtn) {
+        dropZoneBtn.addEventListener('click', () => {
+            const fileInput = document.getElementById('file-input');
+            fileInput.click();
+        });
+    }
+    
+    // File input change event
+    const fileInput = document.getElementById('file-input');
+    if (fileInput) {
+        let isProcessing = false;
+        fileInput.addEventListener('change', async (e) => {
+            if (isProcessing) return;
+            if (e.target.files.length > 0) {
+                isProcessing = true;
+                console.log('Files selected:', e.target.files);
+                await handleFiles(e.target.files);
+                hideFrontpage();
+                document.getElementById('drop-zone').style.display = 'none';
+                isProcessing = false;
+                // Clear the input to allow selecting the same file again
+                fileInput.value = '';
             }
         });
     }
-
-    // Drop zone with multiple file support
-    const dropZone = document.getElementById('drop-zone');
     
-    if (dropZone) {
-        // Prevent default drag behaviors
-        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-            dropZone.addEventListener(eventName, preventDefaults, false);
-            document.body.addEventListener(eventName, preventDefaults, false);
-        });
-
-        // Highlight drop zone when dragging over it
-        ['dragenter', 'dragover'].forEach(eventName => {
-            dropZone.addEventListener(eventName, highlight, false);
-        });
-
-        ['dragleave', 'drop'].forEach(eventName => {
-            dropZone.addEventListener(eventName, unhighlight, false);
-        });
-
-        // Handle dropped files
-        dropZone.addEventListener('drop', handleDrop, false);
-    }
-
-    // Controls
-    const materialSelect = document.getElementById('material-select');
-    const ambientLightControl = document.getElementById('ambient-light');
-    const directionalLightControl = document.getElementById('directional-light');
-    const backgroundColorControl = document.getElementById('background-color');
-    const centerModelBtn = document.getElementById('center-model');
-    const toggleFloorBtn = document.getElementById('toggle-floor');
-    const toggleBackgroundBtn = document.getElementById('toggle-background');
-    const toggleSidebarBtn = document.getElementById('toggle-sidebar');
-
-    if (materialSelect) materialSelect.addEventListener('change', handleMaterialChange);
-    if (ambientLightControl) ambientLightControl.addEventListener('input', handleAmbientLightChange);
-    if (directionalLightControl) directionalLightControl.addEventListener('input', handleDirectionalLightChange);
-    if (backgroundColorControl) backgroundColorControl.addEventListener('input', handleBackgroundColorChange);
-    if (centerModelBtn) centerModelBtn.addEventListener('click', centerModel);
-    if (toggleFloorBtn) toggleFloorBtn.addEventListener('click', toggleFloor);
-    if (toggleBackgroundBtn) toggleBackgroundBtn.addEventListener('click', toggleBackground);
-    if (toggleSidebarBtn) toggleSidebarBtn.addEventListener('click', toggleSidebar);
-
-    // Add turntable button event listener
-    const toggleTurntableBtn = document.getElementById('toggle-turntable');
-    if (toggleTurntableBtn) {
-        toggleTurntableBtn.addEventListener('click', toggleTurntable);
-    } else {
-        // Create turntable button if it doesn't exist
-        const controlsPanel = document.querySelector('.controls-panel');
-        if (controlsPanel) {
-            const newTurntableBtn = document.createElement('button');
-            newTurntableBtn.id = 'toggle-turntable';
-            newTurntableBtn.innerHTML = '<i class="fas fa-sync-alt"></i>';
-            newTurntableBtn.title = 'Toggle Turntable Animation';
-            newTurntableBtn.addEventListener('click', toggleTurntable);
-            controlsPanel.appendChild(newTurntableBtn);
-        }
-    }
-
     // Click handling for object selection
     renderer.domElement.addEventListener('click', handleClick);
 
-    // Add sidebar-specific logic
-    const sidebarAddModelBtn = document.querySelector('.ui-sidebar .add-model-btn');
-    if (sidebarAddModelBtn) {
-        sidebarAddModelBtn.addEventListener('click', () => {
-            document.getElementById('file-input').click();
+    // Setup drop zone events
+    const dropZone = document.getElementById('drop-zone');
+    if (dropZone) {
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, preventDefaults, false);
         });
+        
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, highlight, false);
+        });
+        
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, unhighlight, false);
+        });
+        
+        dropZone.addEventListener('drop', handleDrop, false);
+    }
+    
+    // Material selection
+    const materialSelect = document.getElementById('material-select');
+    if (materialSelect) {
+        materialSelect.addEventListener('change', () => {
+            for (const model of models) {
+                if (model.selected) {
+                    applyMaterialToModel(models.indexOf(model), materialSelect.value);
+                }
+            }
+        });
+    }
+
+    // Control buttons
+    const centerBtn = document.getElementById('center-model');
+    if (centerBtn) {
+        centerBtn.addEventListener('click', centerModel);
+    }
+
+    const turntableBtn = document.getElementById('toggle-turntable');
+    if (turntableBtn) {
+        turntableBtn.addEventListener('click', toggleTurntable);
+    }
+
+    const floorBtn = document.getElementById('toggle-floor');
+    if (floorBtn) {
+        floorBtn.addEventListener('click', toggleFloor);
+    }
+
+    const backgroundBtn = document.getElementById('toggle-background');
+    if (backgroundBtn) {
+        backgroundBtn.addEventListener('click', toggleBackground);
     }
 }
 
@@ -831,7 +821,7 @@ function convertRhinoMeshToThree(rhinoMesh) {
         return null;
     }
     
-    // Create high-quality geometry with proper normals
+    // Create geometry with proper attributes
     const geometry = new THREE.BufferGeometry();
     const positions = new Float32Array(vertices.count * 3);
     
@@ -869,9 +859,11 @@ function convertRhinoMeshToThree(rhinoMesh) {
     geometry.setIndex(indices);
     geometry.computeVertexNormals();
     
-    // For better quality, compute tangents too if possible
+    // Only compute tangents if we have UV coordinates
     try {
-        geometry.computeTangents();
+        if (geometry.attributes.uv) {
+            geometry.computeTangents();
+        }
     } catch (e) {
         console.warn('Could not compute tangents:', e.message);
     }
@@ -1522,8 +1514,12 @@ function handleDrop(event) {
     const dt = event.dataTransfer;
     const files = dt.files;
     
+    // Prevent processing if already handling files
     if (files.length > 0) {
-        handleFiles(files);
+        // Use setTimeout to avoid event propagation issues
+        setTimeout(() => {
+            handleFiles(files);
+        }, 100);
     }
 }
 
@@ -1577,4 +1573,52 @@ function updateModelListInSidebar() {
         
         modelListElement.appendChild(item);
     });
+}
+
+// Fix the missing centerSelectedModel function
+function centerSelectedModel() {
+    if (models.length === 0) {
+        console.warn('No models available to center');
+        return;
+    }
+
+    if (selectedObject) {
+        // If an object is selected, center on that object
+        zoomToFit(selectedObject, camera, controls);
+        console.log('Centering selected model');
+    } else {
+        // Otherwise center on all models
+        centerModel();
+    }
+}
+
+// Add this function if it doesn't exist
+function applyMaterial(mesh, materialType) {
+    if (!mesh || !materialPresets[materialType]) {
+        console.warn('Invalid mesh or material type:', { mesh, materialType });
+        return;
+    }
+    
+    const baseMaterial = materialPresets[materialType];
+    
+    const handleMesh = (meshObject) => {
+        if (meshObject instanceof THREE.Mesh && !meshObject.userData.isOutline) {
+            const newMaterial = baseMaterial.clone();
+            
+            // Store the material type for future reference
+            newMaterial.userData.materialType = materialType;
+            
+            // Apply the new material
+            meshObject.material = newMaterial;
+        }
+    };
+    
+    // Apply to all meshes in the model
+    if (mesh instanceof THREE.Group) {
+        mesh.traverse(handleMesh);
+    } else if (mesh instanceof THREE.Mesh) {
+        handleMesh(mesh);
+    }
+    
+    console.log(`Applied ${materialType} material to mesh`);
 }
