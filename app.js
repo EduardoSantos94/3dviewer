@@ -308,7 +308,7 @@ async function init() {
     camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
     camera.position.set(5, 5, 5);
     camera.lookAt(0, 0, 0);
-    
+
     // Setup renderer with improved exposure
     renderer = new THREE.WebGLRenderer({ 
         antialias: true,
@@ -323,7 +323,7 @@ async function init() {
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.2; // Increased exposure for brighter display
     document.getElementById('viewer-container').appendChild(renderer.domElement);
-    
+
     // Initialize post-processing with reduced bloom
     composer = new EffectComposer(renderer);
     const renderPass = new RenderPass(scene, camera);
@@ -374,10 +374,10 @@ async function init() {
     groundPlane.position.y = 0; // Position at y=0
     groundPlane.receiveShadow = true;
     scene.add(groundPlane);
-    
+
     // Setup event listeners after renderer is created
     setupEventListeners();
-    
+
     // Start animation loop
     animate();
 }
@@ -390,6 +390,12 @@ function setupEventListeners() {
         startViewingBtn.addEventListener('click', () => {
             console.log('Start viewing button clicked');
             hideFrontpage();
+            
+            // Force show the drop zone immediately
+            const dropZone = document.getElementById('drop-zone');
+            if (dropZone) {
+                dropZone.style.display = 'flex';
+            }
         });
     }
     
@@ -398,6 +404,18 @@ function setupEventListeners() {
     if (selectFilesBtn) {
         selectFilesBtn.addEventListener('click', () => {
             console.log('Select files button clicked');
+            
+            // Force immediate UI changes before file dialog opens
+            const frontpage = document.getElementById('frontpage');
+            if (frontpage) {
+                frontpage.style.display = 'none';
+            }
+            
+            const container = document.querySelector('.container');
+            if (container) {
+                container.style.display = 'block';
+            }
+            
             document.getElementById('file-input').click();
         });
     }
@@ -408,6 +426,12 @@ function setupEventListeners() {
         fileInput.addEventListener('change', (event) => {
             const files = event.target.files;
             if (files && files.length > 0) {
+                // Force hide dropzone here to ensure UI is consistent
+                const dropZone = document.getElementById('drop-zone');
+                if (dropZone) {
+                    dropZone.style.display = 'none';
+                }
+                
                 handleFiles(files);
                 // Reset the input to allow selecting the same file again
                 event.target.value = '';
@@ -614,23 +638,31 @@ async function handleFiles(files) {
     try {
         showLoadingIndicator();
         
-        // ALWAYS hide frontpage and show container
+        // Force UI state before any processing
         const frontpage = document.getElementById('frontpage');
         if (frontpage) {
             frontpage.style.display = 'none';
         }
 
-        // Make sure container is visible
+        const dropZone = document.getElementById('drop-zone');
+        if (dropZone) {
+            dropZone.style.display = 'none';
+        }
+
         const container = document.querySelector('.container');
         if (container) {
             container.style.display = 'block';
         }
+        
+        document.querySelector('.controls-panel').style.display = 'block';
+        document.querySelector('.model-list').style.display = 'block';
         
         // Only clear the scene on the first model load
         if (models.length === 0) {
             ClearScene();
         }
 
+        let loadedAnyFile = false;
         for (let i = 0; i < files.length; i++) {
             const file = files[i];
             console.log(`Processing file ${i + 1}/${files.length}: ${file.name}`);
@@ -642,24 +674,16 @@ async function handleFiles(files) {
             }
             
             try {
-                await loadFile(file);
+                const result = await loadFile(file);
+                if (result) loadedAnyFile = true;
             } catch (error) {
                 console.error(`Error processing file ${file.name}:`, error);
                 alert(`Failed to process ${file.name}: ${error.message}`);
             }
         }
 
-        // Always ensure UI is in the correct state after loading files
-        document.querySelector('.controls-panel').style.display = 'block';
-        document.querySelector('.model-list').style.display = 'block';
-
-        const dropZone = document.getElementById('drop-zone');
-        if (dropZone) {
-            dropZone.style.display = 'none';
-        }
-        
-        // Center model and fit to view
-        if (models.length > 0) {
+        // Center model and fit to view if any files were loaded
+        if (loadedAnyFile && models.length > 0) {
             centerModel();
         }
     } catch (error) {
@@ -1068,10 +1092,10 @@ function showMaterialDialog(index) {
         <div class="dialog-content">
             <h3>Change Material for ${model.name}</h3>
             <select id="model-material-select">
-                <option value="gold">Gold (High Quality)</option>
+                <option value="gold">Yellow Gold (High Quality)</option>
                 <option value="rose-gold">Rose Gold (High Quality)</option>
                 <option value="white-gold">White Gold (High Quality)</option>
-                <option value="fast-gold">Gold (Fast Render)</option>
+                <option value="fast-gold">Yellow Gold (Fast Render)</option>
                 <option value="fast-rose-gold">Rose Gold (Fast Render)</option>
                 <option value="fast-white-gold">White Gold (Fast Render)</option>
             </select>
@@ -1087,6 +1111,11 @@ function showMaterialDialog(index) {
     const applyBtn = dialog.querySelector('#apply-material');
     const cancelBtn = dialog.querySelector('#cancel-material');
     const materialSelect = dialog.querySelector('#model-material-select');
+
+    // Set the current material value if available
+    if (model.materialType) {
+        materialSelect.value = model.materialType;
+    }
 
     applyBtn.addEventListener('click', () => {
         const materialType = materialSelect.value;
@@ -1917,9 +1946,20 @@ function setupControls() {
     controls.maxPolarAngle = Math.PI; // Allow full rotation
     controls.target.set(0, 0, 0);
     controls.zoomSpeed = 0.5;    // Slower zoom for more precision
+    controls.autoRotate = false; // Ensure auto-rotation is off
+    controls.enableKeys = false; // Disable keyboard navigation to prevent accidental zooming
+    
+    // Prevent automatic camera changes unless explicitly requested
+    controls.enableRotate = true;
+    controls.rotateSpeed = 0.8;  // Slightly slower rotation for better control
     
     // Disable the built-in mouse wheel zoom to use our custom implementation
     controls.enableZoom = false;
+    
+    // Prevent auto-zooming by setting a fixed up vector
+    controls.addEventListener('change', function() {
+        camera.up.set(0, 1, 0); // Always keep Y as up
+    });
     
     // Register custom wheel event for improved zoom control
     renderer.domElement.addEventListener('wheel', onWheel, { passive: false });
@@ -1993,10 +2033,18 @@ function onWheel(event) {
         controls.maxDistance
     );
     
-    // Apply the zoom by scaling the camera position
+    // Only apply zoom if the distance is changing
     if (clampedDistance !== distance) {
+        // Save camera up vector to prevent auto reorientation
+        const upVector = camera.up.clone();
+        
+        // Apply the zoom by scaling the camera position
         const direction = camera.position.clone().sub(controls.target).normalize();
         camera.position.copy(controls.target).add(direction.multiplyScalar(clampedDistance));
+        
+        // Restore up vector to prevent camera roll
+        camera.up.copy(upVector);
+        
         controls.update();
     }
 }
