@@ -593,4 +593,200 @@ footer a:hover {
 /* Loading indicator text */
 .loading-indicator p {
     color: #000;
+}
+
+/* Right sidebar UI layout */
+.viewer-layout {
+    display: flex;
+    width: 100%;
+    height: 100%;
+}
+
+.viewer-area {
+    flex: 1;
+    position: relative;
+    height: 100%;
+}
+
+.ui-sidebar {
+    width: 280px;
+    height: 100%;
+    background-color: #f9f9f9;
+    border-left: 1px solid #e0e0e0;
+    padding: 20px;
+    overflow-y: auto;
+    z-index: 10;
+    box-shadow: -2px 0 5px rgba(0, 0, 0, 0.05);
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+/* Adjust controls panel to be inside sidebar */
+.controls-panel {
+    position: relative;
+    top: auto;
+    right: auto;
+    flex-direction: column;
+    gap: 15px;
+    width: 100%;
+    padding-bottom: 15px;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+/* Adjust model list to be inside sidebar */
+.model-list {
+    position: relative;
+    top: auto;
+    left: auto;
+    width: 100%;
+    background-color: transparent;
+    border-radius: 0;
+    box-shadow: none;
+    padding: 0;
+    max-height: none;
+    border-bottom: 1px solid #e0e0e0;
+    padding-bottom: 15px;
+}
+
+.model-list h3 {
+    margin-bottom: 15px;
+}
+
+/* Adjust footer to stay at bottom of sidebar */
+footer {
+    position: relative;
+    bottom: auto;
+    left: auto;
+    transform: none;
+    margin-top: auto;
+    padding-top: 15px;
+    text-align: center;
+}
+
+/* Make viewer container full size */
+#viewer-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+}
+
+/* Adjust frontpage for new layout */
+.frontpage {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    z-index: 100;
+}
+
+/* Adjust drop zone for new layout */
+.drop-zone {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    z-index: 90;
+}
+
+/* Control buttons in a grid layout */
+.control-buttons {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    width: 100%;
+}
+
+.control-buttons button {
+    width: 100%;
+    height: 40px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+/* Additional model list styles for the sidebar */
+.model-actions {
+    display: flex;
+    gap: 5px;
+}
+
+.model-action-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #555;
+    font-size: 0.9rem;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 3px;
+    transition: all 0.2s;
+}
+
+.delete-btn:hover {
+    background-color: rgba(255, 0, 0, 0.1);
+    color: #d32f2f;
+}
+
+/* Fix for sidebar when initially loaded */
+.ui-sidebar .controls-panel,
+.ui-sidebar .model-list {
+    display: block;
+}
+
+/* Ensure the viewer fills the available space */
+.viewer-area {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+}
+
+/* Ensure the frontpage covers the entire application */
+.frontpage {
+    z-index: 1000; /* Ensure it covers everything */
+}
+
+/* Fix for drop zone button */
+.drop-zone .add-model-btn {
+    display: inline-block;
+    margin-top: 20px;
+}
+
+/* Make the empty model list message more visible */
+.empty-model-list {
+    padding: 15px 10px;
+    text-align: center;
+    color: #666;
+    background-color: #f0f0f0;
+    border-radius: 4px;
+    margin: 10px 0;
+}
+
+/* Responsive handling for the sidebar */
+@media (max-width: 768px) {
+    .ui-sidebar {
+        width: 240px;
+        padding: 15px;
+    }
+}
+
+@media (max-width: 480px) {
+    .viewer-layout {
+        flex-direction: column;
+    }
+    
+    .ui-sidebar {
+        width: 100%;
+        height: auto;
+        border-left: none;
+        border-top: 1px solid #e0e0e0;
+        max-height: 40vh;
+    }
+    
+    .viewer-area {
+        height: 60vh;
+    }
 } 

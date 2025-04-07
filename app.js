@@ -72,8 +72,26 @@ function showFrontpage() {
 // Hide frontpage
 function hideFrontpage() {
     const frontpage = document.getElementById('frontpage');
+    const dropZone = document.getElementById('drop-zone');
+    
     if (frontpage) {
         frontpage.style.display = 'none';
+    }
+    
+    if (dropZone) {
+        dropZone.style.display = 'none';
+    }
+    
+    // Show the sidebar and controls since they're now part of the main layout
+    const controlsPanel = document.querySelector('.controls-panel');
+    const modelList = document.querySelector('.model-list');
+    
+    if (controlsPanel) {
+        controlsPanel.style.display = 'block';
+    }
+    
+    if (modelList) {
+        modelList.style.display = 'block';
     }
 }
 
@@ -492,6 +510,14 @@ function setupEventListeners() {
 
     // Click handling for object selection
     renderer.domElement.addEventListener('click', handleClick);
+
+    // Add sidebar-specific logic
+    const sidebarAddModelBtn = document.querySelector('.ui-sidebar .add-model-btn');
+    if (sidebarAddModelBtn) {
+        sidebarAddModelBtn.addEventListener('click', () => {
+            document.getElementById('file-input').click();
+        });
+    }
 }
 
 function preventDefaults(e) {
@@ -1155,9 +1181,11 @@ function applyMaterialToModel(index, materialType) {
 
 // Toggle model visibility
 function toggleModelVisibility(index) {
-    if (models[index]) {
+    if (index >= 0 && index < models.length) {
         models[index].visible = !models[index].visible;
         models[index].mesh.visible = models[index].visible;
+        
+        updateModelList(); // Update the model list UI
     }
 }
 
@@ -1487,14 +1515,66 @@ function zoomToFit(object, camera, controls) {
 }
 
 // Handle drop events
-function handleDrop(e) {
-    e.preventDefault();
-    e.stopPropagation();
+function handleDrop(event) {
+    preventDefaults(event);
+    unhighlight();
     
-    const dt = e.dataTransfer;
+    const dt = event.dataTransfer;
     const files = dt.files;
-
-    if (files && files.length > 0) {
+    
+    if (files.length > 0) {
         handleFiles(files);
     }
+}
+
+// Add function to update model list with consistent sidebar appearance
+function updateModelListInSidebar() {
+    const modelListElement = document.getElementById('model-list');
+    if (!modelListElement) return;
+    
+    modelListElement.innerHTML = '';
+    
+    if (models.length === 0) {
+        const emptyMessage = document.createElement('div');
+        emptyMessage.className = 'empty-model-list';
+        emptyMessage.textContent = 'No models loaded';
+        modelListElement.appendChild(emptyMessage);
+        return;
+    }
+    
+    models.forEach((model, index) => {
+        const item = document.createElement('div');
+        item.className = `model-item ${model.selected ? 'selected' : ''}`;
+        
+        const label = document.createElement('div');
+        label.className = 'model-label';
+        
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.checked = model.visible;
+        checkbox.addEventListener('change', () => toggleModelVisibility(index));
+        
+        const nameSpan = document.createElement('span');
+        nameSpan.textContent = model.name;
+        nameSpan.addEventListener('click', () => selectModel(index));
+        
+        const actions = document.createElement('div');
+        actions.className = 'model-actions';
+        
+        const deleteBtn = document.createElement('button');
+        deleteBtn.className = 'model-action-btn delete-btn';
+        deleteBtn.innerHTML = '<i class="fas fa-trash"></i>';
+        deleteBtn.title = 'Remove model';
+        deleteBtn.addEventListener('click', () => removeModel(index));
+        
+        label.appendChild(checkbox);
+        label.appendChild(nameSpan);
+        
+        actions.appendChild(deleteBtn);
+        
+        item.appendChild(label);
+        item.appendChild(actions);
+        
+        modelListElement.appendChild(item);
+    });
 }

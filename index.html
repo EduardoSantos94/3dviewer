@@ -19,87 +19,105 @@
 </head>
 <body>
     <div class="container">
-        <div id="viewer-container">
-            <!-- Loading Indicator -->
-            <div id="loading-indicator" class="loading-indicator">
-                <div class="loading-spinner"></div>
-                <p>Loading 3D viewer...</p>
-            </div>
-        
-            <!-- Frontpage -->
-            <div id="frontpage" class="frontpage">
-                <div class="frontpage-content">
-                    <h1>3D Jewelry Viewer</h1>
-                    <p>Upload your 3D models to view and interact with them</p>
-                    <button id="start-viewing" class="cta-button">Start Viewing</button>
-                    <div class="supported-formats">
-                        <p>Supported formats:</p>
-                        <ul>
-                            <li>Rhino (.3dm)</li>
-                            <li>STL (.stl)</li>
-                            <li>OBJ (.obj)</li>
-                            <li>GLTF/GLB (.gltf/.glb)</li>
-                        </ul>
+        <!-- New layout with viewer area and sidebar -->
+        <div class="viewer-layout">
+            <!-- 3D Viewer Area -->
+            <div class="viewer-area">
+                <div id="viewer-container">
+                    <!-- Loading Indicator -->
+                    <div id="loading-indicator" class="loading-indicator">
+                        <div class="loading-spinner"></div>
+                        <p>Loading 3D viewer...</p>
                     </div>
                 </div>
             </div>
-        
-            <!-- Drop Zone -->
-            <div id="drop-zone" class="drop-zone" style="display: none;">
-                <i class="fas fa-cloud-upload-alt fa-3x"></i>
-                <p>Drag and drop your 3D files here</p>
-                <p>or</p>
-                <button id="add-model" class="add-model-btn">Add Model</button>
+            
+            <!-- Right Sidebar UI -->
+            <div class="ui-sidebar">
+                <!-- Controls Panel (moved to sidebar) -->
+                <div class="controls-panel">
+                    <h3>Controls</h3>
+                    <div class="control-group">
+                        <label for="material-select">Material:</label>
+                        <select id="material-select">
+                            <option value="yellow">Yellow Gold (High Quality)</option>
+                            <option value="rose">Rose Gold (High Quality)</option>
+                            <option value="white">White Gold (High Quality)</option>
+                            <option value="fastYellow">Yellow Gold (Fast Render)</option>
+                            <option value="fastRose">Rose Gold (Fast Render)</option>
+                            <option value="fastWhite">White Gold (Fast Render)</option>
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <label for="ambient-light">Ambient Light:</label>
+                        <input type="range" id="ambient-light" min="0" max="1" step="0.1" value="0.5">
+                    </div>
+                    <div class="control-group">
+                        <label for="directional-light">Directional Light:</label>
+                        <input type="range" id="directional-light" min="0" max="1" step="0.1" value="0.5">
+                    </div>
+                    <div class="control-buttons">
+                        <button id="center-model" title="Center Model">
+                            <i class="fas fa-compress-arrows-alt"></i> Center
+                        </button>
+                        <button id="toggle-turntable" title="Toggle Turntable">
+                            <i class="fas fa-sync-alt"></i> Rotate
+                        </button>
+                        <button id="toggle-floor" title="Toggle Floor">
+                            <i class="fas fa-border-all"></i> Floor
+                        </button>
+                        <button id="toggle-background" title="Toggle Background">
+                            <i class="fas fa-fill-drip"></i> Background
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Model List (moved to sidebar) -->
+                <div class="model-list">
+                    <h3>Models</h3>
+                    <div id="model-list"></div>
+                    <button id="add-model" class="add-model-btn">
+                        <i class="fas fa-plus"></i> Add Model
+                    </button>
+                </div>
+                
+                <!-- File input (hidden) -->
                 <input type="file" id="file-input" style="display: none;" accept=".3dm,.stl,.obj,.gltf,.glb" multiple>
-            </div>
-
-            <!-- Controls Panel -->
-            <div class="controls-panel" style="display: none;">
-                <div class="control-group">
-                    <label for="material-select">Material:</label>
-                    <select id="material-select">
-                        <option value="yellow">Yellow Gold (High Quality)</option>
-                        <option value="rose">Rose Gold (High Quality)</option>
-                        <option value="white">White Gold (High Quality)</option>
-                        <option value="fastYellow">Yellow Gold (Fast Render)</option>
-                        <option value="fastRose">Rose Gold (Fast Render)</option>
-                        <option value="fastWhite">White Gold (Fast Render)</option>
-                    </select>
-                </div>
-                <div class="control-group">
-                    <label for="ambient-light">Ambient Light:</label>
-                    <input type="range" id="ambient-light" min="0" max="1" step="0.1" value="0.5">
-                </div>
-                <div class="control-group">
-                    <label for="directional-light">Directional Light:</label>
-                    <input type="range" id="directional-light" min="0" max="1" step="0.1" value="0.5">
-                </div>
-                <div class="control-buttons">
-                    <button id="center-model" title="Center Model">
-                        <i class="fas fa-compress-arrows-alt"></i>
-                    </button>
-                    <button id="toggle-floor" title="Toggle Floor">
-                        <i class="fas fa-border-all"></i>
-                    </button>
-                    <button id="toggle-background" title="Toggle Background">
-                        <i class="fas fa-fill-drip"></i>
-                    </button>
-                    <button id="toggle-turntable" title="Toggle Turntable">
-                        <i class="fas fa-sync-alt"></i>
-                    </button>
-                </div>
-            </div>
-        
-            <!-- Model List -->
-            <div class="model-list" style="display: none;">
-                <h3>Models</h3>
-                <div id="model-list"></div>
+                
+                <!-- Footer (moved to sidebar) -->
+                <footer>
+                    <p>This work is licensed under a <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank">Creative Commons Attribution 4.0 International License</a>.</p>
+                </footer>
             </div>
         </div>
+        
+        <!-- Frontpage (remains fullscreen) -->
+        <div id="frontpage" class="frontpage">
+            <div class="frontpage-content">
+                <h1>3D Jewelry Viewer</h1>
+                <p>Upload your 3D models to view and interact with them</p>
+                <button id="start-viewing" class="cta-button">Start Viewing</button>
+                <div class="supported-formats">
+                    <p>Supported formats:</p>
+                    <ul>
+                        <li>Rhino (.3dm)</li>
+                        <li>STL (.stl)</li>
+                        <li>OBJ (.obj)</li>
+                        <li>GLTF/GLB (.gltf/.glb)</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    
+        <!-- Drop Zone (remains fullscreen) -->
+        <div id="drop-zone" class="drop-zone" style="display: none;">
+            <i class="fas fa-cloud-upload-alt fa-3x"></i>
+            <p>Drag and drop your 3D files here</p>
+            <p>or</p>
+            <button class="add-model-btn">Select Files</button>
+        </div>
     </div>
-    <footer>
-        <p>This work is licensed under a <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank">Creative Commons Attribution 4.0 International License</a>.</p>
-    </footer>
+    
     <script type="module" src="app.js"></script>
 </body>
 </html> 
