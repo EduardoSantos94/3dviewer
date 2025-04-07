@@ -167,6 +167,7 @@ async function initializeApp() {
 
         // Setup event listeners after initializing UI
         setupEventListeners();
+        setupKeyboardShortcuts();
 
         // Start animation loop
         animate();
@@ -194,51 +195,51 @@ document.addEventListener('DOMContentLoaded', () => {
 // Gold material presets
 const materialPresets = {
     'gold': new THREE.MeshPhysicalMaterial({
-        color: 0xffd700,
-        metalness: 0.95,
-        roughness: 0.05,
+        color: 0xFFD700,  // Brighter yellow gold
+        metalness: 0.85,  // Slightly reduced for better rendering
+        roughness: 0.1,   // Less rough for more shine
         reflectivity: 1.0,
-        clearcoat: 0.3,
-        clearcoatRoughness: 0.2,
-        envMapIntensity: 1.2,
+        clearcoat: 0.5,   // More clearcoat for shine
+        clearcoatRoughness: 0.1,
+        envMapIntensity: 1.5, // Increased for brighter reflections
         side: THREE.DoubleSide
     }),
     'rose-gold': new THREE.MeshPhysicalMaterial({
-        color: 0xe0a080,
-        metalness: 0.95,
-        roughness: 0.05,
+        color: 0xE0A080,
+        metalness: 0.85,
+        roughness: 0.1,
         reflectivity: 1.0,
-        clearcoat: 0.3,
-        clearcoatRoughness: 0.2,
-        envMapIntensity: 1.2,
+        clearcoat: 0.5,
+        clearcoatRoughness: 0.1,
+        envMapIntensity: 1.5,
         side: THREE.DoubleSide
     }),
     'white-gold': new THREE.MeshPhysicalMaterial({
-        color: 0xf0f0f0,
-        metalness: 0.95,
-        roughness: 0.05,
+        color: 0xF0F0F0,
+        metalness: 0.85,
+        roughness: 0.1,
         reflectivity: 1.0,
-        clearcoat: 0.3,
-        clearcoatRoughness: 0.2,
-        envMapIntensity: 1.2,
+        clearcoat: 0.5,
+        clearcoatRoughness: 0.1,
+        envMapIntensity: 1.5,
         side: THREE.DoubleSide
     }),
     'fast-gold': new THREE.MeshStandardMaterial({
-        color: 0xffd700,
-        metalness: 0.9,
-        roughness: 0.1,
+        color: 0xFFD700,  // Brighter yellow gold
+        metalness: 0.8,
+        roughness: 0.2,
         side: THREE.DoubleSide
     }),
     'fast-rose-gold': new THREE.MeshStandardMaterial({
-        color: 0xe0a080,
-        metalness: 0.9,
-        roughness: 0.1,
+        color: 0xE0A080,
+        metalness: 0.8,
+        roughness: 0.2,
         side: THREE.DoubleSide
     }),
     'fast-white-gold': new THREE.MeshStandardMaterial({
-        color: 0xf0f0f0,
-        metalness: 0.9,
-        roughness: 0.1,
+        color: 0xF0F0F0,
+        metalness: 0.8,
+        roughness: 0.2,
         side: THREE.DoubleSide
     })
 };
@@ -308,7 +309,7 @@ async function init() {
     camera.position.set(5, 5, 5);
     camera.lookAt(0, 0, 0);
     
-    // Setup renderer with reduced exposure
+    // Setup renderer with improved exposure
     renderer = new THREE.WebGLRenderer({ 
         antialias: true,
         powerPreference: "high-performance",
@@ -320,7 +321,7 @@ async function init() {
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 0.9; // Slightly brighter for jewelry highlights
+    renderer.toneMappingExposure = 1.2; // Increased exposure for brighter display
     document.getElementById('viewer-container').appendChild(renderer.domElement);
     
     // Initialize post-processing with reduced bloom
@@ -331,9 +332,9 @@ async function init() {
     // Add bloom effect with subtle settings for jewelry
     bloomPass = new UnrealBloomPass(
         new THREE.Vector2(window.innerWidth, window.innerHeight),
-        0.15,  // reduced strength for subtle glow
+        0.2,   // Increased strength for more glow
         0.5,   // radius
-        0.9    // threshold - higher to only bloom the brightest parts
+        0.8    // Lower threshold to bloom more parts
     );
     composer.addPass(bloomPass);
     
@@ -360,19 +361,18 @@ async function init() {
     gridHelper.visible = false;
     scene.add(gridHelper);
     
-    // Add ground plane - hidden by default
-    const planeGeometry = new THREE.PlaneGeometry(40, 40);
-    const planeMaterial = new THREE.MeshStandardMaterial({
-        color: 0xf0f0f0,
-        roughness: 0.7,
-        metalness: 0.0,
+    // Create a ground plane
+    const groundGeometry = new THREE.PlaneGeometry(20, 20);
+    const groundMaterial = new THREE.MeshStandardMaterial({
+        color: 0xffffff,
+        roughness: 0.8,
+        metalness: 0.2,
         side: THREE.DoubleSide
     });
-    groundPlane = new THREE.Mesh(planeGeometry, planeMaterial);
-    groundPlane.rotation.x = Math.PI / 2;
-    groundPlane.position.y = -0.02;
+    groundPlane = new THREE.Mesh(groundGeometry, groundMaterial);
+    groundPlane.rotation.x = Math.PI / 2; // Rotate to be horizontal
+    groundPlane.position.y = 0; // Position at y=0
     groundPlane.receiveShadow = true;
-    groundPlane.visible = false;
     scene.add(groundPlane);
     
     // Setup event listeners after renderer is created
@@ -472,6 +472,11 @@ function setupEventListeners() {
     const backgroundBtn = document.getElementById('toggle-background');
     if (backgroundBtn) {
         backgroundBtn.addEventListener('click', toggleBackground);
+    }
+    
+    const resetCameraBtn = document.getElementById('reset-camera');
+    if (resetCameraBtn) {
+        resetCameraBtn.addEventListener('click', resetCamera);
     }
     
     // Set up sliders for controlling lights
@@ -602,17 +607,27 @@ function toggleTurntable() {
     }
 }
 
-// Simplify the handleFiles function to prevent duplicates
+// Improved handleFiles function to fix the first-time upload issue
 async function handleFiles(files) {
     if (!files || files.length === 0) return;
 
     try {
         showLoadingIndicator();
-        hideFrontpage();
         
-        // Clear scene before loading new files only if we're dropping files for the first time
-        const dropZone = document.getElementById('drop-zone');
-        if (dropZone && dropZone.style.display !== 'none') {
+        // ALWAYS hide frontpage and show container
+        const frontpage = document.getElementById('frontpage');
+        if (frontpage) {
+            frontpage.style.display = 'none';
+        }
+
+        // Make sure container is visible
+        const container = document.querySelector('.container');
+        if (container) {
+            container.style.display = 'block';
+        }
+        
+        // Only clear the scene on the first model load
+        if (models.length === 0) {
             ClearScene();
         }
 
@@ -634,20 +649,18 @@ async function handleFiles(files) {
             }
         }
 
-        // Update UI after files are processed
-    if (models.length > 0) {
-            document.querySelector('.controls-panel').style.display = 'block';
-            document.querySelector('.model-list').style.display = 'block';
-            const dropZone = document.getElementById('drop-zone');
-            if (dropZone) {
-                dropZone.style.display = 'none';
-            }
+        // Always ensure UI is in the correct state after loading files
+        document.querySelector('.controls-panel').style.display = 'block';
+        document.querySelector('.model-list').style.display = 'block';
+
+        const dropZone = document.getElementById('drop-zone');
+        if (dropZone) {
+            dropZone.style.display = 'none';
+        }
+        
+        // Center model and fit to view
+        if (models.length > 0) {
             centerModel();
-        } else {
-            const dropZone = document.getElementById('drop-zone');
-            if (dropZone) {
-                dropZone.style.display = 'flex';
-            }
         }
     } catch (error) {
         console.error('Error processing files:', error);
@@ -1200,12 +1213,20 @@ function handleMaterialChange(event) {
 
 // Handle ambient light change
 function handleAmbientLightChange(event) {
-    ambientLight.intensity = parseFloat(event.target.value);
+    const value = parseFloat(event.target.value);
+    if (ambientLight) {
+        ambientLight.intensity = value;
+        console.log('Ambient light intensity:', value);
+    }
 }
 
 // Handle directional light change
 function handleDirectionalLightChange(event) {
-    directionalLight.intensity = parseFloat(event.target.value);
+    const value = parseFloat(event.target.value);
+    if (directionalLight) {
+        directionalLight.intensity = value;
+        console.log('Directional light intensity:', value);
+    }
 }
 
 // Handle background color change
@@ -1399,10 +1420,33 @@ function toggleSidebar() {
 
 // Reset camera to default position
 function resetCamera() {
+    // If there's a selected object, center on it first
+    if (selectedObject) {
+        controls.target.copy(selectedObject.position);
+    } else {
+        controls.target.set(0, 0, 0);
+    }
+    
     const startPosition = camera.position.clone();
     const startTarget = controls.target.clone();
-    const targetPosition = new THREE.Vector3(0, 3, 5);
-    const targetTarget = new THREE.Vector3(0, 0, 0);
+    
+    // Calculate a good position based on scene content or selected object
+    let targetPosition;
+    if (selectedObject) {
+        // Position camera at an angle to the selected object
+        const box = new THREE.Box3().setFromObject(selectedObject);
+        const size = box.getSize(new THREE.Vector3()).length();
+        const distance = size * 2;
+        targetPosition = new THREE.Vector3(
+            selectedObject.position.x + distance * 0.8,
+            selectedObject.position.y + distance * 0.7,
+            selectedObject.position.z + distance * 0.8
+        );
+    } else {
+        // Default position with good viewing angle
+        targetPosition = new THREE.Vector3(5, 5, 5);
+    }
+    
     const duration = 1000;
     const startTime = Date.now();
 
@@ -1419,7 +1463,7 @@ function resetCamera() {
             : -1 + (4 - 2 * progress) * progress;
 
         camera.position.lerpVectors(startPosition, targetPosition, easeProgress);
-        controls.target.lerpVectors(startTarget, targetTarget, easeProgress);
+        controls.target.lerpVectors(startTarget, selectedObject ? selectedObject.position : new THREE.Vector3(0, 0, 0), easeProgress);
         controls.update();
 
         if (progress < 1) {
@@ -1428,6 +1472,39 @@ function resetCamera() {
     }
 
     animateCamera();
+}
+
+// Add keyboard shortcuts handler
+function setupKeyboardShortcuts() {
+    window.addEventListener('keydown', function(event) {
+        // Only process shortcuts if we're not in an input field
+        if (event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA') {
+            return;
+        }
+        
+        switch(event.key.toLowerCase()) {
+            case ' ': // Space key to reset camera
+                resetCamera();
+                break;
+            case 'f': // F key to toggle floor
+                toggleFloor();
+                break;
+            case 'b': // B key to toggle background
+                toggleBackground();
+                break;
+            case 't': // T key to toggle turntable
+                toggleTurntable();
+                break;
+            case 'c': // C key to center model
+                centerSelectedModel();
+                break;
+            case 'z': // Z key to fit selected model to view
+                if (selectedObject) {
+                    zoomToFit(selectedObject, camera, controls);
+                }
+                break;
+        }
+    });
 }
 
 // Improved zoom to fit function
@@ -1607,78 +1684,80 @@ function applyMaterial(mesh, materialType) {
 
 // Add back updateModelListInSidebar function
 function updateModelListInSidebar() {
-    const modelListElement = document.getElementById('model-list');
-    if (!modelListElement) return;
+    const modelListElement = document.getElementById('model-list-content');
+    if (!modelListElement) {
+        console.error('Model list element not found');
+        return;
+    }
     
-    // Clear existing content and add just one h3 heading
-    modelListElement.innerHTML = '<h3>Models</h3>';
+    // Clear existing content
+    modelListElement.innerHTML = '';
     
     if (models.length === 0) {
         const emptyMessage = document.createElement('div');
         emptyMessage.className = 'empty-model-list';
         emptyMessage.textContent = 'No models loaded. Click "Add Model" to get started.';
         modelListElement.appendChild(emptyMessage);
-        return;
+    } else {
+        models.forEach((model, index) => {
+            const item = document.createElement('div');
+            item.className = `model-item ${model.selected ? 'selected' : ''}`;
+            
+            const label = document.createElement('label');
+            label.className = 'model-label';
+            
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.checked = model.visible;
+            checkbox.addEventListener('change', () => toggleModelVisibility(index));
+            
+            const nameSpan = document.createElement('span');
+            nameSpan.textContent = model.name;
+            nameSpan.addEventListener('click', () => selectModel(index));
+            
+            const controlsDiv = document.createElement('div');
+            controlsDiv.className = 'model-controls';
+            
+            // Visibility toggle
+            const visibilityBtn = document.createElement('button');
+            visibilityBtn.className = 'model-btn visibility-btn';
+            visibilityBtn.innerHTML = `<i class="fas fa-eye${model.visible ? '' : '-slash'}"></i>`;
+            visibilityBtn.title = model.visible ? 'Hide' : 'Show';
+            visibilityBtn.addEventListener('click', () => toggleModelVisibility(index));
+            
+            // Material options
+            const materialBtn = document.createElement('button');
+            materialBtn.className = 'model-btn material-btn';
+            materialBtn.innerHTML = `<i class="fas fa-palette"></i>`;
+            materialBtn.title = 'Change Material';
+            materialBtn.addEventListener('click', () => showMaterialDialog(index));
+            
+            // Delete button
+            const deleteBtn = document.createElement('button');
+            deleteBtn.className = 'model-btn delete-btn';
+            deleteBtn.innerHTML = `<i class="fas fa-trash"></i>`;
+            deleteBtn.title = 'Remove Model';
+            deleteBtn.addEventListener('click', () => {
+                if (confirm(`Are you sure you want to remove "${model.name}"?`)) {
+                    removeModel(index);
+                }
+            });
+            
+            // Add all buttons to controls
+            controlsDiv.appendChild(visibilityBtn);
+            controlsDiv.appendChild(materialBtn);
+            controlsDiv.appendChild(deleteBtn);
+            
+            // Assemble the item
+            label.appendChild(checkbox);
+            label.appendChild(nameSpan);
+            item.appendChild(label);
+            item.appendChild(controlsDiv);
+            modelListElement.appendChild(item);
+        });
     }
     
-    models.forEach((model, index) => {
-        const item = document.createElement('div');
-        item.className = `model-item ${model.selected ? 'selected' : ''}`;
-        
-        const label = document.createElement('label');
-        label.className = 'model-label';
-        
-        const checkbox = document.createElement('input');
-        checkbox.type = 'checkbox';
-        checkbox.checked = model.visible;
-        checkbox.addEventListener('change', () => toggleModelVisibility(index));
-        
-        const nameSpan = document.createElement('span');
-        nameSpan.textContent = model.name;
-        nameSpan.addEventListener('click', () => selectModel(index));
-        
-        const controlsDiv = document.createElement('div');
-        controlsDiv.className = 'model-controls';
-        
-        // Visibility toggle
-        const visibilityBtn = document.createElement('button');
-        visibilityBtn.className = 'model-btn visibility-btn';
-        visibilityBtn.innerHTML = `<i class="fas fa-eye${model.visible ? '' : '-slash'}"></i>`;
-        visibilityBtn.title = model.visible ? 'Hide' : 'Show';
-        visibilityBtn.addEventListener('click', () => toggleModelVisibility(index));
-        
-        // Material options
-        const materialBtn = document.createElement('button');
-        materialBtn.className = 'model-btn material-btn';
-        materialBtn.innerHTML = `<i class="fas fa-palette"></i>`;
-        materialBtn.title = 'Change Material';
-        materialBtn.addEventListener('click', () => showMaterialDialog(index));
-        
-        // Delete button
-        const deleteBtn = document.createElement('button');
-        deleteBtn.className = 'model-btn delete-btn';
-        deleteBtn.innerHTML = `<i class="fas fa-trash"></i>`;
-        deleteBtn.title = 'Remove Model';
-        deleteBtn.addEventListener('click', () => {
-            if (confirm(`Are you sure you want to remove "${model.name}"?`)) {
-                removeModel(index);
-            }
-        });
-        
-        // Add all buttons to controls
-        controlsDiv.appendChild(visibilityBtn);
-        controlsDiv.appendChild(materialBtn);
-        controlsDiv.appendChild(deleteBtn);
-        
-        // Assemble the item
-        label.appendChild(checkbox);
-        label.appendChild(nameSpan);
-        item.appendChild(label);
-        item.appendChild(controlsDiv);
-        modelListElement.appendChild(item);
-    });
-    
-    // Add "Add More Models" button at the bottom
+    // Always add "Add More Models" button
     const addMoreBtn = document.createElement('button');
     addMoreBtn.className = 'add-more-models-btn';
     addMoreBtn.innerHTML = '<i class="fas fa-plus"></i> Add More Models';
@@ -1793,12 +1872,12 @@ async function loadEnvironmentMap() {
 
 // Add setupLights function that was referenced but not defined
 function setupLights() {
-    // Ambient light - subtle for good shadows
-    ambientLight = new THREE.AmbientLight(0xffffff, 0.2);
+    // Ambient light - increased for better overall illumination
+    ambientLight = new THREE.AmbientLight(0xffffff, 0.4); // Increased from 0.2
     scene.add(ambientLight);
     
     // Key light - main directional light from front-top-right
-    directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
+    directionalLight = new THREE.DirectionalLight(0xffffff, 0.7); // Increased from 0.5
     directionalLight.position.set(5, 5, 5);
     directionalLight.castShadow = true;
     directionalLight.shadow.mapSize.width = 2048;
@@ -1809,12 +1888,12 @@ function setupLights() {
     scene.add(directionalLight);
     
     // Fill light - softer light from opposite side
-    const fillLight = new THREE.DirectionalLight(0xfffaf0, 0.3); // Warm light
+    const fillLight = new THREE.DirectionalLight(0xfffaf0, 0.5); // Increased from 0.3
     fillLight.position.set(-5, 3, -2);
     scene.add(fillLight);
     
     // Rim light - from behind to highlight edges
-    const rimLight = new THREE.DirectionalLight(0xf0f8ff, 0.2); // Cool light
+    const rimLight = new THREE.DirectionalLight(0xf0f8ff, 0.3); // Increased from 0.2
     rimLight.position.set(0, -5, -5);
     scene.add(rimLight);
     
@@ -1833,10 +1912,26 @@ function setupControls() {
     controls.enableDamping = true;
     controls.dampingFactor = 0.05;
     controls.screenSpacePanning = true;
-    controls.minDistance = 1;
-    controls.maxDistance = 50;
-    controls.maxPolarAngle = Math.PI / 1.5;
+    controls.minDistance = 0.5;  // Reduced to allow closer zoom
+    controls.maxDistance = 100;  // Increased to allow further zoom out
+    controls.maxPolarAngle = Math.PI; // Allow full rotation
     controls.target.set(0, 0, 0);
+    controls.zoomSpeed = 0.5;    // Slower zoom for more precision
+    
+    // Disable the built-in mouse wheel zoom to use our custom implementation
+    controls.enableZoom = false;
+    
+    // Register custom wheel event for improved zoom control
+    renderer.domElement.addEventListener('wheel', onWheel, { passive: false });
+    
+    // Add double-click to fit model
+    renderer.domElement.addEventListener('dblclick', function(event) {
+        if (selectedObject) {
+            zoomToFit(selectedObject, camera, controls);
+        } else if (models.length > 0) {
+            centerModel();
+        }
+    });
     
     // Setup window resize handler
     window.addEventListener('resize', onWindowResize);
@@ -1872,4 +1967,36 @@ function showErrorMessage(message) {
             document.body.removeChild(errorDiv);
         }
     }, 10000);
+}
+
+// Add improved wheel zoom handler to make zooming more precise
+function onWheel(event) {
+    // Prevent the default scroll behavior
+    event.preventDefault();
+    
+    if (!controls) return;
+    
+    // Calculate zoom factor based on wheel delta
+    const zoomFactor = 0.05;
+    const delta = -Math.sign(event.deltaY) * zoomFactor;
+    
+    // Get current distance to target
+    const distance = camera.position.distanceTo(controls.target);
+    
+    // Calculate new distance with exponential scaling for smoother zoom
+    const newDistance = distance * (1 - delta);
+    
+    // Clamp to min/max distance
+    const clampedDistance = THREE.MathUtils.clamp(
+        newDistance,
+        controls.minDistance,
+        controls.maxDistance
+    );
+    
+    // Apply the zoom by scaling the camera position
+    if (clampedDistance !== distance) {
+        const direction = camera.position.clone().sub(controls.target).normalize();
+        camera.position.copy(controls.target).add(direction.multiplyScalar(clampedDistance));
+        controls.update();
+    }
 }
