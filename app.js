@@ -32,7 +32,13 @@ function isRhino3dmLoaded() {
 // Function to wait for rhino3dm to load with better error handling
 async function initRhino3dm() {
     if (!isRhino3dmLoaded()) {
-        throw new Error('rhino3dm.js is not loaded. Please check your script tag in index.html');
+        console.log('Waiting for rhino3dm to load...');
+        // Wait for a short time to allow the script to load
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        if (!isRhino3dmLoaded()) {
+            throw new Error('rhino3dm.js is not loaded. Please check your internet connection and refresh the page.');
+        }
     }
 
     try {

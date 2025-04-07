@@ -24,15 +24,35 @@
             }
         }
     </script>
-    <script src="node_modules/rhino3dm/rhino3dm.js" async></script>
     <script>
-        // Error handling for Rhino script loading
-        window.addEventListener('error', function(e) {
-            if (e.target.src.includes('rhino3dm.js')) {
-                console.error('Failed to load rhino3dm.js:', e);
+        // Function to load Rhino3dm with fallback
+        function loadRhino3dm() {
+            return new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = 'https://cdn.jsdelivr.net/npm/rhino3dm@7.15.0/rhino3dm.js';
+                script.async = true;
+                
+                script.onload = () => {
+                    console.log('Rhino3dm loaded successfully');
+                    resolve();
+                };
+                
+                script.onerror = (error) => {
+                    console.error('Failed to load Rhino3dm:', error);
+                    reject(new Error('Failed to load Rhino3dm library'));
+                };
+                
+                document.head.appendChild(script);
+            });
+        }
+
+        // Load Rhino3dm when the page loads
+        window.addEventListener('load', () => {
+            loadRhino3dm().catch(error => {
+                console.error('Rhino3dm loading error:', error);
                 alert('Failed to load 3D viewer components. Please refresh the page and ensure you have a stable internet connection.');
-            }
-        }, true);
+            });
+        });
     </script>
 </head>
 <body>
