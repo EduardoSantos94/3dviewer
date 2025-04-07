@@ -191,63 +191,81 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 });
 
-// Update material presets for better quality
+// Gold material presets
 const materialPresets = {
-    yellow: new THREE.MeshPhysicalMaterial({
+    'gold': new THREE.MeshPhysicalMaterial({
+        color: 0xffd700,
+        metalness: 0.95,
+        roughness: 0.05,
+        reflectivity: 1.0,
+        clearcoat: 0.3,
+        clearcoatRoughness: 0.2,
+        envMapIntensity: 1.2,
+        side: THREE.DoubleSide
+    }),
+    'rose-gold': new THREE.MeshPhysicalMaterial({
+        color: 0xe0a080,
+        metalness: 0.95,
+        roughness: 0.05,
+        reflectivity: 1.0,
+        clearcoat: 0.3,
+        clearcoatRoughness: 0.2,
+        envMapIntensity: 1.2,
+        side: THREE.DoubleSide
+    }),
+    'white-gold': new THREE.MeshPhysicalMaterial({
+        color: 0xf0f0f0,
+        metalness: 0.95,
+        roughness: 0.05,
+        reflectivity: 1.0,
+        clearcoat: 0.3,
+        clearcoatRoughness: 0.2,
+        envMapIntensity: 1.2,
+        side: THREE.DoubleSide
+    }),
+    'fast-gold': new THREE.MeshStandardMaterial({
         color: 0xffd700,
         metalness: 0.9,
         roughness: 0.1,
-        clearcoat: 1.0,
-        clearcoatRoughness: 0.1,
-        reflectivity: 1.0,
-        envMapIntensity: 2.0,
         side: THREE.DoubleSide
     }),
-    rose: new THREE.MeshPhysicalMaterial({
-        color: 0xe6b3b3,
+    'fast-rose-gold': new THREE.MeshStandardMaterial({
+        color: 0xe0a080,
         metalness: 0.9,
         roughness: 0.1,
-        clearcoat: 1.0,
-        clearcoatRoughness: 0.1,
-        reflectivity: 1.0,
-        envMapIntensity: 2.0,
         side: THREE.DoubleSide
     }),
-    white: new THREE.MeshPhysicalMaterial({
-        color: 0xffffff,
+    'fast-white-gold': new THREE.MeshStandardMaterial({
+        color: 0xf0f0f0,
         metalness: 0.9,
         roughness: 0.1,
-        clearcoat: 1.0,
-        clearcoatRoughness: 0.1,
-        reflectivity: 1.0,
-        envMapIntensity: 2.0,
         side: THREE.DoubleSide
     })
 };
 
-// Create outline materials
+// Update outline materials
 const outlineMaterials = {
-    yellow: new THREE.MeshBasicMaterial({
+    'gold': new THREE.MeshBasicMaterial({
         color: 0x000000,
         side: THREE.BackSide
     }),
-    rose: new THREE.MeshBasicMaterial({
+    'rose-gold': new THREE.MeshBasicMaterial({
         color: 0x000000,
         side: THREE.BackSide
     }),
-    white: new THREE.MeshBasicMaterial({
+    'white-gold': new THREE.MeshBasicMaterial({
         color: 0x000000,
         side: THREE.BackSide
     }),
-    fastYellow: new THREE.MeshBasicMaterial({
+    'fast-gold': new THREE.MeshBasicMaterial({
         color: 0x000000,
         side: THREE.BackSide
     }),
-    fastRose: new THREE.MeshBasicMaterial({
+    'fast-rose-gold': new THREE.MeshBasicMaterial({
         color: 0x000000,
         side: THREE.BackSide
     }),
-    fastWhite: new THREE.MeshBasicMaterial({
+    'fast-white-gold': new THREE.MeshBasicMaterial({
         color: 0x000000,
         side: THREE.BackSide
     })
@@ -281,85 +299,62 @@ function AddModelToScene(mesh) {
 
 // Initialize the scene
 async function init() {
-    // Create scene
+    // Create scene with darker background
     scene = new THREE.Scene();
-    scene.background = new THREE.Color(0xf5f5f5);
-
-    // Create camera with better initial position
+    scene.background = new THREE.Color(0xe8e8e8); // Light gray for better contrast with gold
+    
+    // Setup camera
     camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
     camera.position.set(5, 5, 5);
     camera.lookAt(0, 0, 0);
-
-    // Create renderer with improved settings
+    
+    // Setup renderer with reduced exposure
     renderer = new THREE.WebGLRenderer({ 
         antialias: true,
-        alpha: true,
         powerPreference: "high-performance",
-        logarithmicDepthBuffer: true
+        preserveDrawingBuffer: true // Needed for screenshots
     });
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 0.8;
     renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 0.9; // Slightly brighter for jewelry highlights
     document.getElementById('viewer-container').appendChild(renderer.domElement);
-
-    // Initialize post-processing
+    
+    // Initialize post-processing with reduced bloom
     composer = new EffectComposer(renderer);
     const renderPass = new RenderPass(scene, camera);
     composer.addPass(renderPass);
     
-    // Add bloom effect
+    // Add bloom effect with subtle settings for jewelry
     bloomPass = new UnrealBloomPass(
         new THREE.Vector2(window.innerWidth, window.innerHeight),
-        0.5,  // strength
-        0.4,  // radius
-        0.85  // threshold
+        0.15,  // reduced strength for subtle glow
+        0.5,   // radius
+        0.9    // threshold - higher to only bloom the brightest parts
     );
     composer.addPass(bloomPass);
-
-    // Setup orbit controls
-    controls = new OrbitControls(camera, renderer.domElement);
-    controls.enableDamping = true;
-    controls.dampingFactor = 0.05;
-    controls.screenSpacePanning = true;
-    controls.minDistance = 1;
-    controls.maxDistance = 50;
-    controls.maxPolarAngle = Math.PI / 1.5;
-    controls.target.set(0, 0, 0);
-
-    await loadEnvironmentMap();
     
-    // Studio lighting setup
-    const hemiLight = new THREE.HemisphereLight(0xffffff, 0xffffff, 0.6);
-    hemiLight.color.setHSL(0.6, 1, 0.6);
-    hemiLight.groundColor.setHSL(0.095, 1, 0.75);
-    hemiLight.position.set(0, 50, 0);
-    scene.add(hemiLight);
+    // Setup lights
+    setupLights();
     
-    directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-    directionalLight.position.set(0, 10, 10);
-    directionalLight.castShadow = true;
-    directionalLight.shadow.mapSize.width = 2048;
-    directionalLight.shadow.mapSize.height = 2048;
-    directionalLight.shadow.camera.near = 0.1;
-    directionalLight.shadow.camera.far = 500;
-    directionalLight.shadow.bias = -0.0001;
-    scene.add(directionalLight);
+    // Setup controls
+    setupControls();
     
-    const fillLight1 = new THREE.DirectionalLight(0xffffff, 0.4);
-    fillLight1.position.set(-10, 5, -10);
-    scene.add(fillLight1);
+    // Create a jewelry-specific environment map
+    const envMap = createJewelryEnvironmentMap(renderer);
+    scene.environment = envMap;
     
-    const fillLight2 = new THREE.DirectionalLight(0xffffff, 0.4);
-    fillLight2.position.set(10, -5, -10);
-    scene.add(fillLight2);
+    // Update all material presets with the environment map
+    Object.values(materialPresets).forEach(material => {
+        if (material.envMap !== undefined) {
+            material.envMap = envMap;
+            material.needsUpdate = true;
+        }
+    });
     
-    ambientLight = new THREE.AmbientLight(0x404040, 0.3);
-    scene.add(ambientLight);
-
     // Add floor grid - hidden by default
     const gridHelper = new THREE.GridHelper(20, 20);
     gridHelper.visible = false;
@@ -368,7 +363,7 @@ async function init() {
     // Add ground plane - hidden by default
     const planeGeometry = new THREE.PlaneGeometry(40, 40);
     const planeMaterial = new THREE.MeshStandardMaterial({
-        color: 0xffffff,
+        color: 0xf0f0f0,
         roughness: 0.7,
         metalness: 0.0,
         side: THREE.DoubleSide
@@ -379,13 +374,10 @@ async function init() {
     groundPlane.receiveShadow = true;
     groundPlane.visible = false;
     scene.add(groundPlane);
-
-    // Setup window resize handler
-    window.addEventListener('resize', onWindowResize);
     
     // Setup event listeners after renderer is created
     setupEventListeners();
-
+    
     // Start animation loop
     animate();
 }
@@ -414,8 +406,12 @@ function setupEventListeners() {
     const fileInput = document.getElementById('file-input');
     if (fileInput) {
         fileInput.addEventListener('change', (event) => {
-            console.log('Files selected:', event.target.files);
-            handleFiles(event.target.files);
+            const files = event.target.files;
+            if (files && files.length > 0) {
+                handleFiles(files);
+                // Reset the input to allow selecting the same file again
+                event.target.value = '';
+            }
         });
     }
 
@@ -438,7 +434,10 @@ function setupEventListeners() {
             event.preventDefault();
             event.stopPropagation();
             dropZone.classList.remove('dragover');
-            handleFiles(event.dataTransfer.files);
+            const files = event.dataTransfer.files;
+            if (files && files.length > 0) {
+                handleFiles(files);
+            }
         });
     }
     
@@ -516,18 +515,19 @@ function getLoaderForFile(filename) {
 // Update meshing parameters for better quality
 function getMeshingParameters(rhino) {
     const mp = new rhino.MeshingParameters();
-    mp.gridMinCount = 400;      // Increased for better detail
-    mp.gridMaxCount = 2000;     // Increased for higher quality
-    mp.gridAngle = 3;          // Decreased for smoother curves
-    mp.gridAspectRatio = 0.1;  // Decreased for more uniform mesh
-    mp.simplePlanes = false;   // Don't simplify planar surfaces
-    mp.refineGrid = true;      // Enable grid refinement
-    mp.simplifyMesh = false;   // Don't simplify the resulting mesh
-    mp.packNormals = true;     // Pack normals for better quality
-    mp.tolerance = 0.00001;    // Increased accuracy
-    mp.minimumEdgeLength = 0.00001; // Better edge detail
-    mp.maximumEdgeLength = 0.05;    // Limit long edges
-    mp.refineAngle = 3;            // Lower value for better refinement
+    mp.gridMinCount = 20;      // Minimal number of grid quads in each direction (default: 16)
+    mp.gridMaxCount = 100;     // Maximal number of grid quads in each direction (default: 64)
+    mp.gridAngle = 0;          // Angle in degrees (default: 20)
+    mp.gridAspectRatio = 1.0;  // The maximum allowed aspect ratio of grid quads (default: 6.0)
+    mp.refineGrid = true;      // Whether to refine the grid to improve mesh quality
+    mp.simplePlanes = false;   // Don't simplify planar areas to avoid triangulation issues
+    mp.smoothNormals = true;   // Calculate smooth normals
+    mp.normalAngle = 5;        // Normal angle between polygon faces to smooth (default: 20 degrees)
+    mp.minimumEdgeLength = 0.0001;
+    mp.maximumEdgeLength = 0.1;
+    mp.texture3d = true;       // Generate 3d texture coordinates (default: false)
+    mp.jaggedSeams = false;    // Optimize for smoothing across edges (default: false)
+    mp.tolerance = 0.005;      // Tolerance setting to use for meshing (default: 0.01)
     return mp;
 }
 
@@ -577,7 +577,7 @@ function toggleTurntable() {
         alert('Please select an object first by clicking on it');
         return;
     }
-    
+
     isTurntableActive = !isTurntableActive;
     console.log("Turntable active:", isTurntableActive);
     
@@ -635,7 +635,7 @@ async function handleFiles(files) {
         }
 
         // Update UI after files are processed
-        if (models.length > 0) {
+    if (models.length > 0) {
             document.querySelector('.controls-panel').style.display = 'block';
             document.querySelector('.model-list').style.display = 'block';
             const dropZone = document.getElementById('drop-zone');
@@ -659,32 +659,41 @@ async function handleFiles(files) {
 
 // Ensure the loadFile function is correctly loading files
 async function loadFile(file) {
-    console.log(`[loadFile] Starting to load file: ${file.name}`);
-    
-    const extension = file.name.split('.').pop().toLowerCase();
-    console.log(`[loadFile] File extension: ${extension}`);
-    
-    let result;
-    
-    if (extension === '3dm') {
-        console.log(`[loadFile] Processing 3DM file`);
-        result = await process3DMFile(file);
-    } else if (['stl', 'obj', 'gltf', 'glb'].includes(extension)) {
-        console.log(`[loadFile] Processing ${extension.toUpperCase()} file`);
-        result = await processOtherFile(file);
-    } else {
-        throw new Error(`Unsupported file type: ${extension}`);
+    try {
+        console.log(`[loadFile] Starting to load file: ${file.name}`);
+        
+        const extension = file.name.split('.').pop().toLowerCase();
+        console.log(`[loadFile] File extension: ${extension}`);
+        
+        let result;
+        
+        if (extension === '3dm') {
+            console.log(`[loadFile] Processing 3DM file`);
+            result = await process3DMFile(file);
+        } else if (['stl', 'obj', 'gltf', 'glb'].includes(extension)) {
+            console.log(`[loadFile] Processing ${extension.toUpperCase()} file`);
+            result = await processOtherFile(file);
+        } else {
+            throw new Error(`Unsupported file type: ${extension}`);
+        }
+        
+        if (!result) {
+            throw new Error(`Failed to process ${file.name}`);
+        }
+        
+        // Load the model into the scene
+        loadModel(result, file.name);
+        
+        console.log(`[loadFile] Successfully loaded: ${file.name}`);
+        return result;
+    } catch (error) {
+        console.error(`Error loading file ${file.name}:`, error);
+        // Show error message to user
+        const errorMessage = `Failed to load ${file.name}: ${error.message}`;
+        showErrorMessage(errorMessage);
+        hideLoadingIndicator();
+        return null;
     }
-    
-    if (!result) {
-        throw new Error(`Failed to process ${file.name}`);
-    }
-    
-    // Load the model into the scene
-    loadModel(result, file.name);
-    
-    console.log(`[loadFile] Successfully loaded: ${file.name}`);
-    return result;
 }
 
 // Update the processOtherFile function to return the object rather than calling loadModel
@@ -715,7 +724,7 @@ async function processOtherFile(file) {
     });
 }
 
-// Update process3DMFile to return the object rather than calling loadModel
+// Update process3DMFile to use threejs JSON conversion when possible
 async function process3DMFile(file) {
     if (!rhino) {
         throw new Error('rhino3dm is not initialized. Please refresh the page and try again.');
@@ -742,18 +751,106 @@ async function process3DMFile(file) {
         if (geometry) {
             try {
                 if (geometry.objectType === rhino.ObjectType.Mesh) {
-                    const mesh = convertRhinoMeshToThree(geometry);
-                    if (mesh) {
+                    // For mesh objects, use the direct threejs JSON conversion
+                    const threeJson = geometry.toThreejsJSON();
+                    if (threeJson) {
+                        const bufferGeometry = new THREE.BufferGeometry();
+                        
+                        // Set geometry attributes from the converted JSON
+                        const jsonData = threeJson.data;
+                        if (jsonData.attributes.position) {
+                            bufferGeometry.setAttribute('position', 
+                                new THREE.Float32BufferAttribute(jsonData.attributes.position.array, 3));
+                        }
+                        
+                        if (jsonData.attributes.normal) {
+                            bufferGeometry.setAttribute('normal', 
+                                new THREE.Float32BufferAttribute(jsonData.attributes.normal.array, 3));
+                        }
+                        
+                        if (jsonData.attributes.uv && jsonData.attributes.uv.array.length > 0) {
+                            bufferGeometry.setAttribute('uv', 
+                                new THREE.Float32BufferAttribute(jsonData.attributes.uv.array, 2));
+                        }
+                        
+                        if (jsonData.index) {
+                            bufferGeometry.setIndex(Array.from(jsonData.index.array));
+                        }
+                        
+                        const material = materialPresets['gold'].clone();
+                        const mesh = new THREE.Mesh(bufferGeometry, material);
                         group.add(mesh);
                         geometryFound = true;
                     }
                 } else if (geometry.objectType === rhino.ObjectType.Brep || 
                          geometry.objectType === rhino.ObjectType.Surface ||
                          geometry.objectType === rhino.ObjectType.SubD) {
-                    const meshes = await convertRhinoGeometryToMesh(geometry, mp, rhino);
-                    if (meshes && meshes.length > 0) {
-                        meshes.forEach(mesh => group.add(mesh));
-                        geometryFound = true;
+                    // For Brep, Surface and SubD objects, use the meshing process
+                    // Create a mesh for the entire Brep instead of face by face
+                    const rhinoMesh = new rhino.Mesh();
+                    
+                    // For Brep objects
+                    if (geometry.objectType === rhino.ObjectType.Brep) {
+                        const faces = geometry.faces();
+                        for (let j = 0; j < faces.count; j++) {
+                            const face = faces.get(j);
+                            const mesh = face.getMesh(mp);
+                            if (mesh) {
+                                rhinoMesh.append(mesh);
+                                mesh.delete();
+                            }
+                            face.delete();
+                        }
+                        faces.delete();
+                    } 
+                    // For Surface objects
+                    else if (geometry.objectType === rhino.ObjectType.Surface) {
+                        geometry.createMesh(mp, rhinoMesh);
+                    }
+                    // For SubD objects
+                    else if (geometry.objectType === rhino.ObjectType.SubD) {
+                        // Subdivide to get smooth surfaces
+                        geometry.subdivide(2);
+                        const subDMesh = rhino.Mesh.createFromSubDControlNet(geometry, true);
+                        if (subDMesh) {
+                            rhinoMesh.append(subDMesh);
+                            subDMesh.delete();
+                        }
+                    }
+                    
+                    // Convert the Rhino mesh to Three.js format
+                    if (rhinoMesh && rhinoMesh.vertices().count > 0) {
+                        const threeJson = rhinoMesh.toThreejsJSON();
+                        if (threeJson) {
+                            const bufferGeometry = new THREE.BufferGeometry();
+                            
+                            // Set geometry attributes from the converted JSON
+                            const jsonData = threeJson.data;
+                            if (jsonData.attributes.position) {
+                                bufferGeometry.setAttribute('position', 
+                                    new THREE.Float32BufferAttribute(jsonData.attributes.position.array, 3));
+                            }
+                            
+                            if (jsonData.attributes.normal) {
+                                bufferGeometry.setAttribute('normal', 
+                                    new THREE.Float32BufferAttribute(jsonData.attributes.normal.array, 3));
+                            }
+                            
+                            if (jsonData.attributes.uv && jsonData.attributes.uv.array.length > 0) {
+                                bufferGeometry.setAttribute('uv', 
+                                    new THREE.Float32BufferAttribute(jsonData.attributes.uv.array, 2));
+                            }
+                            
+                            if (jsonData.index) {
+                                bufferGeometry.setIndex(Array.from(jsonData.index.array));
+                            }
+                            
+                            const material = materialPresets['gold'].clone();
+                            const mesh = new THREE.Mesh(bufferGeometry, material);
+                            group.add(mesh);
+                            geometryFound = true;
+                        }
+                        rhinoMesh.delete();
                     }
                 }
             } catch (error) {
@@ -806,83 +903,79 @@ async function convertRhinoGeometryToMesh(geometry, mp, rhino) {
     return meshes;
 }
 
-// Update convertRhinoMeshToThree for better quality
+// Fix the computeTangents error in convertRhinoMeshToThree
 function convertRhinoMeshToThree(rhinoMesh) {
     if (!rhinoMesh) return null;
 
-    const vertices = rhinoMesh.vertices();
-    const faces = rhinoMesh.faces();
-    const normals = rhinoMesh.normals();
-    
-    if (!vertices || !faces || vertices.count === 0 || faces.count === 0) {
-        console.warn('Invalid mesh data');
+    try {
+        const vertices = rhinoMesh.vertices();
+        const faces = rhinoMesh.faces();
+        const normals = rhinoMesh.normals();
+        
+        if (!vertices || !faces || vertices.count === 0 || faces.count === 0) {
+            console.warn('Invalid mesh data - empty vertices or faces');
+            return null;
+        }
+        
+        const geometry = new THREE.BufferGeometry();
+        const positions = new Float32Array(vertices.count * 3);
+        const normalArray = new Float32Array(vertices.count * 3);
+        const indices = [];
+        
+        // Get vertices with higher precision
+        for (let i = 0; i < vertices.count; i++) {
+            const vertex = vertices.get(i);
+            positions[i * 3] = vertex[0];
+            positions[i * 3 + 1] = vertex[1];
+            positions[i * 3 + 2] = vertex[2];
+            
+            // Get vertex normals if available
+            if (normals) {
+                const normal = normals.get(i);
+                normalArray[i * 3] = normal[0];
+                normalArray[i * 3 + 1] = normal[1];
+                normalArray[i * 3 + 2] = normal[2];
+            }
+        }
+        
+        // Get faces with proper winding order
+        for (let i = 0; i < faces.count; i++) {
+            const face = faces.get(i);
+            if (face[2] !== face[3]) {
+                // Triangle face
+                indices.push(face[0], face[1], face[2]);
+            } else {
+                // Quad face - split into two triangles
+                indices.push(face[0], face[1], face[2]);
+                indices.push(face[0], face[2], face[3]);
+            }
+        }
+        
+        geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        if (normals) {
+            geometry.setAttribute('normal', new THREE.BufferAttribute(normalArray, 3));
+        } else {
+            geometry.computeVertexNormals();
+        }
+        geometry.setIndex(indices);
+        
+        // Only compute tangents if we have UVs
+        // Skip computeTangents to avoid errors
+        
+        // Create mesh with fast material for better performance
+        const mesh = new THREE.Mesh(
+            geometry,
+            materialPresets['fast-gold'].clone()
+        );
+        
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
+        
+        return mesh;
+    } catch (error) {
+        console.error('Error converting Rhino mesh to Three.js:', error);
         return null;
     }
-    
-    const geometry = new THREE.BufferGeometry();
-    const positions = new Float32Array(vertices.count * 3);
-    const normalArray = new Float32Array(vertices.count * 3);
-    const indices = [];
-    
-    // Get vertices with higher precision
-    for (let i = 0; i < vertices.count; i++) {
-        const vertex = vertices.get(i);
-        positions[i * 3] = vertex[0];
-        positions[i * 3 + 1] = vertex[1];
-        positions[i * 3 + 2] = vertex[2];
-        
-        // Get vertex normals if available
-        if (normals) {
-            const normal = normals.get(i);
-            normalArray[i * 3] = normal[0];
-            normalArray[i * 3 + 1] = normal[1];
-            normalArray[i * 3 + 2] = normal[2];
-        }
-    }
-    
-    // Get faces with proper winding order
-    for (let i = 0; i < faces.count; i++) {
-        const face = faces.get(i);
-        if (face[2] !== face[3]) {
-            // Triangle face
-            indices.push(face[0], face[1], face[2]);
-        } else {
-            // Quad face - split into two triangles
-            indices.push(face[0], face[1], face[2]);
-            indices.push(face[0], face[2], face[3]);
-        }
-    }
-    
-    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-    if (normals) {
-        geometry.setAttribute('normal', new THREE.BufferAttribute(normalArray, 3));
-    } else {
-        geometry.computeVertexNormals();
-    }
-    geometry.setIndex(indices);
-    
-    // Compute tangents for better material rendering
-    geometry.computeTangents();
-    
-    // Create mesh with high quality material
-    const mesh = new THREE.Mesh(
-        geometry,
-        new THREE.MeshPhysicalMaterial({
-            color: 0xffd700,
-            metalness: 0.9,
-            roughness: 0.1,
-            clearcoat: 1.0,
-            clearcoatRoughness: 0.1,
-            reflectivity: 1.0,
-            envMapIntensity: 2.0,
-            side: THREE.DoubleSide
-        })
-    );
-    
-    mesh.castShadow = true;
-    mesh.receiveShadow = true;
-    
-    return mesh;
 }
 
 // Update model list in UI with improved multiple model handling
@@ -943,9 +1036,9 @@ function selectModel(index) {
         if (materialSelect && models[index].materialType) {
             materialSelect.value = models[index].materialType;
         }
-    } else {
+        } else {
         selectedObject = null;
-    }
+        }
     
     // Update model list to reflect selection changes
     updateModelList();
@@ -962,12 +1055,12 @@ function showMaterialDialog(index) {
         <div class="dialog-content">
             <h3>Change Material for ${model.name}</h3>
             <select id="model-material-select">
-                <option value="yellow">Yellow Gold (High Quality)</option>
-                <option value="rose">Rose Gold (High Quality)</option>
-                <option value="white">White Gold (High Quality)</option>
-                <option value="fastYellow">Yellow Gold (Fast Render)</option>
-                <option value="fastRose">Rose Gold (Fast Render)</option>
-                <option value="fastWhite">White Gold (Fast Render)</option>
+                <option value="gold">Gold (High Quality)</option>
+                <option value="rose-gold">Rose Gold (High Quality)</option>
+                <option value="white-gold">White Gold (High Quality)</option>
+                <option value="fast-gold">Gold (Fast Render)</option>
+                <option value="fast-rose-gold">Rose Gold (Fast Render)</option>
+                <option value="fast-white-gold">White Gold (Fast Render)</option>
             </select>
             <div class="dialog-buttons">
                 <button id="apply-material">Apply</button>
@@ -1036,7 +1129,7 @@ function removeModel(index) {
             if (mesh.material) {
                 if (Array.isArray(mesh.material)) {
                     mesh.material.forEach(mat => mat.dispose());
-                } else {
+    } else {
                     mesh.material.dispose();
                 }
             }
@@ -1288,7 +1381,7 @@ function toggleFloor() {
 
 function toggleBackground() {
     isDarkBackground = !isDarkBackground;
-    scene.background = new THREE.Color(isDarkBackground ? 0x000000 : 0xf5f5f5);
+    scene.background = new THREE.Color(isDarkBackground ? 0x000000 : 0xf0f0f0);
     
     // Update button state
     const toggleBackgroundBtn = document.getElementById('toggle-background');
@@ -1395,12 +1488,12 @@ function loadModel(object, fileName) {
     // Handle different types of loaded objects
     if (object instanceof THREE.BufferGeometry) {
         // For STL files
-        const material = materialPresets.yellow.clone();
+        const material = materialPresets['gold'].clone();
         mesh = new THREE.Mesh(object, material);
         mesh.name = fileName;
         
         // Create outline mesh
-        const outlineMesh = new THREE.Mesh(object, outlineMaterials.yellow.clone());
+        const outlineMesh = new THREE.Mesh(object, outlineMaterials['gold'].clone());
         outlineMesh.scale.set(1.02, 1.02, 1.02);
         outlineMesh.userData.isOutline = true;
         mesh.add(outlineMesh);
@@ -1411,12 +1504,12 @@ function loadModel(object, fileName) {
         if (mesh instanceof THREE.Group) {
             mesh.traverse(child => {
                 if (child instanceof THREE.Mesh && !child.userData.isOutline) {
-                    const material = materialPresets.yellow.clone();
+                    const material = materialPresets['gold'].clone();
                     child.material = material;
                     
                     // Create outline mesh only if not too many children (prevent performance issues)
                     if (mesh.children.length < 100) {
-                        const outlineMesh = new THREE.Mesh(child.geometry, outlineMaterials.yellow.clone());
+                        const outlineMesh = new THREE.Mesh(child.geometry, outlineMaterials['gold'].clone());
                         outlineMesh.scale.set(1.02, 1.02, 1.02);
                         outlineMesh.userData.isOutline = true;
                         child.add(outlineMesh);
@@ -1424,10 +1517,10 @@ function loadModel(object, fileName) {
                 }
             });
         } else {
-            const material = materialPresets.yellow.clone();
+            const material = materialPresets['gold'].clone();
             mesh.material = material;
             
-            const outlineMesh = new THREE.Mesh(mesh.geometry, outlineMaterials.yellow.clone());
+            const outlineMesh = new THREE.Mesh(mesh.geometry, outlineMaterials['gold'].clone());
             outlineMesh.scale.set(1.02, 1.02, 1.02);
             outlineMesh.userData.isOutline = true;
             mesh.add(outlineMesh);
@@ -1497,33 +1590,19 @@ function centerSelectedModel() {
 
 // Add applyMaterial function back
 function applyMaterial(mesh, materialType) {
-    if (!mesh || !materialPresets[materialType]) {
-        console.warn('Invalid mesh or material type:', { mesh, materialType });
-        return;
-    }
+    if (!mesh || !materialPresets[materialType]) return;
     
-    const baseMaterial = materialPresets[materialType];
+    const material = materialPresets[materialType].clone();
     
-    const handleMesh = (meshObject) => {
-        if (meshObject instanceof THREE.Mesh && !meshObject.userData.isOutline) {
-            const newMaterial = baseMaterial.clone();
-            
-            // Store the material type for future reference
-            newMaterial.userData.materialType = materialType;
-            
-            // Apply the new material
-            meshObject.material = newMaterial;
-        }
-    };
-    
-    // Apply to all meshes in the model
     if (mesh instanceof THREE.Group) {
-        mesh.traverse(handleMesh);
+        mesh.traverse((child) => {
+            if (child instanceof THREE.Mesh) {
+                child.material = material;
+            }
+        });
     } else if (mesh instanceof THREE.Mesh) {
-        handleMesh(mesh);
+        mesh.material = material;
     }
-    
-    console.log(`Applied ${materialType} material to mesh`);
 }
 
 // Add back updateModelListInSidebar function
@@ -1610,54 +1689,88 @@ function updateModelListInSidebar() {
     modelListElement.appendChild(addMoreBtn);
 }
 
-// Create default environment map for better reflections
-function createDefaultEnvironment() {
+// Create a more suitable environment map for jewelry
+function createJewelryEnvironmentMap(renderer) {
     const pmremGenerator = new THREE.PMREMGenerator(renderer);
     pmremGenerator.compileEquirectangularShader();
     
-    // Create a simple scene with gradient sky
-    const skyScene = new THREE.Scene();
-    const skyGeometry = new THREE.SphereGeometry(10, 32, 32);
-    const skyMaterial = new THREE.ShaderMaterial({
-        uniforms: {
-            topColor: { value: new THREE.Color(0x0077ff) },
-            bottomColor: { value: new THREE.Color(0xffffff) },
-            offset: { value: 33 },
-            exponent: { value: 0.6 }
-        },
-        vertexShader: `
-            varying vec3 vWorldPosition;
-            void main() {
-                vec4 worldPosition = modelMatrix * vec4(position, 1.0);
-                vWorldPosition = worldPosition.xyz;
-                gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-            }
-        `,
-        fragmentShader: `
-            uniform vec3 topColor;
-            uniform vec3 bottomColor;
-            uniform float offset;
-            uniform float exponent;
-            varying vec3 vWorldPosition;
-            void main() {
-                float h = normalize(vWorldPosition + offset).y;
-                gl_FragColor = vec4(mix(bottomColor, topColor, max(pow(max(h, 0.0), exponent), 0.0)), 1.0);
-            }
-        `,
+    // Create a simple environment with studio-like lighting
+    const cubeRenderTarget = pmremGenerator.fromScene(createStudioScene(), 0.04);
+    const envMap = cubeRenderTarget.texture;
+    
+    // Clean up resources
+    cubeRenderTarget.dispose();
+    pmremGenerator.dispose();
+    
+    return envMap;
+}
+
+// Create a studio-like environment for the reflections
+function createStudioScene() {
+    const scene = new THREE.Scene();
+    
+    // Top light
+    const topLight = new THREE.DirectionalLight(0xffffff, 1.0);
+    topLight.position.set(0, 10, 0);
+    scene.add(topLight);
+    
+    // Front light
+    const frontLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    frontLight.position.set(0, 0, 10);
+    scene.add(frontLight);
+    
+    // Back light
+    const backLight = new THREE.DirectionalLight(0xffffff, 0.3);
+    backLight.position.set(0, 0, -10);
+    scene.add(backLight);
+    
+    // Side lights
+    const rightLight = new THREE.DirectionalLight(0xffffff, 0.5);
+    rightLight.position.set(10, 0, 0);
+    scene.add(rightLight);
+    
+    const leftLight = new THREE.DirectionalLight(0xffffff, 0.5);
+    leftLight.position.set(-10, 0, 0);
+    scene.add(leftLight);
+    
+    // Create a large sphere to act as the environment
+    const geometry = new THREE.SphereGeometry(100, 32, 32);
+    const material = new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        side: THREE.BackSide,
+        fog: false
+    });
+    
+    // Create a gradient material for the background
+    const vertexShader = `
+        varying vec3 vWorldPosition;
+        void main() {
+            vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+            vWorldPosition = worldPosition.xyz;
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+    `;
+    
+    const fragmentShader = `
+        varying vec3 vWorldPosition;
+        void main() {
+            vec3 topColor = vec3(0.8, 0.8, 0.9); // Light blue-gray
+            vec3 bottomColor = vec3(0.3, 0.3, 0.4); // Dark blue-gray
+            float h = normalize(vWorldPosition).y;
+            gl_FragColor = vec4(mix(bottomColor, topColor, max(0.0, h)), 1.0);
+        }
+    `;
+    
+    const gradientMaterial = new THREE.ShaderMaterial({
+        vertexShader: vertexShader,
+        fragmentShader: fragmentShader,
         side: THREE.BackSide
     });
     
-    const sky = new THREE.Mesh(skyGeometry, skyMaterial);
-    skyScene.add(sky);
+    const sphere = new THREE.Mesh(geometry, gradientMaterial);
+    scene.add(sphere);
     
-    // Generate environment map from sky scene
-    const envMap = pmremGenerator.fromScene(skyScene).texture;
-    pmremGenerator.dispose();
-    skyScene.remove(sky);
-    sky.geometry.dispose();
-    sky.material.dispose();
-    
-    return envMap;
+    return scene;
 }
 
 // Update environment map loading
@@ -1676,4 +1789,87 @@ async function loadEnvironmentMap() {
     } catch (error) {
         console.warn('Failed to create environment map:', error);
     }
+}
+
+// Add setupLights function that was referenced but not defined
+function setupLights() {
+    // Ambient light - subtle for good shadows
+    ambientLight = new THREE.AmbientLight(0xffffff, 0.2);
+    scene.add(ambientLight);
+    
+    // Key light - main directional light from front-top-right
+    directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
+    directionalLight.position.set(5, 5, 5);
+    directionalLight.castShadow = true;
+    directionalLight.shadow.mapSize.width = 2048;
+    directionalLight.shadow.mapSize.height = 2048;
+    directionalLight.shadow.camera.near = 0.1;
+    directionalLight.shadow.camera.far = 500;
+    directionalLight.shadow.bias = -0.0001;
+    scene.add(directionalLight);
+    
+    // Fill light - softer light from opposite side
+    const fillLight = new THREE.DirectionalLight(0xfffaf0, 0.3); // Warm light
+    fillLight.position.set(-5, 3, -2);
+    scene.add(fillLight);
+    
+    // Rim light - from behind to highlight edges
+    const rimLight = new THREE.DirectionalLight(0xf0f8ff, 0.2); // Cool light
+    rimLight.position.set(0, -5, -5);
+    scene.add(rimLight);
+    
+    // Update sliders to match light intensities
+    const ambientSlider = document.getElementById('ambient-light');
+    if (ambientSlider) ambientSlider.value = ambientLight.intensity;
+    
+    const directionalSlider = document.getElementById('directional-light');
+    if (directionalSlider) directionalSlider.value = directionalLight.intensity;
+}
+
+// Add setupControls function that was referenced but not defined
+function setupControls() {
+    // Orbit controls
+    controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+    controls.screenSpacePanning = true;
+    controls.minDistance = 1;
+    controls.maxDistance = 50;
+    controls.maxPolarAngle = Math.PI / 1.5;
+    controls.target.set(0, 0, 0);
+    
+    // Setup window resize handler
+    window.addEventListener('resize', onWindowResize);
+}
+
+// Show error message function
+function showErrorMessage(message) {
+    // Create error message element
+    const errorDiv = document.createElement('div');
+    errorDiv.className = 'error-message';
+    errorDiv.innerHTML = `
+        <div class="error-content">
+            <i class="fas fa-exclamation-triangle"></i>
+            <h3>Error</h3>
+            <p>${message}</p>
+            <button id="error-close">OK</button>
+        </div>
+    `;
+    
+    document.body.appendChild(errorDiv);
+    
+    // Add event listener to close button
+    const closeBtn = document.getElementById('error-close');
+    if (closeBtn) {
+        closeBtn.addEventListener('click', () => {
+            document.body.removeChild(errorDiv);
+        });
+    }
+    
+    // Auto-remove after 10 seconds
+    setTimeout(() => {
+        if (document.body.contains(errorDiv)) {
+            document.body.removeChild(errorDiv);
+        }
+    }, 10000);
 }
