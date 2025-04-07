@@ -24,42 +24,14 @@
             }
         }
     </script>
-    <script>
-        // Function to load Rhino3dm with fallback
-        function loadRhino3dm() {
-            return new Promise((resolve, reject) => {
-                const script = document.createElement('script');
-                script.src = 'https://cdn.jsdelivr.net/npm/rhino3dm@7.15.0/rhino3dm.js';
-                script.async = true;
-                
-                script.onload = () => {
-                    console.log('Rhino3dm loaded successfully');
-                    resolve();
-                };
-                
-                script.onerror = (error) => {
-                    console.error('Failed to load Rhino3dm:', error);
-                    reject(new Error('Failed to load Rhino3dm library'));
-                };
-                
-                document.head.appendChild(script);
-            });
-        }
-
-        // Load Rhino3dm when the page loads
-        window.addEventListener('load', () => {
-            loadRhino3dm().catch(error => {
-                console.error('Rhino3dm loading error:', error);
-                alert('Failed to load 3D viewer components. Please refresh the page and ensure you have a stable internet connection.');
-            });
-        });
-    </script>
+    <script src="lib/rhino3dm/rhino3dm.js"></script>
+    <script src="app.js" type="module"></script>
 </head>
 <body>
     <!-- Loading Indicator -->
     <div id="loading-indicator">
         <div class="spinner"></div>
-        <div class="loading-text">Loading 3D Viewer...</div>
+        <p class="loading-text">Loading...</p>
     </div>
 
     <!-- Front Page -->
@@ -85,9 +57,15 @@
     <!-- Drop Zone -->
     <div id="drop-zone" class="drop-zone">
         <div class="drop-zone-content">
-            <p>Drag & drop your 3D model here</p>
+            <i class="fas fa-cloud-upload-alt"></i>
+            <h2>Drop your 3D model here</h2>
             <p>or</p>
-            <button id="select-files">Select Files</button>
+            <button id="select-files" class="select-files-btn">
+                <i class="fas fa-folder-open"></i>
+                Select Files
+            </button>
+            <input type="file" id="file-input" accept=".3dm,.obj,.stl,.glb,.gltf" multiple style="display: none;">
+            <p class="supported-formats">Supported formats: 3DM, OBJ, STL, GLB/GLTF</p>
         </div>
     </div>
 
@@ -129,8 +107,5 @@
             </div>
         </div>
     </div>
-
-    <input type="file" id="file-input" accept=".3dm,.obj,.stl,.glb,.gltf" multiple style="display: none;">
-    <script type="module" src="app.js"></script>
 </body>
 </html> 

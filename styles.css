@@ -212,7 +212,7 @@ body {
     color: #666;
 }
 
-.drop-zone .add-model-btn {
+#select-files {
     background-color: #4285f4;
     color: white;
     border: none;
@@ -220,11 +220,25 @@ body {
     border-radius: 4px;
     cursor: pointer;
     font-size: 1rem;
-    transition: background-color 0.3s ease;
+    transition: all 0.3s ease;
+    margin-top: 1rem;
+    display: inline-block;
 }
 
-.drop-zone .add-model-btn:hover {
+#select-files:hover {
     background-color: #3367d6;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+#select-files:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+#select-files i {
+    margin-right: 0.5rem;
+    font-size: 1rem;
 }
 
 /* Controls Panel */
@@ -449,6 +463,12 @@ body {
 @keyframes spin {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
+}
+
+.loading-text {
+    margin-top: 1rem;
+    color: #333;
+    font-size: 1.2rem;
 }
 
 /* Footer styles */

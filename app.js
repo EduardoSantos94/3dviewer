@@ -34,7 +34,7 @@ async function initRhino3dm() {
     if (!isRhino3dmLoaded()) {
         console.log('Waiting for rhino3dm to load...');
         // Wait for a short time to allow the script to load
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        await new Promise(resolve => setTimeout(resolve, 2000));
         
         if (!isRhino3dmLoaded()) {
             throw new Error('rhino3dm.js is not loaded. Please check your internet connection and refresh the page.');
@@ -402,9 +402,10 @@ function setupEventListeners() {
     }
     
     // Drop zone select files button
-    const dropZoneBtn = document.querySelector('.drop-zone .add-model-btn');
-    if (dropZoneBtn) {
-        dropZoneBtn.addEventListener('click', () => {
+    const selectFilesBtn = document.getElementById('select-files');
+    if (selectFilesBtn) {
+        selectFilesBtn.addEventListener('click', () => {
+            console.log('Select files button clicked');
             document.getElementById('file-input').click();
         });
     }
@@ -413,6 +414,7 @@ function setupEventListeners() {
     const fileInput = document.getElementById('file-input');
     if (fileInput) {
         fileInput.addEventListener('change', (event) => {
+            console.log('Files selected:', event.target.files);
             handleFiles(event.target.files);
         });
     }
