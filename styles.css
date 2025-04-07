@@ -44,7 +44,19 @@ body {
     left: 0;
     width: 100%;
     height: 100%;
-    overflow: hidden;
+    display: none;
+    z-index: 1;
+}
+
+.viewer-layout {
+    display: flex;
+    width: 100%;
+    height: 100%;
+}
+
+.viewer-area {
+    flex: 1;
+    position: relative;
 }
 
 #viewer-container {
@@ -53,63 +65,61 @@ body {
     left: 0;
     width: 100%;
     height: 100%;
-    z-index: 0;
+    background-color: #f5f5f7;
 }
 
 /* Frontpage Styles */
 .frontpage {
-    position: absolute;
+    position: fixed;
     top: 0;
     left: 0;
     width: 100%;
     height: 100%;
     display: flex;
-    flex-direction: column;
     justify-content: center;
     align-items: center;
-    z-index: 10;
-    background-color: rgba(245, 245, 245, 0.9);
+    background-color: #f5f5f7;
+    z-index: 1000;
 }
 
 .frontpage-content {
-    max-width: 600px;
-    padding: 40px;
     text-align: center;
+    padding: 2rem;
     background-color: white;
-    border-radius: 15px;
+    border-radius: 1rem;
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    max-width: 600px;
+    width: 90%;
 }
 
 .frontpage h1 {
     font-size: 2.5rem;
     margin-bottom: 1rem;
-    color: #000; /* Black for headings */
-    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    color: #000;
 }
 
 .frontpage p {
     font-size: 1.2rem;
     margin-bottom: 2rem;
-    max-width: 800px;
-    text-align: center;
-    line-height: 1.6;
-    color: #000; /* Black for paragraph text */
+    color: #000;
 }
 
 .supported-formats {
-    margin-top: 20px;
+    margin: 2rem 0;
+    padding: 20px;
+    background-color: #f8f9fa;
+    border-radius: 8px;
 }
 
-.supported-formats p {
+.supported-formats h3 {
     margin-bottom: 1rem;
-    font-size: 1rem;
     color: #000;
 }
 
 .supported-formats ul {
     list-style: none;
     padding: 0;
-    margin: 10px 0;
+    margin: 0;
     display: flex;
     justify-content: center;
     gap: 20px;
@@ -118,9 +128,12 @@ body {
 .supported-formats li {
     color: #000;
     font-size: 0.9rem;
+    padding: 8px 16px;
+    background-color: white;
+    border-radius: 6px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
 }
 
-/* Buttons */
 .cta-button {
     background-color: #007AFF;
     color: white;
@@ -128,14 +141,19 @@ body {
     padding: 12px 24px;
     border-radius: 8px;
     font-size: 16px;
+    font-weight: 500;
     cursor: pointer;
-    transition: background-color 0.2s;
+    transition: all 0.2s ease;
+    margin-top: 2rem;
 }
 
 .cta-button:hover {
     background-color: #0056b3;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
 }
 
+/* Buttons */
 .add-model-btn {
     background-color: #007AFF;
     color: white;
@@ -153,27 +171,60 @@ body {
 
 /* Drop Zone */
 .drop-zone {
-    position: absolute;
+    position: fixed;
     top: 0;
     left: 0;
     width: 100%;
     height: 100%;
-    display: flex;
-    flex-direction: column;
+    display: none;
     justify-content: center;
     align-items: center;
-    z-index: 10;
-    background-color: rgba(245, 245, 245, 0.9);
-    transition: background-color 0.3s;
+    background-color: rgba(255, 255, 255, 0.95);
+    z-index: 1000;
 }
 
 .drop-zone.dragover {
     background-color: rgba(66, 133, 244, 0.1);
+    border: 2px dashed #4285f4;
+}
+
+.drop-zone-content {
+    text-align: center;
+    padding: 2rem;
+    background-color: white;
+    border-radius: 1rem;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 
 .drop-zone i {
-    color: #000;
+    font-size: 3rem;
+    color: #4285f4;
     margin-bottom: 1rem;
+}
+
+.drop-zone h2 {
+    margin-bottom: 1rem;
+    color: #333;
+}
+
+.drop-zone p {
+    margin: 1rem 0;
+    color: #666;
+}
+
+.drop-zone .add-model-btn {
+    background-color: #4285f4;
+    color: white;
+    border: none;
+    padding: 0.75rem 1.5rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 1rem;
+    transition: background-color 0.3s ease;
+}
+
+.drop-zone .add-model-btn:hover {
+    background-color: #3367d6;
 }
 
 /* Controls Panel */
@@ -373,24 +424,24 @@ body {
 }
 
 /* Loading Indicator */
-.loading-indicator {
-    position: absolute;
+#loading-indicator {
+    position: fixed;
     top: 0;
     left: 0;
     width: 100%;
     height: 100%;
-    background-color: rgba(255, 255, 255, 0.8);
-    display: flex;
+    display: none;
     justify-content: center;
     align-items: center;
-    z-index: 100;
+    background-color: rgba(255, 255, 255, 0.9);
+    z-index: 2000;
 }
 
 .spinner {
     width: 50px;
     height: 50px;
     border: 5px solid #f3f3f3;
-    border-top: 5px solid #4285f4;
+    border-top: 5px solid #3498db;
     border-radius: 50%;
     animation: spin 1s linear infinite;
 }
@@ -596,19 +647,6 @@ footer a:hover {
 }
 
 /* Right sidebar UI layout */
-.viewer-layout {
-    display: flex;
-    width: 100%;
-    height: 100%;
-}
-
-.viewer-area {
-    flex: 1;
-    position: relative;
-    height: 100%;
-    background-color: #f5f5f5;
-}
-
 .ui-sidebar {
     width: 280px;
     height: 100%;

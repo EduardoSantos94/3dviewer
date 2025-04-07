@@ -65,8 +65,20 @@ function hideLoadingIndicator() {
 // Show frontpage
 function showFrontpage() {
     const frontpage = document.getElementById('frontpage');
+    const dropZone = document.getElementById('drop-zone');
+    const container = document.querySelector('.container');
+    
     if (frontpage) {
         frontpage.style.display = 'flex';
+        console.log('Showing frontpage');
+    }
+    
+    if (dropZone) {
+        dropZone.style.display = 'none';
+    }
+    
+    if (container) {
+        container.style.display = 'none';
     }
 }
 
@@ -74,16 +86,27 @@ function showFrontpage() {
 function hideFrontpage() {
     const frontpage = document.getElementById('frontpage');
     const dropZone = document.getElementById('drop-zone');
+    const container = document.querySelector('.container');
+    const viewerContainer = document.getElementById('viewer-container');
     
     if (frontpage) {
         frontpage.style.display = 'none';
+        console.log('Hiding frontpage');
+    }
+    
+    if (container) {
+        container.style.display = 'block';
     }
     
     if (dropZone) {
-        dropZone.style.display = 'none';
+        dropZone.style.display = 'flex';
+    }
+
+    if (viewerContainer) {
+        viewerContainer.style.display = 'block';
     }
     
-    // Show the sidebar and controls since they're now part of the main layout
+    // Show the sidebar and controls
     const controlsPanel = document.querySelector('.controls-panel');
     const modelList = document.querySelector('.model-list');
     
@@ -94,6 +117,11 @@ function hideFrontpage() {
     if (modelList) {
         modelList.style.display = 'block';
     }
+
+    // Force a resize event to ensure proper rendering
+    window.dispatchEvent(new Event('resize'));
+    
+    console.log('Front page hidden, viewer ready');
 }
 
 // Initialize the application
@@ -106,20 +134,36 @@ async function initializeApp() {
         await initRhino3dm();
 
         // Then initialize Three.js scene and components
-        init();
-        setupEventListeners();
-        animate();
-
-        // Initially hide UI elements
+        await init();
+        
+        // Initially hide UI elements except frontpage
+        const container = document.querySelector('.container');
         const controlsPanel = document.querySelector('.controls-panel');
         const modelList = document.querySelector('.model-list');
         const dropZone = document.getElementById('drop-zone');
         const frontpage = document.getElementById('frontpage');
+        const viewerContainer = document.getElementById('viewer-container');
 
+        // Ensure frontpage is visible
+        if (frontpage) {
+            frontpage.style.display = 'flex';
+            console.log('Frontpage is visible');
+        } else {
+            console.error('Frontpage element not found');
+        }
+
+        // Hide other elements
+        if (container) container.style.display = 'none';
         if (controlsPanel) controlsPanel.style.display = 'none';
         if (modelList) modelList.style.display = 'none';
         if (dropZone) dropZone.style.display = 'none';
-        if (frontpage) frontpage.style.display = 'flex';
+        if (viewerContainer) viewerContainer.style.display = 'none';
+
+        // Setup event listeners after initializing UI
+        setupEventListeners();
+
+        // Start animation loop
+        animate();
 
         console.log('🛠️ App initialized successfully');
         hideLoadingIndicator();
@@ -127,7 +171,7 @@ async function initializeApp() {
         console.error('Failed to initialize:', error);
         hideLoadingIndicator();
         alert('Failed to initialize 3D viewer. Please refresh the page and ensure you have a stable internet connection.');
-        throw error; // Re-throw to help with debugging
+        throw error;
     }
 }
 
@@ -256,6 +300,20 @@ async function init() {
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     document.getElementById('viewer-container').appendChild(renderer.domElement);
 
+    // Initialize post-processing
+    composer = new EffectComposer(renderer);
+    const renderPass = new RenderPass(scene, camera);
+    composer.addPass(renderPass);
+    
+    // Add bloom effect
+    bloomPass = new UnrealBloomPass(
+        new THREE.Vector2(window.innerWidth, window.innerHeight),
+        0.5,  // strength
+        0.4,  // radius
+        0.85  // threshold
+    );
+    composer.addPass(bloomPass);
+
     // Setup orbit controls
     controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
@@ -328,20 +386,12 @@ async function init() {
 
 // Update the setupEventListeners function to properly handle file selection
 function setupEventListeners() {
-    // Add model button in sidebar
-    const addModelBtn = document.getElementById('add-model');
-    if (addModelBtn) {
-        addModelBtn.addEventListener('click', () => {
-            document.getElementById('file-input').click();
-        });
-    }
-    
     // Start viewing button on frontpage
     const startViewingBtn = document.getElementById('start-viewing');
     if (startViewingBtn) {
         startViewingBtn.addEventListener('click', () => {
+            console.log('Start viewing button clicked');
             hideFrontpage();
-            document.getElementById('drop-zone').style.display = 'flex';
         });
     }
     
@@ -353,39 +403,35 @@ function setupEventListeners() {
         });
     }
 
-    // File input change event
+    // File input change handler
     const fileInput = document.getElementById('file-input');
     if (fileInput) {
-        fileInput.addEventListener('change', (e) => {
-            if (e.target.files.length > 0) {
-                handleFiles(e.target.files);
-                // Reset the input value after a short delay
-                setTimeout(() => {
-                    e.target.value = '';
-                }, 100);
-            }
+        fileInput.addEventListener('change', (event) => {
+            handleFiles(event.target.files);
         });
     }
-    
-    // Click handling for object selection
-    renderer.domElement.addEventListener('click', handleClick);
 
-    // Setup drop zone events
+    // Drop zone handlers
     const dropZone = document.getElementById('drop-zone');
     if (dropZone) {
-        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-            dropZone.addEventListener(eventName, preventDefaults, false);
+        dropZone.addEventListener('dragover', (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            dropZone.classList.add('dragover');
         });
-        
-        ['dragenter', 'dragover'].forEach(eventName => {
-            dropZone.addEventListener(eventName, highlight, false);
+
+        dropZone.addEventListener('dragleave', (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            dropZone.classList.remove('dragover');
         });
-        
-        ['dragleave', 'drop'].forEach(eventName => {
-            dropZone.addEventListener(eventName, unhighlight, false);
+
+        dropZone.addEventListener('drop', (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            dropZone.classList.remove('dragover');
+            handleFiles(event.dataTransfer.files);
         });
-        
-        dropZone.addEventListener('drop', handleDrop, false);
     }
     
     // Material selection
@@ -431,19 +477,9 @@ function setupEventListeners() {
     if (directionalLightSlider) {
         directionalLightSlider.addEventListener('input', handleDirectionalLightChange);
     }
-}
 
-function preventDefaults(e) {
-    e.preventDefault();
-    e.stopPropagation();
-}
-
-function highlight(e) {
-    document.getElementById('drop-zone').classList.add('dragover');
-}
-
-function unhighlight(e) {
-    document.getElementById('drop-zone').classList.remove('dragover');
+    // Click handling for object selection
+    renderer.domElement.addEventListener('click', handleClick);
 }
 
 // Get appropriate loader for file type
@@ -566,14 +602,21 @@ async function handleFiles(files) {
         showLoadingIndicator();
         hideFrontpage();
         
-        // Clear scene before loading new files
-        if (document.getElementById('drop-zone').style.display !== 'none') {
+        // Clear scene before loading new files only if we're dropping files for the first time
+        const dropZone = document.getElementById('drop-zone');
+        if (dropZone && dropZone.style.display !== 'none') {
             ClearScene();
         }
 
         for (let i = 0; i < files.length; i++) {
             const file = files[i];
             console.log(`Processing file ${i + 1}/${files.length}: ${file.name}`);
+            
+            // Check if file is already loaded
+            if (models.some(model => model.name === file.name)) {
+                console.log(`File ${file.name} is already loaded, skipping...`);
+                continue;
+            }
             
             try {
                 await loadFile(file);
@@ -587,10 +630,16 @@ async function handleFiles(files) {
         if (models.length > 0) {
             document.querySelector('.controls-panel').style.display = 'block';
             document.querySelector('.model-list').style.display = 'block';
-            document.getElementById('drop-zone').style.display = 'none';
+            const dropZone = document.getElementById('drop-zone');
+            if (dropZone) {
+                dropZone.style.display = 'none';
+            }
             centerModel();
         } else {
-            document.getElementById('drop-zone').style.display = 'flex';
+            const dropZone = document.getElementById('drop-zone');
+            if (dropZone) {
+                dropZone.style.display = 'flex';
+            }
         }
     } catch (error) {
         console.error('Error processing files:', error);

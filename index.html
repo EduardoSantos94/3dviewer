@@ -5,10 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="Content-Security-Policy" content="
         default-src 'self';
-        script-src 'self' 'unsafe-eval' 'unsafe-inline' https://unpkg.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com;
+        script-src 'self' 'unsafe-eval' 'unsafe-inline' https://unpkg.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://files.mcneel.com blob:;
         style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com;
         font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com;
-        connect-src 'self' https://cdn.jsdelivr.net https://unpkg.com https://cdnjs.cloudflare.com;
+        connect-src 'self' https://cdn.jsdelivr.net https://unpkg.com https://cdnjs.cloudflare.com https://files.mcneel.com;
         img-src 'self' data: blob:;
         worker-src 'self' blob:;
     ">
@@ -16,97 +16,101 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+    <script src="node_modules/rhino3dm/rhino3dm.js" async></script>
+    <script>
+        // Error handling for Rhino script loading
+        window.addEventListener('error', function(e) {
+            if (e.target.src.includes('rhino3dm.js')) {
+                console.error('Failed to load rhino3dm.js:', e);
+                alert('Failed to load 3D viewer components. Please refresh the page and ensure you have a stable internet connection.');
+            }
+        }, true);
+    </script>
 </head>
 <body>
-    <div class="container">
-        <div class="viewer-layout">
-            <div class="viewer-area" id="viewer-container">
-                <!-- 3D viewer will be inserted here -->
+    <!-- Loading Indicator -->
+    <div id="loading-indicator">
+        <div class="spinner"></div>
+        <div class="loading-text">Loading 3D Viewer...</div>
+    </div>
+
+    <!-- Front Page -->
+    <div id="frontpage" class="frontpage">
+        <div class="frontpage-content">
+            <h1>3D Jewelry Viewer</h1>
+            <p>Upload and view your 3D jewelry models in high quality with realistic materials and lighting.</p>
+            
+            <div class="supported-formats">
+                <h3>Supported Formats</h3>
+                <ul>
+                    <li>3DM (Rhino)</li>
+                    <li>OBJ</li>
+                    <li>STL</li>
+                    <li>GLB/GLTF</li>
+                </ul>
             </div>
             
-            <div class="ui-sidebar">
+            <button id="start-viewing" class="cta-button">Start Viewing</button>
+        </div>
+    </div>
+
+    <!-- Drop Zone -->
+    <div id="drop-zone" class="drop-zone">
+        <div class="drop-zone-content">
+            <p>Drag & drop your 3D model here</p>
+            <p>or</p>
+            <button id="select-files">Select Files</button>
+        </div>
+    </div>
+
+    <!-- Main Container -->
+    <div class="container">
+        <div class="viewer-layout">
+            <div class="viewer-area">
+                <div id="viewer-container"></div>
+            </div>
+            <div class="sidebar">
                 <div class="controls-panel">
                     <h3>Controls</h3>
-                    
-                    <label class="control-label">Material:</label>
-                    <select id="material-select">
-                        <option value="yellow">Yellow Gold (Fast Render)</option>
-                        <option value="rose">Rose Gold (Fast Render)</option>
-                        <option value="white">White Gold (Fast Render)</option>
-                        <option value="fastYellow">Yellow Gold (Fast Render)</option>
-                        <option value="fastRose">Rose Gold (Fast Render)</option>
-                        <option value="fastWhite">White Gold (Fast Render)</option>
-                    </select>
-
-                    <label class="control-label">Ambient Light:</label>
-                    <input type="range" id="ambient-light" min="0" max="1" step="0.01" value="0.3">
-                    
-                    <label class="control-label">Directional Light:</label>
-                    <input type="range" id="directional-light" min="0" max="1" step="0.01" value="0.7">
-                    
-                    <div class="control-buttons">
-                        <button id="center-model"><i class="fas fa-bullseye"></i> Center</button>
-                        <button id="toggle-turntable"><i class="fas fa-sync-alt"></i> Rotate</button>
-                        <button id="toggle-floor"><i class="fas fa-square"></i> Floor</button>
-                        <button id="toggle-background"><i class="fas fa-fill-drip"></i> Background</button>
+                    <div class="control-group">
+                        <label>Material</label>
+                        <select id="material-select">
+                            <option value="gold">Gold</option>
+                            <option value="rose-gold">Rose Gold</option>
+                            <option value="white-gold">White Gold</option>
+                            <option value="platinum">Platinum</option>
+                            <option value="silver">Silver</option>
+                        </select>
                     </div>
-                    
-                    <button id="add-model" class="add-model-btn"><i class="fas fa-plus"></i> Add Model</button>
+                    <div class="control-group">
+                        <button id="center-model">Center Model</button>
+                    </div>
+                    <div class="control-group">
+                        <label>Ambient Light</label>
+                        <input type="range" id="ambient-light" min="0" max="1" step="0.1" value="0.5">
+                    </div>
+                    <div class="control-group">
+                        <label>Directional Light</label>
+                        <input type="range" id="directional-light" min="0" max="1" step="0.1" value="0.8">
+                    </div>
                 </div>
-                
-                <div class="model-list" id="model-list">
-                    <!-- Model list will be populated here -->
+                <div class="model-list">
+                    <h3>Loaded Models</h3>
+                    <div id="model-list-content"></div>
                 </div>
-                
-                <div class="footer">
-                    <p>This work is licensed under a <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank">Creative Commons Attribution 4.0 International License</a>.</p>
-                </div>
-            </div>
-        </div>
-        
-        <div id="loading-indicator">
-            <div class="spinner"></div>
-            <div class="loading-text">Loading...</div>
-        </div>
-        
-        <div id="frontpage">
-            <div class="frontpage-content">
-                <h1>3D Jewelry Viewer</h1>
-                <p>Upload and view your 3D jewelry models in high quality with realistic materials</p>
-                <div class="supported-formats">
-                    <h3>Supported Formats</h3>
-                    <ul>
-                        <li><strong>.3dm</strong> - Rhino 3D Models</li>
-                        <li><strong>.stl</strong> - Stereolithography</li>
-                        <li><strong>.obj</strong> - Wavefront Object</li>
-                        <li><strong>.glb/.gltf</strong> - GL Transmission Format</li>
-                    </ul>
-                </div>
-                <button id="start-viewing">Start Viewing</button>
-            </div>
-        </div>
-        
-        <div id="drop-zone" class="drop-zone">
-            <div class="drop-zone-content">
-                <i class="fas fa-cloud-upload-alt"></i>
-                <h2>Drag & Drop Files Here</h2>
-                <p>or</p>
-                <button class="add-model-btn">Select Files</button>
             </div>
         </div>
     </div>
-    
-    <input type="file" id="file-input" style="display: none;" accept=".3dm,.stl,.obj,.gltf,.glb" multiple>
-    
-    <script type="importmap">
-    {
-        "imports": {
-            "three": "https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.module.js",
-            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.132.2/examples/jsm/"
-        }
-    }
-    </script>
-    <script async src="https://cdn.jsdelivr.net/npm/rhino3dm@7.15.0/rhino3dm.js"></script>
+
+    <input type="file" id="file-input" accept=".3dm,.obj,.stl,.glb,.gltf" multiple style="display: none;">
     <script type="module" src="app.js"></script>
 </body>
 </html> 
