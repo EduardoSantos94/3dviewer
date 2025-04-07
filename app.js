@@ -634,7 +634,7 @@ function toggleTurntable() {
     }
 }
 
-// Update file handling to support multiple files
+// Update existing handleFiles function to use new loadFile function
 async function handleFiles(files) {
     if (!files || files.length === 0) return;
 
@@ -647,21 +647,12 @@ async function handleFiles(files) {
         // Process each file sequentially to avoid memory issues
         for (let i = 0; i < files.length; i++) {
             const file = files[i];
-            const extension = file.name.split('.').pop().toLowerCase();
             console.log(`Processing file ${i + 1}/${files.length}: ${file.name}`);
             
             try {
-                if (extension === '3dm') {
-                    // Important: Wait for each 3DM file to complete before moving to the next
-                    await process3DMFile(file);
-                    successCount++;
-                } else if (['stl', 'obj', 'gltf', 'glb'].includes(extension)) {
-                    await processOtherFile(file);
-                    successCount++;
-                } else {
-                    console.warn(`Unsupported file type: ${extension}`);
-                    alert(`File type not supported: ${extension}`);
-                }
+                // Use the new loadFile function to process the file
+                await loadFile(file);
+                successCount++;
             } catch (error) {
                 console.error(`Error processing file ${file.name}:`, error);
                 alert(`Failed to process ${file.name}: ${error.message}`);
@@ -693,13 +684,170 @@ async function handleFiles(files) {
     }
 }
 
-// Process 3DM file with improved quality
+// Create new loadFile function that handles all file types and prevents duplicates
+async function loadFile(file) {
+    // Generate a unique ID for this file to prevent duplicates
+    const fileId = `${file.name}_${file.size}_${file.lastModified}`;
+    console.log(`[loadFile] Starting to load file: ${file.name} (ID: ${fileId})`);
+    
+    // Check if file with same ID is already loaded
+    const existingModelIndex = models.findIndex(model => model.fileId === fileId);
+    if (existingModelIndex >= 0) {
+        console.log(`[loadFile] File already loaded, removing existing model: ${file.name}`);
+        // Remove the existing model before loading again
+        scene.remove(models[existingModelIndex].mesh);
+        models.splice(existingModelIndex, 1);
+    }
+    
+    const extension = file.name.split('.').pop().toLowerCase();
+    console.log(`[loadFile] File extension: ${extension}`);
+    
+    let result;
+    
+    // Process file based on extension
+    if (extension === '3dm') {
+        console.log(`[loadFile] Processing 3DM file`);
+        result = await process3DMFile(file);
+    } else if (['stl', 'obj', 'gltf', 'glb'].includes(extension)) {
+        console.log(`[loadFile] Processing ${extension.toUpperCase()} file`);
+        result = await processOtherFile(file);
+    } else {
+        throw new Error(`Unsupported file type: ${extension}`);
+    }
+    
+    // Store file ID with the model to prevent duplicates
+    result.userData = result.userData || {};
+    result.userData.fileId = fileId;
+    
+    // Load the model into the scene
+    loadModel(result, file.name, fileId);
+    
+    console.log(`[loadFile] Successfully loaded: ${file.name}`);
+    return result;
+}
+
+// Update loadModel function to store fileId
+function loadModel(object, fileName, fileId) {
+    let mesh;
+    
+    console.log(`[loadModel] Loading model: ${fileName} (ID: ${fileId})`);
+    
+    // Handle different types of loaded objects
+    if (object instanceof THREE.BufferGeometry) {
+        // For STL files
+        const material = materialPresets.yellow.clone();
+        mesh = new THREE.Mesh(object, material);
+        
+        // Create outline mesh
+        const outlineMesh = new THREE.Mesh(object, outlineMaterials.yellow.clone());
+        outlineMesh.scale.set(1.02, 1.02, 1.02);
+        outlineMesh.userData.isOutline = true;
+        mesh.add(outlineMesh);
+    } else if (object instanceof THREE.Group || object instanceof THREE.Mesh) {
+        mesh = object;
+        
+        if (mesh instanceof THREE.Group) {
+            mesh.traverse(child => {
+                if (child instanceof THREE.Mesh && !child.userData.isOutline) {
+                    const material = materialPresets.yellow.clone();
+                    child.material = material;
+                    
+                    const outlineMesh = new THREE.Mesh(child.geometry, outlineMaterials.yellow.clone());
+                    outlineMesh.scale.set(1.02, 1.02, 1.02);
+                    outlineMesh.userData.isOutline = true;
+                    child.add(outlineMesh);
+                }
+            });
+        } else {
+            const material = materialPresets.yellow.clone();
+            mesh.material = material;
+            
+            const outlineMesh = new THREE.Mesh(mesh.geometry, outlineMaterials.yellow.clone());
+            outlineMesh.scale.set(1.02, 1.02, 1.02);
+            outlineMesh.userData.isOutline = true;
+            mesh.add(outlineMesh);
+        }
+    } else {
+        console.error('Unsupported object type:', object);
+        return;
+    }
+
+    // Center and scale the model
+    const box = new THREE.Box3().setFromObject(mesh);
+    const center = box.getCenter(new THREE.Vector3());
+    const size = box.getSize(new THREE.Vector3());
+    
+    const maxDim = Math.max(size.x, size.y, size.z);
+    const scale = 1.5 / maxDim;
+    
+    mesh.position.set(0, 0, 0);
+    mesh.position.sub(center.multiplyScalar(scale));
+    mesh.scale.set(scale, scale, scale);
+    mesh.position.y = -box.min.y * scale + 0.5;
+
+    // Add to models array with fileId
+    models.push({
+        mesh: mesh,
+        name: fileName,
+        fileId: fileId,
+        visible: true,
+        selected: false
+    });
+
+    scene.add(mesh);
+    console.log(`[loadModel] Added model to scene: ${fileName}`);
+    
+    // Update model list in UI
+    updateModelList();
+    
+    // Show UI elements only after the first model is loaded
+    if (models.length === 1) {
+        document.querySelector('.controls-panel').style.display = 'block';
+        document.querySelector('.model-list').style.display = 'block';
+        document.getElementById('drop-zone').style.display = 'none';
+        document.getElementById('frontpage').style.display = 'none';
+        
+        zoomToFit(mesh, camera, controls);
+        controls.enableRotate = true;
+        controls.update();
+    }
+}
+
+// Update the processOtherFile function to return the object rather than calling loadModel
+async function processOtherFile(file) {
+    const loader = getLoaderForFile(file.name);
+    if (!loader) {
+        throw new Error(`Unsupported file format: ${file.name.split('.').pop()}`);
+    }
+
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            loader.load(e.target.result, 
+                (object) => {
+                    console.log(`[processOtherFile] Successfully loaded ${file.name}`);
+                    resolve(object);
+                },
+                (progress) => {
+                    console.log(`Loading ${file.name}: ${Math.round(progress.loaded / progress.total * 100)}%`);
+                },
+                (error) => {
+                    reject(new Error(`Failed to load ${file.name}: ${error.message}`));
+                }
+            );
+        };
+        reader.onerror = () => reject(new Error(`Failed to read ${file.name}`));
+        reader.readAsDataURL(file);
+    });
+}
+
+// Update process3DMFile to return the object rather than calling loadModel
 async function process3DMFile(file) {
     if (!rhino) {
         throw new Error('rhino3dm is not initialized. Please refresh the page and try again.');
     }
 
-    console.log('Processing 3DM file:', file.name);
+    console.log('[process3DMFile] Processing 3DM file:', file.name);
     const buffer = await file.arrayBuffer();
     
     const doc = rhino.File3dm.fromByteArray(new Uint8Array(buffer));
@@ -747,11 +895,12 @@ async function process3DMFile(file) {
     objects.delete();
     doc.delete();
 
-    if (geometryFound) {
-        loadModel(group, file.name);
-    } else {
+    if (!geometryFound) {
         throw new Error('No valid geometry found in the 3DM file');
     }
+    
+    console.log(`[process3DMFile] Successfully processed 3DM file with ${group.children.length} geometries`);
+    return group;
 }
 
 // Convert Rhino geometry to mesh with improved quality
@@ -781,34 +930,6 @@ async function convertRhinoGeometryToMesh(geometry, mp, rhino) {
     }
     
     return meshes;
-}
-
-// Process other file formats
-async function processOtherFile(file) {
-    const loader = getLoaderForFile(file.name);
-    if (!loader) {
-        throw new Error(`Unsupported file format: ${file.name.split('.').pop()}`);
-    }
-
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            loader.load(e.target.result, 
-                (object) => {
-                    loadModel(object, file.name);
-                    resolve();
-                },
-                (progress) => {
-                    console.log(`Loading ${file.name}: ${Math.round(progress.loaded / progress.total * 100)}%`);
-                },
-                (error) => {
-                    reject(new Error(`Failed to load ${file.name}: ${error.message}`));
-                }
-            );
-        };
-        reader.onerror = () => reject(new Error(`Failed to read ${file.name}`));
-        reader.readAsDataURL(file);
-    });
 }
 
 // Improved mesh conversion for better quality
@@ -887,89 +1008,6 @@ function convertRhinoMeshToThree(rhinoMesh) {
     mesh.receiveShadow = true;
     
     return mesh;
-}
-
-// Load model into scene
-function loadModel(object, fileName) {
-    let mesh;
-    
-    // Handle different types of loaded objects
-    if (object instanceof THREE.BufferGeometry) {
-        // For STL files
-        const material = materialPresets.yellow.clone();
-        mesh = new THREE.Mesh(object, material);
-        
-        // Create outline mesh
-        const outlineMesh = new THREE.Mesh(object, outlineMaterials.yellow.clone());
-        outlineMesh.scale.set(1.02, 1.02, 1.02);
-        outlineMesh.userData.isOutline = true;
-        mesh.add(outlineMesh);
-    } else if (object instanceof THREE.Group || object instanceof THREE.Mesh) {
-        mesh = object;
-        
-        if (mesh instanceof THREE.Group) {
-            mesh.traverse(child => {
-                if (child instanceof THREE.Mesh && !child.userData.isOutline) {
-                    const material = materialPresets.yellow.clone();
-                    child.material = material;
-                    
-                    const outlineMesh = new THREE.Mesh(child.geometry, outlineMaterials.yellow.clone());
-                    outlineMesh.scale.set(1.02, 1.02, 1.02);
-                    outlineMesh.userData.isOutline = true;
-                    child.add(outlineMesh);
-                }
-            });
-        } else {
-            const material = materialPresets.yellow.clone();
-            mesh.material = material;
-            
-            const outlineMesh = new THREE.Mesh(mesh.geometry, outlineMaterials.yellow.clone());
-            outlineMesh.scale.set(1.02, 1.02, 1.02);
-            outlineMesh.userData.isOutline = true;
-            mesh.add(outlineMesh);
-        }
-    } else {
-        console.error('Unsupported object type:', object);
-        return;
-    }
-
-    // Center and scale the model
-    const box = new THREE.Box3().setFromObject(mesh);
-    const center = box.getCenter(new THREE.Vector3());
-    const size = box.getSize(new THREE.Vector3());
-    
-    const maxDim = Math.max(size.x, size.y, size.z);
-    const scale = 1.5 / maxDim;
-    
-    mesh.position.set(0, 0, 0);
-    mesh.position.sub(center.multiplyScalar(scale));
-    mesh.scale.set(scale, scale, scale);
-    mesh.position.y = -box.min.y * scale + 0.5;
-
-    // Add to models array
-    models.push({
-        mesh: mesh,
-        name: fileName,
-        visible: true,
-        selected: false
-    });
-
-    scene.add(mesh);
-    
-    // Update model list in UI
-    updateModelList();
-    
-    // Show UI elements only after the first model is loaded
-    if (models.length === 1) {
-        document.querySelector('.controls-panel').style.display = 'block';
-        document.querySelector('.model-list').style.display = 'block';
-        document.getElementById('drop-zone').style.display = 'none';
-        document.getElementById('frontpage').style.display = 'none';
-        
-        zoomToFit(mesh, camera, controls);
-        controls.enableRotate = true;
-        controls.update();
-    }
 }
 
 // Update model list in UI with improved multiple model handling
@@ -1514,8 +1552,8 @@ function handleDrop(event) {
     const dt = event.dataTransfer;
     const files = dt.files;
     
-    // Prevent processing if already handling files
     if (files.length > 0) {
+        console.log(`[handleDrop] Received ${files.length} files via drag-and-drop`);
         // Use setTimeout to avoid event propagation issues
         setTimeout(() => {
             handleFiles(files);
