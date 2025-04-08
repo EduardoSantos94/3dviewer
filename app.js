@@ -23,6 +23,7 @@ let composer;
 let bloomPass;
 let rhino = null; // Global rhino3dm instance
 let animationId = null; // For tracking animation frames
+let currentMaterial = 'gold'; // Default material for new models
 
 // Function to check if rhino3dm is loaded
 function isRhino3dmLoaded() {
@@ -1029,7 +1030,8 @@ async function process3DMFile(buffer) {
                 }
                 
                 const attributes = rhinoObject.attributes();
-                const layerIndex = attributes.layerIndex();
+                // Fix: Use layerIndex as a property, not as a function
+                const layerIndex = attributes.layerIndex;
                 
                 // Get the layer by index properly
                 const layers = doc.layers();
@@ -1044,6 +1046,7 @@ async function process3DMFile(buffer) {
                 // Get layer properties safely
                 if (layer) {
                     try {
+                        // Check if these are properties or methods
                         isLayerVisible = typeof layer.visible === 'function' ? layer.visible() : layer.visible;
                         layerName = typeof layer.name === 'function' ? layer.name() : layer.name;
                     } catch (e) {
@@ -1051,10 +1054,24 @@ async function process3DMFile(buffer) {
                     }
                 }
                 
-                if (attributes.materialSource() === rhino.ObjectMaterialSource.MaterialFromObject) {
-                    const rhinoMaterial = attributes.material();
+                // Use materialSource as a property, not a function if it's a property
+                const materialSource = typeof attributes.materialSource === 'function' ?
+                    attributes.materialSource() : attributes.materialSource;
+                    
+                const objectMaterialSource = typeof rhino.ObjectMaterialSource === 'object' ?
+                    rhino.ObjectMaterialSource.MaterialFromObject : 0; // Fallback value
+                
+                if (materialSource === objectMaterialSource) {
+                    // Use material as a property or function as appropriate
+                    const rhinoMaterial = typeof attributes.material === 'function' ?
+                        attributes.material() : attributes.material;
+                        
                     if (rhinoMaterial) {
-                        const materialColor = convertRhinoColorToTHREE(rhinoMaterial.diffuseColor());
+                        // Use diffuseColor as a property or function as appropriate
+                        const diffuseColor = typeof rhinoMaterial.diffuseColor === 'function' ?
+                            rhinoMaterial.diffuseColor() : rhinoMaterial.diffuseColor;
+                            
+                        const materialColor = convertRhinoColorToTHREE(diffuseColor);
                         materialHash = materialColor.getHexString();
                         
                         if (!materials.has(materialHash)) {
@@ -1073,7 +1090,11 @@ async function process3DMFile(buffer) {
                     // Safely get the layer color
                     let layerColor;
                     try {
-                        layerColor = convertRhinoColorToTHREE(layer.color());
+                        // Use color as a property or function as appropriate
+                        const layerColorObj = typeof layer.color === 'function' ? 
+                            layer.color() : layer.color;
+                            
+                        layerColor = convertRhinoColorToTHREE(layerColorObj);
                     } catch (e) {
                         console.warn('Error getting layer color:', e);
                         layerColor = new THREE.Color(0x808080); // Default gray fallback
@@ -1120,8 +1141,10 @@ async function process3DMFile(buffer) {
                     // Set a unique ID on the mesh to avoid duplication
                     mesh.userData.rhinoId = objectId;
                     
-                    // Add name from attributes if available
-                    const attributeName = typeof attributes.name === 'function' ? attributes.name() : attributes.name;
+                    // Add name from attributes if available - using as property or function as appropriate
+                    const attributeName = typeof attributes.name === 'function' ? 
+                        attributes.name() : attributes.name;
+                        
                     if (attributeName) {
                         mesh.name = attributeName;
                     } else if (layerName) {
@@ -1190,7 +1213,15 @@ function convertRhinoGeometryToMesh(geometry, material) {
             mp.comfortMargin = 0.1;
             mp.angularTolerance = 0.1;
             
-            const meshes3d = brep.meshes(mp);
+            // Handle meshes as property or method
+            const meshes3d = typeof brep.meshes === 'function' ? 
+                brep.meshes(mp) : (mp ? null : brep.meshes);
+                
+            if (!meshes3d) {
+                console.warn('Failed to generate meshes from Brep');
+                return null;
+            }
+            
             for (let i = 0; i < meshes3d.count; i++) {
                 const mesh3d = meshes3d.get(i);
                 const threeMesh = rhinoMeshToThreeMesh(mesh3d, material);
@@ -1220,7 +1251,15 @@ function convertRhinoGeometryToMesh(geometry, material) {
         
         // For extrusion objects, mesh them first
         else if (objectType === rhino.ObjectType.Extrusion) {
-            const brep = geometry.toBRep();
+            // Handle toBRep as property or method
+            const brep = typeof geometry.toBRep === 'function' ? 
+                geometry.toBRep() : geometry.toBRep;
+                
+            if (!brep) {
+                console.warn('Failed to convert Extrusion to BRep');
+                return null;
+            }
+            
             const meshes = [];
             
             // Create meshing parameters
@@ -1229,7 +1268,16 @@ function convertRhinoGeometryToMesh(geometry, material) {
             mp.gridMaxCount = 32;
             mp.refineGrid = true;
             
-            const meshes3d = brep.meshes(mp);
+            // Handle meshes as property or method
+            const meshes3d = typeof brep.meshes === 'function' ? 
+                brep.meshes(mp) : (mp ? null : brep.meshes);
+                
+            if (!meshes3d) {
+                console.warn('Failed to generate meshes from Extrusion BRep');
+                brep.delete();
+                return null;
+            }
+            
             for (let i = 0; i < meshes3d.count; i++) {
                 const mesh3d = meshes3d.get(i);
                 const threeMesh = rhinoMeshToThreeMesh(mesh3d, material);
@@ -1269,8 +1317,15 @@ function rhinoMeshToThreeMesh(rhinoMesh, material) {
         // Create BufferGeometry to hold the mesh data
         const geometry = new THREE.BufferGeometry();
         
-        // Get vertices
-        const vertices = rhinoMesh.vertices();
+        // Get vertices - handle as property or method
+        const vertices = typeof rhinoMesh.vertices === 'function' ? 
+            rhinoMesh.vertices() : rhinoMesh.vertices;
+            
+        if (!vertices) {
+            console.warn('No vertices found in Rhino mesh');
+            return null;
+        }
+        
         const vertexCount = vertices.count;
         const positions = new Float32Array(vertexCount * 3);
         
@@ -1285,8 +1340,15 @@ function rhinoMeshToThreeMesh(rhinoMesh, material) {
         // Set the vertex positions
         geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
         
-        // Get faces
-        const faces = rhinoMesh.faces();
+        // Get faces - handle as property or method
+        const faces = typeof rhinoMesh.faces === 'function' ? 
+            rhinoMesh.faces() : rhinoMesh.faces;
+            
+        if (!faces) {
+            console.warn('No faces found in Rhino mesh');
+            return null;
+        }
+        
         const faceCount = faces.count;
         const indices = [];
         
@@ -1302,8 +1364,10 @@ function rhinoMeshToThreeMesh(rhinoMesh, material) {
         // Set the face indices
         geometry.setIndex(indices);
         
-        // Get normals if they exist
-        const normals = rhinoMesh.normals();
+        // Get normals if they exist - handle as property or method
+        const normals = typeof rhinoMesh.normals === 'function' ? 
+            rhinoMesh.normals() : rhinoMesh.normals;
+            
         if (normals && normals.count === vertexCount) {
             const normalsArray = new Float32Array(vertexCount * 3);
             
@@ -1918,13 +1982,18 @@ function loadModel(object, fileName) {
     console.log(`[loadModel] Loading model: ${fileName}`);
 
     try {
+        // Get material type, defaulting to 'gold' if currentMaterial is not set or invalid
+        const materialType = (currentMaterial && materialPresets[currentMaterial]) 
+            ? currentMaterial 
+            : 'gold';
+            
         // Create a model object to store information
         const modelInfo = {
             name: fileName || 'Unknown Model',
             mesh: object,
             visible: true,
             selected: false,
-            material: currentMaterial || 'gold',
+            materialType: materialType,
             originalPosition: object.position.clone(),
             geometry: null
         };
@@ -1947,8 +2016,8 @@ function loadModel(object, fileName) {
             });
         }
 
-        // Apply the current material
-        applyMaterial(object, currentMaterial || 'gold');
+        // Apply the material - use materialType instead of currentMaterial
+        applyMaterial(object, materialType);
 
         // Add to the scene
         scene.add(object);
@@ -1969,8 +2038,8 @@ function loadModel(object, fileName) {
         // Update the model list in the UI
         updateModelListInSidebar();
 
-        // Return the new model info
-        return modelInfo;
+        // Return the index of the new model in the models array
+        return models.length - 1;
     } catch (error) {
         console.error(`Error loading model ${fileName}:`, error);
         return null;
@@ -2146,6 +2215,82 @@ function applyMaterial(mesh, materialType) {
     } else if (mesh instanceof THREE.Mesh) {
         mesh.material = material;
     }
+}
+
+// Create outline for a mesh using the outlineMaterials
+function createOutline(object) {
+    if (!object) return null;
+    
+    try {
+        // Determine material type, defaulting to 'gold'
+        let materialType = 'gold';
+        
+        // Check if the object already has a material with a type
+        if (object instanceof THREE.Mesh && object.material && object.material.userData && object.material.userData.materialType) {
+            materialType = object.material.userData.materialType;
+        }
+        
+        // Get the outline material or use default
+        const outlineMaterial = outlineMaterials[materialType] || outlineMaterials['gold'];
+        
+        if (object instanceof THREE.Group) {
+            // For groups, create a group of outlines
+            const outlineGroup = new THREE.Group();
+            
+            object.traverse((child) => {
+                if (child instanceof THREE.Mesh) {
+                    const childOutline = createMeshOutline(child, outlineMaterial.clone());
+                    if (childOutline) {
+                        childOutline.visible = false; // Start with outline hidden
+                        outlineGroup.add(childOutline);
+                    }
+                }
+            });
+            
+            if (outlineGroup.children.length > 0) {
+                outlineGroup.userData.isOutline = true;
+                object.userData.outline = outlineGroup;
+                return outlineGroup;
+            }
+            
+            return null;
+        } else if (object instanceof THREE.Mesh) {
+            // For individual meshes
+            const outline = createMeshOutline(object, outlineMaterial.clone());
+            if (outline) {
+                outline.visible = false; // Start with outline hidden
+                outline.userData.isOutline = true;
+                object.userData.outline = outline;
+                return outline;
+            }
+        }
+        
+        return null;
+    } catch (error) {
+        console.error('Error creating outline:', error);
+        return null;
+    }
+}
+
+// Helper function to create an outline for a single mesh
+function createMeshOutline(mesh, outlineMaterial) {
+    if (!mesh || !mesh.geometry) return null;
+    
+    // Clone the geometry for the outline
+    const geometry = mesh.geometry.clone();
+    
+    // Create the outline mesh
+    const outline = new THREE.Mesh(geometry, outlineMaterial);
+    
+    // Copy the transform from original mesh
+    outline.position.copy(mesh.position);
+    outline.rotation.copy(mesh.rotation);
+    outline.scale.copy(mesh.scale).multiplyScalar(1.05); // Slightly larger scale
+    
+    // Mark as outline for later identification
+    outline.userData.isOutline = true;
+    
+    return outline;
 }
 
 // Add back updateModelListInSidebar function
