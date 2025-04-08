@@ -56,7 +56,7 @@ async function initRhino3dm() {
 function showLoadingIndicator() {
     const loadingIndicator = document.getElementById('loading-indicator');
     if (loadingIndicator) {
-        loadingIndicator.style.display = 'block';
+        loadingIndicator.style.display = 'flex';  // Changed to flex for better centering
     }
 }
 
@@ -88,7 +88,7 @@ function showFrontpage() {
     }
 }
 
-// Hide frontpage
+// Hide frontpage with improved visibility management
 function hideFrontpage() {
     const frontpage = document.getElementById('frontpage');
     const dropZone = document.getElementById('drop-zone');
@@ -100,30 +100,21 @@ function hideFrontpage() {
         console.log('Hiding frontpage');
     }
     
+    // Show the main container first
     if (container) {
         container.style.display = 'block';
     }
     
+    // Then show the drop zone for file selection
     if (dropZone) {
         dropZone.style.display = 'flex';
     }
 
+    // Ensure viewer is visible
     if (viewerContainer) {
         viewerContainer.style.display = 'block';
     }
     
-    // Show the sidebar and controls
-    const controlsPanel = document.querySelector('.controls-panel');
-    const modelList = document.querySelector('.model-list');
-    
-    if (controlsPanel) {
-        controlsPanel.style.display = 'block';
-    }
-    
-    if (modelList) {
-        modelList.style.display = 'block';
-    }
-
     // Force a resize event to ensure proper rendering
     window.dispatchEvent(new Event('resize'));
     
@@ -142,7 +133,7 @@ async function initializeApp() {
         // Then initialize Three.js scene and components
         await init();
         
-        // Initially hide UI elements except frontpage
+        // Set up the initial UI state
         const container = document.querySelector('.container');
         const controlsPanel = document.querySelector('.controls-panel');
         const modelList = document.querySelector('.model-list');
@@ -150,20 +141,25 @@ async function initializeApp() {
         const frontpage = document.getElementById('frontpage');
         const viewerContainer = document.getElementById('viewer-container');
 
-        // Ensure frontpage is visible
-        if (frontpage) {
-            frontpage.style.display = 'flex';
-            console.log('Frontpage is visible');
-        } else {
-            console.error('Frontpage element not found');
-        }
+        // Ensure all elements exist before trying to manipulate them
+        if (!frontpage) console.error('Frontpage element not found');
+        if (!container) console.error('Container element not found');
+        if (!controlsPanel) console.error('Controls panel element not found');
+        if (!modelList) console.error('Model list element not found');
+        if (!dropZone) console.error('Drop zone element not found');
+        if (!viewerContainer) console.error('Viewer container element not found');
 
-        // Hide other elements
+        // Initial state: only show frontpage
+        if (frontpage) frontpage.style.display = 'flex';
         if (container) container.style.display = 'none';
-        if (controlsPanel) controlsPanel.style.display = 'none';
-        if (modelList) modelList.style.display = 'none';
         if (dropZone) dropZone.style.display = 'none';
-        if (viewerContainer) viewerContainer.style.display = 'none';
+        
+        // Make sure the sidebar is ready but hidden until needed
+        if (controlsPanel) controlsPanel.style.display = 'block';
+        if (modelList) modelList.style.display = 'block';
+        
+        // Make sure viewer container is ready
+        if (viewerContainer) viewerContainer.style.display = 'block';
 
         // Setup event listeners after initializing UI
         setupEventListeners();
@@ -174,6 +170,20 @@ async function initializeApp() {
 
         console.log('🛠️ App initialized successfully');
         hideLoadingIndicator();
+        
+        // Force a resize event to ensure proper rendering
+        window.dispatchEvent(new Event('resize'));
+        
+        // Update the model list sidebar
+        updateModelListInSidebar();
+        
+        console.log('UI state after initialization:');
+        console.log('- Frontpage visible:', frontpage ? frontpage.style.display : 'element not found');
+        console.log('- Container visible:', container ? container.style.display : 'element not found');
+        console.log('- Drop zone visible:', dropZone ? dropZone.style.display : 'element not found');
+        console.log('- Controls panel ready:', controlsPanel ? controlsPanel.style.display : 'element not found');
+        console.log('- Model list ready:', modelList ? modelList.style.display : 'element not found');
+        
     } catch (error) {
         console.error('Failed to initialize:', error);
         hideLoadingIndicator();
@@ -384,11 +394,15 @@ async function init() {
 
 // Update the setupEventListeners function to properly handle file selection
 function setupEventListeners() {
+    console.log('Setting up event listeners...');
+    
     // Start viewing button on frontpage
     const startViewingBtn = document.getElementById('start-viewing');
     if (startViewingBtn) {
         startViewingBtn.addEventListener('click', () => {
             console.log('Start viewing button clicked');
+            
+            // Hide frontpage and show other UI components
             hideFrontpage();
             
             // Force show the drop zone immediately
@@ -396,7 +410,15 @@ function setupEventListeners() {
             if (dropZone) {
                 dropZone.style.display = 'flex';
             }
+            
+            // Make sure container is visible too
+            const container = document.querySelector('.container');
+            if (container) {
+                container.style.display = 'block';
+            }
         });
+    } else {
+        console.error('Start viewing button not found!');
     }
     
     // Drop zone select files button
@@ -418,6 +440,8 @@ function setupEventListeners() {
             
             document.getElementById('file-input').click();
         });
+    } else {
+        console.error('Select files button not found!');
     }
 
     // File input change handler
@@ -432,11 +456,19 @@ function setupEventListeners() {
                     dropZone.style.display = 'none';
                 }
                 
+                // Make sure container is visible
+                const container = document.querySelector('.container');
+                if (container) {
+                    container.style.display = 'block';
+                }
+                
                 handleFiles(files);
                 // Reset the input to allow selecting the same file again
                 event.target.value = '';
             }
         });
+    } else {
+        console.error('File input not found!');
     }
 
     // Drop zone handlers
@@ -463,6 +495,8 @@ function setupEventListeners() {
                 handleFiles(files);
             }
         });
+    } else {
+        console.error('Drop zone not found!');
     }
     
     // Material selection
@@ -475,47 +509,78 @@ function setupEventListeners() {
                 }
             }
         });
+    } else {
+        console.error('Material select not found!');
     }
 
-    // Control buttons
+    // Control buttons - verify each exists before adding listener
     const centerBtn = document.getElementById('center-model');
     if (centerBtn) {
         centerBtn.addEventListener('click', centerSelectedModel);
+        console.log('Center model button initialized');
+    } else {
+        console.error('Center model button not found!');
     }
 
     const turntableBtn = document.getElementById('toggle-turntable');
     if (turntableBtn) {
         turntableBtn.addEventListener('click', toggleTurntable);
+        console.log('Turntable button initialized');
+    } else {
+        console.error('Turntable button not found!');
     }
 
     const floorBtn = document.getElementById('toggle-floor');
     if (floorBtn) {
         floorBtn.addEventListener('click', toggleFloor);
+        console.log('Floor button initialized');
+    } else {
+        console.error('Floor button not found!');
     }
 
     const backgroundBtn = document.getElementById('toggle-background');
     if (backgroundBtn) {
         backgroundBtn.addEventListener('click', toggleBackground);
+        console.log('Background button initialized');
+    } else {
+        console.error('Background button not found!');
     }
     
     const resetCameraBtn = document.getElementById('reset-camera');
     if (resetCameraBtn) {
         resetCameraBtn.addEventListener('click', resetCamera);
+        console.log('Reset camera button initialized');
+    } else {
+        console.error('Reset camera button not found!');
     }
     
     // Set up sliders for controlling lights
     const ambientLightSlider = document.getElementById('ambient-light');
     if (ambientLightSlider) {
         ambientLightSlider.addEventListener('input', handleAmbientLightChange);
+        console.log('Ambient light slider initialized');
+    } else {
+        console.error('Ambient light slider not found!');
     }
     
     const directionalLightSlider = document.getElementById('directional-light');
     if (directionalLightSlider) {
         directionalLightSlider.addEventListener('input', handleDirectionalLightChange);
+        console.log('Directional light slider initialized');
+    } else {
+        console.error('Directional light slider not found!');
     }
 
     // Click handling for object selection
-    renderer.domElement.addEventListener('click', handleClick);
+    const rendererElement = renderer ? renderer.domElement : null;
+    if (rendererElement) {
+        rendererElement.addEventListener('click', handleClick);
+        console.log('Renderer click handler initialized');
+    } else {
+        console.error('Renderer DOM element not found or not initialized yet!');
+    }
+    
+    console.log('All event listeners set up successfully');
 }
 
 // Get appropriate loader for file type
@@ -540,7 +605,7 @@ function getLoaderForFile(filename) {
         case '3dm':
             console.log('Initializing Rhino3dmLoader');
             const loader = new Rhino3dmLoader();
-            loader.setLibraryPath('https://cdn.jsdelivr.net/npm/rhino3dm@7.15.0/');
+            loader.setLibraryPath('./lib/rhino3dm/');
             return loader;
         default:
             console.log('No loader found for extension:', extension);
@@ -726,58 +791,109 @@ async function handleFiles(files) {
 
     try {
         showLoadingIndicator();
+        console.log(`Processing ${files.length} file(s)`);
         
         // Force UI state before any processing
         const frontpage = document.getElementById('frontpage');
         if (frontpage) {
             frontpage.style.display = 'none';
         }
-
+        
         const dropZone = document.getElementById('drop-zone');
         if (dropZone) {
             dropZone.style.display = 'none';
         }
-
+        
         const container = document.querySelector('.container');
         if (container) {
             container.style.display = 'block';
         }
         
-        document.querySelector('.controls-panel').style.display = 'block';
-        document.querySelector('.model-list').style.display = 'block';
+        // Ensure controls are visible
+        const controlsPanel = document.querySelector('.controls-panel');
+        if (controlsPanel) {
+            controlsPanel.style.display = 'block';
+        }
         
-        // Only clear the scene on the first model load
-        if (models.length === 0) {
-            ClearScene();
+        const modelList = document.querySelector('.model-list');
+        if (modelList) {
+            modelList.style.display = 'block';
+        }
+        
+        const viewerContainer = document.getElementById('viewer-container');
+        if (viewerContainer) {
+            viewerContainer.style.display = 'block';
         }
 
-        let loadedAnyFile = false;
+        // Process each file
         for (let i = 0; i < files.length; i++) {
             const file = files[i];
-            console.log(`Processing file ${i + 1}/${files.length}: ${file.name}`);
+            const extension = file.name.split('.').pop().toLowerCase();
             
-            // Check if file is already loaded
-            if (models.some(model => model.name === file.name)) {
-                console.log(`File ${file.name} is already loaded, skipping...`);
-                continue;
-            }
+            console.log(`Processing file: ${file.name} (${extension})`);
             
             try {
-                const result = await loadFile(file);
-                if (result) loadedAnyFile = true;
+                let object;
+                
+                if (extension === '3dm') {
+                    try {
+                        object = await process3DMFile(file);  // Fixed: Changed from process3dmFile to process3DMFile
+                    } catch (error) {
+                        console.error(`Error processing 3DM file: ${error.message}`);
+                        alert(`Failed to process ${file.name}: ${error.message}`);
+                        continue;  // Skip to the next file
+                    }
+                } else {
+                    try {
+                        object = await processOtherFile(file);
+                    } catch (error) {
+                        console.error(`Error processing file: ${error.message}`);
+                        alert(`Failed to process ${file.name}: ${error.message}`);
+                        continue;  // Skip to the next file
+                    }
+                }
+                
+                if (object) {
+                    // Add object to scene and model list
+                    const modelIndex = loadModel(object, file.name);
+                    
+                    // Auto-select the first model if this is the first one loaded
+                    if (models.length === 1 || i === 0) {
+                        selectModel(modelIndex);
+                    }
+                    
+                    console.log(`Successfully added ${file.name} to scene`);
+                }
             } catch (error) {
-                console.error(`Error processing file ${file.name}:`, error);
-                alert(`Failed to process ${file.name}: ${error.message}`);
+                console.error(`Failed to process ${file.name}:`, error);
+                alert(`Failed to process ${file.name}: ${error.message || 'Unknown error'}`);
             }
         }
-
-        // Center model and fit to view if any files were loaded
-        if (loadedAnyFile && models.length > 0) {
+        
+        // Update the model list in the sidebar
+        updateModelListInSidebar();
+        
+        // After all models are loaded, center them in the scene
+        if (models.length > 0) {
             centerModel();
+            console.log('Centered all models in scene');
         }
+        
+        // Log the current UI state
+        console.log('UI state after file processing:');
+        console.log('- Frontpage visible:', frontpage ? frontpage.style.display : 'element not found');
+        console.log('- Container visible:', container ? container.style.display : 'element not found');
+        console.log('- Drop zone visible:', dropZone ? dropZone.style.display : 'element not found');
+        console.log('- Controls panel visible:', controlsPanel ? controlsPanel.style.display : 'element not found');
+        console.log('- Model list visible:', modelList ? modelList.style.display : 'element not found');
+        console.log('- Viewer container visible:', viewerContainer ? viewerContainer.style.display : 'element not found');
+        
+        // Force a resize event to ensure proper rendering
+        window.dispatchEvent(new Event('resize'));
+        
     } catch (error) {
-        console.error('Error processing files:', error);
-        alert(error.message || 'Failed to process files. Please try again.');
+        console.error('Error handling files:', error);
+        alert(`Failed to process files: ${error.message || 'Unknown error'}`);
     } finally {
         hideLoadingIndicator();
     }
@@ -1736,6 +1852,8 @@ function loadModel(object, fileName) {
         controls.enableRotate = true;
         controls.update();
     }
+
+    return models.length - 1;
 }
 
 // Add centerSelectedModel function back
