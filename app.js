@@ -44,10 +44,10 @@ async function initRhino3dm() {
     try {
         console.log('Initializing rhino3dm...');
         rhino = await rhino3dm();
-        console.log('âœ… rhino3dm initialized successfully');
+        console.log('rhino3dm initialized successfully');
         return rhino;
     } catch (error) {
-        console.error('âŒ Failed to initialize rhino3dm:', error);
+        console.error('Failed to initialize rhino3dm:', error);
         throw error;
     }
 }
@@ -168,7 +168,7 @@ async function initializeApp() {
         // Start animation loop
         animate();
 
-        console.log('ðŸ› ï¸ App initialized successfully');
+        console.log('App initialized successfully');
         hideLoadingIndicator();
         
         // Force a resize event to ensure proper rendering
@@ -298,14 +298,14 @@ function ClearScene() {
   loadedMeshes = [];
   models = [];
   selectedObject = null;
-  console.log("ðŸ§¹ Scene cleared");
+  console.log("Scene cleared");
 }
 
 // Function to add a model to the scene
 function AddModelToScene(mesh) {
   scene.add(mesh);
   loadedMeshes.push(mesh);
-  console.log("ðŸ“¦ Mesh added:", mesh.name || "Unnamed");
+  console.log("Mesh added:", mesh.name || "Unnamed");
 }
 
 // Initialize the scene
@@ -846,11 +846,19 @@ async function handleFiles(files) {
                 
                 let object;
                 
+                // Read the file as ArrayBuffer first
+                const fileBuffer = await new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = e => resolve(e.target.result);
+                    reader.onerror = e => reject(new Error("Error reading file"));
+                    reader.readAsArrayBuffer(file);
+                });
+                
                 // Process the file based on its extension
                 if (extension === '3dm') {
                     try {
                         // Use the rhino3dm library directly
-                        object = await process3DMFile(file.name);
+                        object = await process3DMFile(fileBuffer, file.name);
                     } catch (error) {
                         console.error(`Error processing 3DM file: ${error.message}`);
                         alert(`Failed to process ${file.name}: ${error.message}`);
@@ -914,12 +922,12 @@ async function process3DMFile(bytes, filename) {
         console.log('[process3DMFile] Processing 3DM file');
 
         // Initialize rhino if needed
-        if (!rhino3dm) {
-            rhino3dm = await initRhino3dm();
+        if (!rhino) {
+            rhino = await initRhino3dm();
         }
         
         // Parse the 3DM file
-        const rhinoDoc = rhino3dm.File3dm.fromByteArray(bytes);
+        const rhinoDoc = rhino.File3dm.fromByteArray(bytes);
         console.log(`[process3DMFile] Loaded document with ${rhinoDoc.objects().count} objects`);
         
         // Create a group to hold all meshes from this file
@@ -951,7 +959,7 @@ async function process3DMFile(bytes, filename) {
             console.log(`[process3DMFile] Processing object ${i} of type: ${objectType}`);
             
             // For Brep objects, we need to convert them to meshes
-            if (objectType === rhino3dm.ObjectType.Brep) {
+            if (objectType === rhino.ObjectType.Brep) {
                 console.log('[process3DMFile] Processing Brep object');
                 const brep = geometry;
                 
@@ -961,7 +969,7 @@ async function process3DMFile(bytes, filename) {
                 
                 for (let faceIndex = 0; faceIndex < faces.count; faceIndex++) {
                     const face = faces.get(faceIndex);
-                    const mesh = face.getMesh(rhino3dm.MeshType.Any);
+                    const mesh = face.getMesh(rhino.MeshType.Any);
                     
                     if (mesh) {
                         meshes.push(mesh);
@@ -1067,7 +1075,7 @@ async function process3DMFile(bytes, filename) {
             }
             
             // For Mesh objects, we can directly convert them to THREE.Geometry
-            else if (objectType === rhino3dm.ObjectType.Mesh) {
+            else if (objectType === rhino.ObjectType.Mesh) {
                 console.log('[process3DMFile] Processing Mesh object');
                 const mesh = geometry;
                 const meshVertices = mesh.vertices();
@@ -1635,7 +1643,7 @@ function animate() {
         const delta = turntableClock.getDelta();
         selectedObject.rotation.y += turntableSpeed * delta;
         
-        // Keep rotation within 0-2Ï€ range for better performance
+        // Keep rotation within 0-2PI range for better performance
         if (selectedObject.rotation.y > Math.PI * 2) {
             selectedObject.rotation.y -= Math.PI * 2;
         }
