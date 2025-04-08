@@ -7,7 +7,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { Rhino3dmLoader } from 'three/addons/loaders/3DMLoader.js';
-import * as TWEEN from 'tween.js';
+import * as TWEEN from './lib/tween/tween.module.js';
 
 // Initialize Three.js scene
 let scene, camera, renderer, controls;
@@ -636,6 +636,22 @@ function getLoaderForFile(filename) {
             console.log('No loader found for extension:', extension);
             return null;
     }
+}
+
+// Get loader for file path or object
+function getLoaderForPath(path) {
+    // If path is an object (typically a 3D model object), return a dummy loader
+    if (typeof path === 'object') {
+        // Create a simple loader that just returns the object
+        return {
+            load: (url, onLoad) => {
+                onLoad(path);
+            }
+        };
+    }
+    
+    // For string paths, use the existing getLoaderForFile function
+    return getLoaderForFile(typeof path === 'string' ? path : path.name);
 }
 
 // Update the processOtherFile function to fix Content Security Policy issues when loading OBJ files
@@ -1446,6 +1462,9 @@ function selectModel(index) {
     models.forEach(model => {
         model.selected = false;
         
+        const modelMesh = getModelMesh(model);
+        if (!modelMesh) return;
+        
         const handleMesh = (mesh) => {
             if (mesh instanceof THREE.Mesh && !mesh.userData.isOutline) {
                 if (mesh.material) {
@@ -1456,17 +1475,18 @@ function selectModel(index) {
             }
         };
         
-        if (model.mesh instanceof THREE.Group) {
-            model.mesh.traverse(handleMesh);
-        } else if (model.mesh instanceof THREE.Mesh) {
-            handleMesh(model.mesh);
+        if (modelMesh instanceof THREE.Group) {
+            modelMesh.traverse(handleMesh);
+        } else if (modelMesh instanceof THREE.Mesh) {
+            handleMesh(modelMesh);
         }
     });
     
     // Then select the clicked model
     if (index >= 0 && index < models.length) {
         models[index].selected = true;
-        selectedObject = models[index].mesh;
+        const modelMesh = getModelMesh(models[index]);
+        selectedObject = modelMesh;
         
         // Highlight the selected model with a slight emissive glow
         const handleMesh = (mesh) => {
@@ -1486,16 +1506,16 @@ function selectModel(index) {
         }
         
         // Center camera on selected model
-        zoomToFit(selectedObject, camera, controls);
+        zoomToFit([models[index]], true);
         
         // Update material selector to show the current material
         const materialSelect = document.getElementById('material-select');
         if (materialSelect && models[index].materialType) {
             materialSelect.value = models[index].materialType;
         }
-        } else {
+    } else {
         selectedObject = null;
-        }
+    }
     
     // Update model list to reflect selection changes
     updateModelList();
@@ -1553,10 +1573,14 @@ function applyMaterialToModel(index, materialType) {
     if (index < 0 || index >= models.length) return;
     
     const model = models[index];
-    applyMaterial(model.mesh, materialType);
+    const modelMesh = getModelMesh(model);
     
-    // Update the model's material type for future reference
-    model.materialType = materialType;
+    if (modelMesh) {
+        applyMaterial(modelMesh, materialType);
+        
+        // Update the model's material type for future reference
+        model.materialType = materialType;
+    }
 }
 
 // Toggle model visibility
@@ -1564,7 +1588,11 @@ function toggleModelVisibility(index) {
     if (index >= 0 && index < models.length) {
         const model = models[index];
         model.visible = !model.visible;
-        model.mesh.visible = model.visible;
+        
+        const modelMesh = getModelMesh(model);
+        if (modelMesh) {
+            modelMesh.visible = model.visible;
+        }
         
         // Update model list to reflect visibility changes
         updateModelList();
@@ -1574,59 +1602,56 @@ function toggleModelVisibility(index) {
 // Remove model
 function removeModel(index) {
     if (models[index]) {
-        const mesh = models[index].mesh;
+        const modelMesh = getModelMesh(models[index]);
         
-        // Remove from scene
-        scene.remove(mesh);
-        
-        // Remove from loadedMeshes array
-        const meshIndex = loadedMeshes.indexOf(mesh);
-        if (meshIndex !== -1) {
-            loadedMeshes.splice(meshIndex, 1);
-        }
-        
-        // Properly dispose resources
-        if (mesh instanceof THREE.Mesh) {
-            if (mesh.geometry) mesh.geometry.dispose();
-            if (mesh.material) {
-                if (Array.isArray(mesh.material)) {
-                    mesh.material.forEach(mat => mat.dispose());
-    } else {
-                    mesh.material.dispose();
+        if (modelMesh) {
+            // Remove from scene
+            scene.remove(modelMesh);
+            
+            // Remove from loadedMeshes array if it exists
+            if (typeof loadedMeshes !== 'undefined') {
+                const meshIndex = loadedMeshes.indexOf(modelMesh);
+                if (meshIndex !== -1) {
+                    loadedMeshes.splice(meshIndex, 1);
                 }
             }
-        } else if (mesh instanceof THREE.Group) {
-            mesh.traverse(child => {
-                if (child instanceof THREE.Mesh) {
-                    if (child.geometry) child.geometry.dispose();
-                    if (child.material) {
-                        if (Array.isArray(child.material)) {
-                            child.material.forEach(mat => mat.dispose());
-                        } else {
-                            child.material.dispose();
-                        }
+            
+            // Properly dispose resources
+            if (modelMesh instanceof THREE.Mesh) {
+                if (modelMesh.geometry) modelMesh.geometry.dispose();
+                if (modelMesh.material) {
+                    if (Array.isArray(modelMesh.material)) {
+                        modelMesh.material.forEach(mat => mat.dispose());
+                    } else {
+                        modelMesh.material.dispose();
                     }
                 }
-            });
+            } else if (modelMesh instanceof THREE.Group) {
+                modelMesh.traverse(child => {
+                    if (child instanceof THREE.Mesh) {
+                        if (child.geometry) child.geometry.dispose();
+                        if (child.material) {
+                            if (Array.isArray(child.material)) {
+                                child.material.forEach(mat => mat.dispose());
+                            } else {
+                                child.material.dispose();
+                            }
+                        }
+                    }
+                });
+            }
+            
+            // Reset selected object if it was selected
+            if (selectedObject === modelMesh) {
+                selectedObject = null;
+            }
         }
         
         // Remove from models array
         models.splice(index, 1);
         
-        // Reset selected object if it was selected
-        if (selectedObject === mesh) {
-            selectedObject = null;
-        }
-        
         // Update UI using updateModelListInSidebar
         updateModelListInSidebar();
-        
-        // Show drop zone if no models left
-        if (models.length === 0) {
-            document.getElementById('drop-zone').style.display = 'flex';
-        }
-        
-        console.log(`Removed model: ${mesh.name || "Unnamed"}`);
     }
 }
 
@@ -1785,6 +1810,9 @@ function animate() {
     // Update controls for responsive camera movement
     controls.update();
     
+    // Update TWEEN animations
+    TWEEN.update();
+    
     // Handle turntable animation with improved handling
     if (isTurntableActive && selectedObject) {
         if (!turntableClock.running) {
@@ -1803,37 +1831,65 @@ function animate() {
 
 // Center all models
 function centerModel() {
-    if (models.length === 0) return;
-
-    let targetObject;
-    if (selectedObject) {
-        // If an object is selected, center on that object
-        targetObject = selectedObject;
-    } else {
-        // Otherwise center on all models
-    const combinedBox = new THREE.Box3();
-    models.forEach(model => {
-        const box = new THREE.Box3().setFromObject(model.mesh);
-        combinedBox.union(box);
-    });
-
-    const center = combinedBox.getCenter(new THREE.Vector3());
-    const size = combinedBox.getSize(new THREE.Vector3());
-    const maxDim = Math.max(size.x, size.y, size.z);
-    const scale = 1.5 / maxDim;
-
-    // Center and scale all models
-    models.forEach(model => {
-        model.mesh.position.sub(center);
-        model.mesh.scale.set(scale, scale, scale);
-        model.mesh.position.y = -combinedBox.min.y * scale + 0.5;
-    });
-
-        targetObject = models[0].mesh;
+    if (models.length === 0) {
+        console.log('No models to center');
+        return;
     }
 
-    // Use zoomToFit for smooth camera transition
-    zoomToFit(targetObject, camera, controls);
+    try {
+        console.log(`Centering ${models.length} models`);
+        
+        // If there's a selected object, just fit that one
+        if (selectedObject) {
+            console.log('Centering selected object');
+            // Use the zoomToFit function for the selected object
+            zoomToFit([selectedObject], true);
+            return;
+        }
+        
+        // Create a combined bounding box for all valid models
+        const combinedBox = new THREE.Box3();
+        let validModelCount = 0;
+        
+        // Safely expand the bounding box with each model
+        models.forEach((model, index) => {
+            try {
+                if (model && model.object && model.visible !== false) {
+                    // Make sure the world matrix is updated
+                    model.object.updateMatrixWorld(true);
+                    
+                    // Get or compute the bounding box
+                    const modelBox = model.boundingBox || new THREE.Box3().setFromObject(model.object);
+                    
+                    // Only use the box if it's valid
+                    if (isValidBoundingBox(modelBox)) {
+                        combinedBox.union(modelBox);
+                        validModelCount++;
+                        console.log(`Added model ${index} to combined bounding box`);
+                    } else {
+                        console.warn(`Model ${index} has invalid bounding box, skipping`);
+                    }
+                }
+            } catch (err) {
+                console.error(`Error processing model ${index} for centering:`, err);
+            }
+        });
+        
+        // If no valid models found, use a default box
+        if (validModelCount === 0) {
+            console.warn('No valid models found for centering, using default positioning');
+            combinedBox.set(
+                new THREE.Vector3(-1, -1, -1),
+                new THREE.Vector3(1, 1, 1)
+            );
+        }
+        
+        // Now use zoomToFit to handle the camera positioning
+        zoomToFit(models, true);
+        
+    } catch (error) {
+        console.error('Error in centerModel:', error);
+    }
 }
 
 function toggleFloor() {
@@ -2054,15 +2110,16 @@ function zoomToFit(selectedModels = null, animate = true) {
 // Load model function that adds a model to the scene without duplicating geometry
 function loadModel(modelPath, materialType = null) {
     // Create a progress indicator
+    const progressContainer = document.getElementById('progress-container');
     const progressElement = document.getElementById('progress');
-    progressElement.style.display = 'block';
+    progressContainer.style.display = 'block';
     progressElement.style.width = '0%';
     
     // Check if we already have this model loaded
     const existingModelIndex = models.findIndex(model => model.path === modelPath);
     if (existingModelIndex >= 0) {
         console.log(`Model ${modelPath} already loaded`);
-        progressElement.style.display = 'none';
+        progressContainer.style.display = 'none';
         return existingModelIndex;
     }
     
@@ -2115,7 +2172,8 @@ function loadModel(modelPath, materialType = null) {
                 }
                 
                 // Hide the progress indicator
-                progressElement.style.display = 'none';
+                progressContainer.style.display = 'none';
+                progressElement.style.width = '0%';
                 
                 // Update UI to reflect the new model
                 updateLoadedModelsUI();
@@ -2145,7 +2203,8 @@ function loadModel(modelPath, materialType = null) {
         },
         (error) => {
             console.error(`Error loading model: ${modelPath}`, error);
-            progressElement.style.display = 'none';
+            progressContainer.style.display = 'none';
+            progressElement.style.width = '0%';
             
             // Remove the model from our models array
             models.splice(modelIndex, 1);
@@ -2278,6 +2337,7 @@ function positionAndScaleModel(object, model) {
             max: box.max,
             size: box.getSize(new THREE.Vector3())
         });
+        
         
         // Calculate center of the bounding box
         const center = new THREE.Vector3();
@@ -2789,5 +2849,35 @@ function isValidBoundingBox(box) {
         isFinite(box.max.x) && isFinite(box.max.y) && isFinite(box.max.z) &&
         box.max.x >= box.min.x && box.max.y >= box.min.y && box.max.z >= box.min.z
     );
+}
+
+// Helper function to extract filename from path
+function getFileNameFromPath(path) {
+    if (!path) return "Unknown Model";
+    
+    // Handle both file objects and path strings
+    if (typeof path === 'object' && path.name) {
+        return path.name;
+    }
+    
+    // Handle path strings
+    if (typeof path === 'string') {
+        // Remove query parameters if any
+        const pathWithoutQuery = path.split('?')[0];
+        
+        // Split by forward slash or backslash and get the last element
+        const parts = pathWithoutQuery.split(/[\/\\]/);
+        return parts[parts.length - 1];
+    }
+    
+    return "Unknown Model";
+}
+
+// Helper function to get a model's mesh regardless of structure
+function getModelMesh(model) {
+    if (!model) return null;
+    
+    // Support both legacy 'mesh' and newer 'object' references
+    return model.object || model.mesh || null;
 }
 
