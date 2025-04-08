@@ -1,4 +1,4 @@
-import * as THREE from 'three';
+﻿import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
@@ -2385,4 +2385,67 @@ function onWheel(event) {
     }
 }
 
-// Using existing validateGeometry and fixGeometryBounds functions defined earlier
+// Helper functions for geometry validation
+
+// Validate a THREE.js geometry to check for NaN values
+function validateGeometry(geometry) {
+    if (!geometry || !geometry.attributes || !geometry.attributes.position) {
+        return false;
+    }
+    
+    const positions = geometry.attributes.position.array;
+    
+    // Check if the bounding box is computable
+    try {
+        geometry.computeBoundingBox();
+        const box = geometry.boundingBox;
+        
+        // Check if bounding box is valid
+        if (isNaN(box.min.x) || isNaN(box.min.y) || isNaN(box.min.z) ||
+            isNaN(box.max.x) || isNaN(box.max.y) || isNaN(box.max.z)) {
+            return false;
+        }
+        
+        // Check if bounding box is infinitely small
+        const size = new THREE.Vector3();
+        box.getSize(size);
+        if (size.x < 1e-10 || size.y < 1e-10 || size.z < 1e-10) {
+            return false;
+        }
+    } catch (e) {
+        console.warn('Error computing bounding box:', e);
+        return false;
+    }
+    
+    return true;
+}
+
+// Fix a THREE.js geometry with invalid bounds
+function fixGeometryBounds(geometry) {
+    if (!geometry || !geometry.attributes || !geometry.attributes.position) {
+        return;
+    }
+    
+    const positions = geometry.attributes.position.array;
+    let hasChanges = false;
+    
+    // Replace any NaN values with zeros
+    for (let i = 0; i < positions.length; i++) {
+        if (isNaN(positions[i]) || !isFinite(positions[i])) {
+            positions[i] = 0;
+            hasChanges = true;
+        }
+        
+        // Fix extremely large values that can cause rendering issues
+        if (Math.abs(positions[i]) > 1e6) {
+            positions[i] = positions[i] > 0 ? 1e6 : -1e6;
+            hasChanges = true;
+        }
+    }
+    
+    if (hasChanges) {
+        geometry.attributes.position.needsUpdate = true;
+        geometry.computeBoundingBox();
+        geometry.computeBoundingSphere();
+    }
+}

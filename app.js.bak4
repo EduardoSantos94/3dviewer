@@ -1,4 +1,4 @@
-import * as THREE from 'three';
+﻿import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
@@ -2385,4 +2385,31 @@ function onWheel(event) {
     }
 }
 
+// Helper functions for geometry validation
+
+// Validate a THREE.js geometry to check for NaN values
 // Using existing validateGeometry and fixGeometryBounds functions defined earlier
+    
+    const positions = geometry.attributes.position.array;
+    let hasChanges = false;
+    
+    // Replace any NaN values with zeros
+    for (let i = 0; i < positions.length; i++) {
+        if (isNaN(positions[i]) || !isFinite(positions[i])) {
+            positions[i] = 0;
+            hasChanges = true;
+        }
+        
+        // Fix extremely large values that can cause rendering issues
+        if (Math.abs(positions[i]) > 1e6) {
+            positions[i] = positions[i] > 0 ? 1e6 : -1e6;
+            hasChanges = true;
+        }
+    }
+    
+    if (hasChanges) {
+        geometry.attributes.position.needsUpdate = true;
+        geometry.computeBoundingBox();
+        geometry.computeBoundingSphere();
+    }
+}
