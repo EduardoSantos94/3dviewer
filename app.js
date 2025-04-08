@@ -605,7 +605,17 @@ function getLoaderForFile(filename) {
         case '3dm':
             console.log('Initializing Rhino3dmLoader');
             const loader = new Rhino3dmLoader();
+            // Use the local library path
             loader.setLibraryPath('./lib/rhino3dm/');
+            
+            // Add custom handling to avoid duplicate meshes
+            loader.parse = function(data) {
+                console.log('Custom parse method for Rhino3dmLoader to prevent duplication');
+                // We'll implement our own parsing in process3DMFile
+                // This is just a placeholder to prevent double loading
+                return new THREE.Group();
+            };
+            
             return loader;
         default:
             console.log('No loader found for extension:', extension);
@@ -825,6 +835,9 @@ async function handleFiles(files) {
             viewerContainer.style.display = 'block';
         }
 
+        // Track newly added models for selection
+        const addedModelIndices = [];
+
         // Process each file
         for (let i = 0; i < files.length; i++) {
             const file = files[i];
@@ -833,11 +846,18 @@ async function handleFiles(files) {
             console.log(`Processing file: ${file.name} (${extension})`);
             
             try {
+                // Check if we already have this file loaded
+                const alreadyLoaded = models.some(model => model.name === file.name);
+                if (alreadyLoaded) {
+                    console.log(`File ${file.name} is already loaded, skipping`);
+                    continue;
+                }
+                
                 let object;
                 
                 if (extension === '3dm') {
                     try {
-                        object = await process3DMFile(file);  // Fixed: Changed from process3dmFile to process3DMFile
+                        object = await process3DMFile(file);
                     } catch (error) {
                         console.error(`Error processing 3DM file: ${error.message}`);
                         alert(`Failed to process ${file.name}: ${error.message}`);
@@ -857,12 +877,10 @@ async function handleFiles(files) {
                     // Add object to scene and model list
                     const modelIndex = loadModel(object, file.name);
                     
-                    // Auto-select the first model if this is the first one loaded
-                    if (models.length === 1 || i === 0) {
-                        selectModel(modelIndex);
+                    if (modelIndex >= 0) {
+                        addedModelIndices.push(modelIndex);
+                        console.log(`Successfully added ${file.name} to scene with index ${modelIndex}`);
                     }
-                    
-                    console.log(`Successfully added ${file.name} to scene`);
                 }
             } catch (error) {
                 console.error(`Failed to process ${file.name}:`, error);
@@ -872,6 +890,11 @@ async function handleFiles(files) {
         
         // Update the model list in the sidebar
         updateModelListInSidebar();
+        
+        // Auto-select the first model that was added (if any)
+        if (addedModelIndices.length > 0) {
+            selectModel(addedModelIndices[0]);
+        }
         
         // After all models are loaded, center them in the scene
         if (models.length > 0) {
@@ -952,89 +975,31 @@ async function process3DMFile(file) {
         throw new Error('Failed to parse 3DM file');
     }
 
-    const objects = doc.objects();
+    // Use a single approach to convert the model - create one group to hold all meshes
     const group = new THREE.Group();
+    group.name = file.name;
     let geometryFound = false;
 
+    console.log(`[process3DMFile] Document has ${doc.objects().count} objects`);
+
+    // Get the meshing parameters for quality settings
     const mp = getMeshingParameters(rhino);
-
-    for (let i = 0; i < objects.count; i++) {
-        const obj = objects.get(i);
-        const geometry = obj.geometry();
-
-        if (geometry) {
-            try {
-                if (geometry.objectType === rhino.ObjectType.Mesh) {
-                    // For mesh objects, use the direct threejs JSON conversion
-                    const threeJson = geometry.toThreejsJSON();
-                    if (threeJson) {
-                        const bufferGeometry = new THREE.BufferGeometry();
-                        
-                        // Set geometry attributes from the converted JSON
-                        const jsonData = threeJson.data;
-                        if (jsonData.attributes.position) {
-                            bufferGeometry.setAttribute('position', 
-                                new THREE.Float32BufferAttribute(jsonData.attributes.position.array, 3));
-                        }
-                        
-                        if (jsonData.attributes.normal) {
-                            bufferGeometry.setAttribute('normal', 
-                                new THREE.Float32BufferAttribute(jsonData.attributes.normal.array, 3));
-                        }
-                        
-                        if (jsonData.attributes.uv && jsonData.attributes.uv.array.length > 0) {
-                            bufferGeometry.setAttribute('uv', 
-                                new THREE.Float32BufferAttribute(jsonData.attributes.uv.array, 2));
-                        }
-                        
-                        if (jsonData.index) {
-                            bufferGeometry.setIndex(Array.from(jsonData.index.array));
-                        }
-                        
-                        const material = materialPresets['gold'].clone();
-                        const mesh = new THREE.Mesh(bufferGeometry, material);
-                        group.add(mesh);
-                        geometryFound = true;
-                    }
-                } else if (geometry.objectType === rhino.ObjectType.Brep || 
-                         geometry.objectType === rhino.ObjectType.Surface ||
-                         geometry.objectType === rhino.ObjectType.SubD) {
-                    // For Brep, Surface and SubD objects, use the meshing process
-                    // Create a mesh for the entire Brep instead of face by face
-                    const rhinoMesh = new rhino.Mesh();
-                    
-                    // For Brep objects
-                    if (geometry.objectType === rhino.ObjectType.Brep) {
-                        const faces = geometry.faces();
-                        for (let j = 0; j < faces.count; j++) {
-                            const face = faces.get(j);
-                            const mesh = face.getMesh(mp);
-                            if (mesh) {
-                                rhinoMesh.append(mesh);
-                                mesh.delete();
-                            }
-                            face.delete();
-                        }
-                        faces.delete();
-                    } 
-                    // For Surface objects
-                    else if (geometry.objectType === rhino.ObjectType.Surface) {
-                        geometry.createMesh(mp, rhinoMesh);
-                    }
-                    // For SubD objects
-                    else if (geometry.objectType === rhino.ObjectType.SubD) {
-                        // Subdivide to get smooth surfaces
-                        geometry.subdivide(2);
-                        const subDMesh = rhino.Mesh.createFromSubDControlNet(geometry, true);
-                        if (subDMesh) {
-                            rhinoMesh.append(subDMesh);
-                            subDMesh.delete();
-                        }
-                    }
-                    
-                    // Convert the Rhino mesh to Three.js format
-                    if (rhinoMesh && rhinoMesh.vertices().count > 0) {
-                        const threeJson = rhinoMesh.toThreejsJSON();
+    
+    // OPTION A: Direct conversion of the entire file
+    // This skips manual extraction of each object and lets rhino3dm handle it
+    try {
+        console.log(`[process3DMFile] Using direct conversion from file`);
+        const objects = doc.objects();
+        
+        for (let i = 0; i < objects.count; i++) {
+            const obj = objects.get(i);
+            const geometry = obj.geometry();
+            
+            if (geometry) {
+                try {
+                    if (geometry.objectType === rhino.ObjectType.Mesh) {
+                        // For mesh objects, use the direct threejs JSON conversion
+                        const threeJson = geometry.toThreejsJSON();
                         if (threeJson) {
                             const bufferGeometry = new THREE.BufferGeometry();
                             
@@ -1059,28 +1024,107 @@ async function process3DMFile(file) {
                                 bufferGeometry.setIndex(Array.from(jsonData.index.array));
                             }
                             
-                            const material = materialPresets['gold'].clone();
-                            const mesh = new THREE.Mesh(bufferGeometry, material);
+                            // Create simple mesh without material - materials are applied in loadModel
+                            const mesh = new THREE.Mesh(bufferGeometry);
+                            mesh.name = `mesh_${i}`;
                             group.add(mesh);
                             geometryFound = true;
+                            console.log(`[process3DMFile] Added mesh from Rhino Mesh object ${i}`);
                         }
-                        rhinoMesh.delete();
+                    } else if (geometry.objectType === rhino.ObjectType.Brep || 
+                             geometry.objectType === rhino.ObjectType.Surface ||
+                             geometry.objectType === rhino.ObjectType.SubD) {
+                        // For Brep, Surface and SubD objects, use the meshing process
+                        // Create a mesh for the entire Brep instead of face by face
+                        const rhinoMesh = new rhino.Mesh();
+                        
+                        // For Brep objects
+                        if (geometry.objectType === rhino.ObjectType.Brep) {
+                            const faces = geometry.faces();
+                            for (let j = 0; j < faces.count; j++) {
+                                const face = faces.get(j);
+                                const mesh = face.getMesh(mp);
+                                if (mesh) {
+                                    rhinoMesh.append(mesh);
+                                    mesh.delete();
+                                }
+                                face.delete();
+                            }
+                            faces.delete();
+                        } 
+                        // For Surface objects
+                        else if (geometry.objectType === rhino.ObjectType.Surface) {
+                            geometry.createMesh(mp, rhinoMesh);
+                        }
+                        // For SubD objects
+                        else if (geometry.objectType === rhino.ObjectType.SubD) {
+                            // Subdivide to get smooth surfaces
+                            geometry.subdivide(2);
+                            const subDMesh = rhino.Mesh.createFromSubDControlNet(geometry, true);
+                            if (subDMesh) {
+                                rhinoMesh.append(subDMesh);
+                                subDMesh.delete();
+                            }
+                        }
+                        
+                        // Convert the Rhino mesh to Three.js format
+                        if (rhinoMesh && rhinoMesh.vertices().count > 0) {
+                            const threeJson = rhinoMesh.toThreejsJSON();
+                            if (threeJson) {
+                                const bufferGeometry = new THREE.BufferGeometry();
+                                
+                                // Set geometry attributes from the converted JSON
+                                const jsonData = threeJson.data;
+                                if (jsonData.attributes.position) {
+                                    bufferGeometry.setAttribute('position', 
+                                        new THREE.Float32BufferAttribute(jsonData.attributes.position.array, 3));
+                                }
+                                
+                                if (jsonData.attributes.normal) {
+                                    bufferGeometry.setAttribute('normal', 
+                                        new THREE.Float32BufferAttribute(jsonData.attributes.normal.array, 3));
+                                }
+                                
+                                if (jsonData.attributes.uv && jsonData.attributes.uv.array.length > 0) {
+                                    bufferGeometry.setAttribute('uv', 
+                                        new THREE.Float32BufferAttribute(jsonData.attributes.uv.array, 2));
+                                }
+                                
+                                if (jsonData.index) {
+                                    bufferGeometry.setIndex(Array.from(jsonData.index.array));
+                                }
+                                
+                                // Create simple mesh without material - materials are applied in loadModel
+                                const mesh = new THREE.Mesh(bufferGeometry);
+                                mesh.name = `mesh_${i}`;
+                                group.add(mesh);
+                                geometryFound = true;
+                                console.log(`[process3DMFile] Added mesh from Brep/Surface/SubD object ${i}`);
+                            }
+                            rhinoMesh.delete();
+                        }
                     }
+                } catch (error) {
+                    console.error(`Error converting geometry ${i}:`, error);
+                } finally {
+                    geometry.delete();
                 }
-            } catch (error) {
-                console.error('Error converting geometry:', error);
-            } finally {
-                geometry.delete();
             }
+            obj.delete();
         }
-        obj.delete();
+        
+        objects.delete();
+    }
+    catch (error) {
+        console.error('Error in direct conversion:', error);
     }
 
+    // Clean up resources
     mp.delete();
-    objects.delete();
     doc.delete();
 
-    if (!geometryFound) {
+    // Check if we found any valid geometry
+    if (!geometryFound || group.children.length === 0) {
         throw new Error('No valid geometry found in the 3DM file');
     }
     
@@ -1782,16 +1826,37 @@ function loadModel(object, fileName) {
         mesh.add(outlineMesh);
     } else if (object instanceof THREE.Group || object instanceof THREE.Mesh) {
         mesh = object;
-        mesh.name = fileName;
+        
+        // Ensure mesh has a name
+        if (!mesh.name) {
+            mesh.name = fileName;
+        }
+        
+        console.log(`[loadModel] Processing ${mesh instanceof THREE.Group ? 'Group' : 'Mesh'} with ${mesh instanceof THREE.Group ? mesh.children.length : '1'} objects`);
         
         if (mesh instanceof THREE.Group) {
+            // Assign materials to all children in the group
             mesh.traverse(child => {
                 if (child instanceof THREE.Mesh && !child.userData.isOutline) {
-                    const material = materialPresets['gold'].clone();
-                    child.material = material;
+                    console.log(`[loadModel] Applying material to child: ${child.name || 'unnamed'}`);
+                    
+                    // Assign material if the mesh doesn't already have one
+                    if (!child.material || child.material.type === 'MeshBasicMaterial') {
+                        const material = materialPresets['gold'].clone();
+                        child.material = material;
+                    }
+                    
+                    // Only add outline if it doesn't already have one
+                    let hasOutline = false;
+                    child.traverse(grandchild => {
+                        if (grandchild.userData && grandchild.userData.isOutline) {
+                            hasOutline = true;
+                        }
+                    });
                     
                     // Create outline mesh only if not too many children (prevent performance issues)
-                    if (mesh.children.length < 100) {
+                    // and only if it doesn't already have an outline
+                    if (!hasOutline && mesh.children.length < 100 && child.geometry) {
                         const outlineMesh = new THREE.Mesh(child.geometry, outlineMaterials['gold'].clone());
                         outlineMesh.scale.set(1.02, 1.02, 1.02);
                         outlineMesh.userData.isOutline = true;
@@ -1799,18 +1864,31 @@ function loadModel(object, fileName) {
                     }
                 }
             });
-        } else {
-            const material = materialPresets['gold'].clone();
-            mesh.material = material;
+        } else if (mesh instanceof THREE.Mesh) {
+            // Assign material to the mesh if it doesn't already have one
+            if (!mesh.material || mesh.material.type === 'MeshBasicMaterial') {
+                const material = materialPresets['gold'].clone();
+                mesh.material = material;
+            }
             
-            const outlineMesh = new THREE.Mesh(mesh.geometry, outlineMaterials['gold'].clone());
-            outlineMesh.scale.set(1.02, 1.02, 1.02);
-            outlineMesh.userData.isOutline = true;
-            mesh.add(outlineMesh);
+            // Only add outline if it doesn't already have one
+            let hasOutline = false;
+            mesh.traverse(child => {
+                if (child.userData && child.userData.isOutline) {
+                    hasOutline = true;
+                }
+            });
+            
+            if (!hasOutline && mesh.geometry) {
+                const outlineMesh = new THREE.Mesh(mesh.geometry, outlineMaterials['gold'].clone());
+                outlineMesh.scale.set(1.02, 1.02, 1.02);
+                outlineMesh.userData.isOutline = true;
+                mesh.add(outlineMesh);
+            }
         }
     } else {
         console.error('Unsupported object type:', object);
-        return;
+        return -1;  // Return invalid index
     }
 
     // Center and scale the model
