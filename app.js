@@ -7,6 +7,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { Rhino3dmLoader } from 'three/addons/loaders/3DMLoader.js';
+import * as TWEEN from 'tween.js';
 
 // Initialize Three.js scene
 let scene, camera, renderer, controls;
@@ -1188,7 +1189,7 @@ function updateProgressBar(progress) {
 
 // Convert Rhino color to THREE.js color
 function convertRhinoColorToTHREE(rhinoColor) {
-    if (!rhinoColor) return new THREE.Color(0x808080); // Default gray
+    if (!rhinoColor) return new THREE.Color(0xFFD700); // Default gold color instead of gray
     return new THREE.Color(rhinoColor.r / 255, rhinoColor.g / 255, rhinoColor.b / 255);
 }
 
@@ -1198,6 +1199,25 @@ function convertRhinoGeometryToMesh(geometry, material) {
     const objectType = geometry.objectType;
     
     try {
+        // Debug the material to ensure it's being applied correctly
+        console.log('Material for new geometry:', material);
+        
+        // Make a clone of the material for this specific geometry
+        const clonedMaterial = material.clone();
+        
+        // Enhance material properties to improve visibility
+        if (clonedMaterial instanceof THREE.MeshStandardMaterial || 
+            clonedMaterial instanceof THREE.MeshPhysicalMaterial) {
+            clonedMaterial.side = THREE.DoubleSide; // Render both sides
+            clonedMaterial.needsUpdate = true;      // Force material update
+            
+            // Ensure emissive is set for better visibility
+            if (!clonedMaterial.emissive) {
+                clonedMaterial.emissive = new THREE.Color(0x222222);
+                clonedMaterial.emissiveIntensity = 0.1;
+            }
+        }
+        
         // For Brep objects, we need to mesh it first
         if (objectType === rhino.ObjectType.Brep) {
             const meshes = [];
@@ -1224,9 +1244,13 @@ function convertRhinoGeometryToMesh(geometry, material) {
             
             for (let i = 0; i < meshes3d.count; i++) {
                 const mesh3d = meshes3d.get(i);
-                const threeMesh = rhinoMeshToThreeMesh(mesh3d, material);
+                const threeMesh = rhinoMeshToThreeMesh(mesh3d, clonedMaterial);
                 
                 if (threeMesh) {
+                    // Set castShadow and receiveShadow for better visualization
+                    threeMesh.castShadow = true;
+                    threeMesh.receiveShadow = true;
+                    
                     meshes.push(threeMesh);
                 }
                 mesh3d.delete();
@@ -1246,7 +1270,12 @@ function convertRhinoGeometryToMesh(geometry, material) {
         
         // For mesh objects, convert directly
         else if (objectType === rhino.ObjectType.Mesh) {
-            return rhinoMeshToThreeMesh(geometry, material);
+            const threeMesh = rhinoMeshToThreeMesh(geometry, clonedMaterial);
+            if (threeMesh) {
+                threeMesh.castShadow = true;
+                threeMesh.receiveShadow = true;
+            }
+            return threeMesh;
         }
         
         // For extrusion objects, mesh them first
@@ -1280,9 +1309,11 @@ function convertRhinoGeometryToMesh(geometry, material) {
             
             for (let i = 0; i < meshes3d.count; i++) {
                 const mesh3d = meshes3d.get(i);
-                const threeMesh = rhinoMeshToThreeMesh(mesh3d, material);
+                const threeMesh = rhinoMeshToThreeMesh(mesh3d, clonedMaterial);
                 
                 if (threeMesh) {
+                    threeMesh.castShadow = true;
+                    threeMesh.receiveShadow = true;
                     meshes.push(threeMesh);
                 }
                 mesh3d.delete();
@@ -1923,127 +1954,208 @@ function setupKeyboardShortcuts() {
 }
 
 // Improved zoom to fit function
-function zoomToFit(object, camera, controls) {
-    const box = new THREE.Box3().setFromObject(object);
-    const size = box.getSize(new THREE.Vector3()).length();
-    const center = box.getCenter(new THREE.Vector3());
-
-    // Calculate the distance needed to fit the object
-    const distance = size / (2 * Math.tan((Math.PI * camera.fov) / 360));
-    const direction = controls.target.clone()
-        .sub(camera.position)
-        .normalize()
-        .multiplyScalar(distance);
-
-    // Smoothly animate to the new position
-    const startPosition = camera.position.clone();
-    const startTarget = controls.target.clone();
-    const duration = 1000; // Animation duration in ms
-    const startTime = Date.now();
-
-    function animateCamera() {
-        const elapsed = Date.now() - startTime;
-        const progress = Math.min(elapsed / duration, 1);
-        
-        // Ease in-out function for smooth animation
-        const easeProgress = progress < 0.5 
-            ? 2 * progress * progress 
-            : -1 + (4 - 2 * progress) * progress;
-
-        // Interpolate position and target
-        camera.position.lerpVectors(
-            startPosition,
-            center.clone().sub(direction),
-            easeProgress
-        );
-        controls.target.lerpVectors(
-            startTarget,
-            center,
-            easeProgress
-        );
-        controls.update();
-
-        if (progress < 1) {
-            requestAnimationFrame(animateCamera);
-        }
+function zoomToFit(selectedModels = null, animate = true) {
+    const modelsToFit = selectedModels || models;
+    
+    if (!modelsToFit || modelsToFit.length === 0) {
+        console.warn('No models to fit in view');
+        return;
     }
-
-    animateCamera();
+    
+    // Create a new bounding box encompassing all models to fit
+    const box = new THREE.Box3();
+    
+    // Track whether we've found any valid geometry
+    let foundValidGeometry = false;
+    
+    modelsToFit.forEach(model => {
+        if (model.object) {
+            // Ensure we have a valid bounding box for the model
+            if (!model.boundingBox) {
+                // If no bounding box stored, calculate it
+                model.boundingBox = new THREE.Box3().setFromObject(model.object);
+            }
+            
+            // Only expand the overall box if the model's box is valid
+            if (isValidBoundingBox(model.boundingBox)) {
+                box.union(model.boundingBox);
+                foundValidGeometry = true;
+            }
+        }
+    });
+    
+    // If we didn't find any valid geometry, return
+    if (!foundValidGeometry) {
+        console.warn('No valid geometry found to fit in view');
+        return;
+    }
+    
+    // Calculate the center of the box
+    const center = new THREE.Vector3();
+    box.getCenter(center);
+    
+    // Calculate the size of the box
+    const size = new THREE.Vector3();
+    box.getSize(size);
+    
+    // Log for debugging
+    console.log('Zooming to fit box:', {
+        center: center,
+        size: size
+    });
+    
+    // Get the max dimension of the bounding box
+    const maxDim = Math.max(size.x, size.y, size.z);
+    
+    // Calculate the distance based on the field of view and size
+    const fov = camera.fov * (Math.PI / 180);
+    
+    // Add padding factor to ensure models fit comfortably in view
+    const padding = 1.5;
+    
+    // Calculate the camera distance, ensuring we're not too close
+    let distance = Math.max(
+        (maxDim * padding) / (2 * Math.tan(fov / 2)),
+        5 // Minimum distance to avoid clipping
+    );
+    
+    // Calculate the target position (center of models)
+    const targetPosition = center.clone();
+    
+    // Calculate the new camera position
+    // Position the camera to look at the models from a front-top-right perspective
+    const offset = new THREE.Vector3(1, 0.7, 1).normalize().multiplyScalar(distance);
+    const newPosition = targetPosition.clone().add(offset);
+    
+    // Set the camera target (controls target)
+    if (animate) {
+        // Animate the movement
+        new TWEEN.Tween(controls.target)
+            .to(targetPosition, 1000)
+            .easing(TWEEN.Easing.Cubic.Out)
+            .start();
+            
+        // Animate the camera position
+        new TWEEN.Tween(camera.position)
+            .to(newPosition, 1000)
+            .easing(TWEEN.Easing.Cubic.Out)
+            .start();
+    } else {
+        // Set immediately
+        controls.target.copy(targetPosition);
+        camera.position.copy(newPosition);
+        controls.update();
+    }
+    
+    // Reset camera up vector to ensure consistent orientation
+    camera.up.set(0, 1, 0);
 }
 
 // Load model function that adds a model to the scene without duplicating geometry
-function loadModel(object, fileName) {
-    // Check if we have a valid object
-    if (!object) {
-        console.error('Invalid object provided to loadModel');
-        return null;
+function loadModel(modelPath, materialType = null) {
+    // Create a progress indicator
+    const progressElement = document.getElementById('progress');
+    progressElement.style.display = 'block';
+    progressElement.style.width = '0%';
+    
+    // Check if we already have this model loaded
+    const existingModelIndex = models.findIndex(model => model.path === modelPath);
+    if (existingModelIndex >= 0) {
+        console.log(`Model ${modelPath} already loaded`);
+        progressElement.style.display = 'none';
+        return existingModelIndex;
     }
-
-    console.log(`[loadModel] Loading model: ${fileName}`);
-
-    try {
-        // Get material type, defaulting to 'gold' if currentMaterial is not set or invalid
-        const materialType = (currentMaterial && materialPresets[currentMaterial]) 
-            ? currentMaterial 
-            : 'gold';
+    
+    // Determine which material to use, with better fallback handling
+    let materialToUse = currentMaterial || 'gold';
+    if (materialType && materialPresets[materialType]) {
+        materialToUse = materialType;
+    } else if (!materialPresets[materialToUse]) {
+        materialToUse = 'gold'; // Default fallback
+    }
+    
+    // Create a placeholder for this model
+    const modelInfo = {
+        path: modelPath,
+        name: getFileNameFromPath(modelPath),
+        object: null,
+        originalPosition: new THREE.Vector3(),
+        originalScale: new THREE.Vector3(1, 1, 1),
+        boundingBox: null,
+        selected: false,
+        visible: true,
+        material: materialToUse
+    };
+    
+    // Add the model to our models array
+    const modelIndex = models.push(modelInfo) - 1;
+    
+    console.log(`Loading model: ${modelPath} with material: ${materialToUse}`);
+    
+    // Load the model
+    const loader = getLoaderForPath(modelPath);
+    loader.load(
+        modelPath,
+        (object) => {
+            // Apply the material to the model
+            applyMaterial(object, materialPresets[materialToUse]);
             
-        // Create a model object to store information
-        const modelInfo = {
-            name: fileName || 'Unknown Model',
-            mesh: object,
-            visible: true,
-            selected: false,
-            materialType: materialType,
-            originalPosition: object.position.clone(),
-            geometry: null
-        };
-
-        // Check if the object has a valid bounding box
-        if (object instanceof THREE.Mesh) {
-            if (!validateGeometry(object.geometry)) {
-                console.warn(`Model ${fileName} has invalid geometry, fixing...`);
-                fixGeometryBounds(object.geometry);
-            }
-        } else if (object instanceof THREE.Group) {
-            // For groups, check and fix each child mesh
-            object.traverse(child => {
-                if (child instanceof THREE.Mesh) {
-                    if (!validateGeometry(child.geometry)) {
-                        console.warn(`Child in model ${fileName} has invalid geometry, fixing...`);
-                        fixGeometryBounds(child.geometry);
-                    }
+            // Add the loaded object to the model info
+            modelInfo.object = object;
+            
+            // Position and scale the model
+            if (positionAndScaleModel(object, modelInfo)) {
+                // Add the object to the scene
+                scene.add(object);
+                
+                // Create an outline for the object
+                modelInfo.outline = createOutline(object, materialToUse);
+                if (modelInfo.outline) {
+                    scene.add(modelInfo.outline);
                 }
-            });
+                
+                // Hide the progress indicator
+                progressElement.style.display = 'none';
+                
+                // Update UI to reflect the new model
+                updateLoadedModelsUI();
+                
+                // Log and zoom to fit the newly loaded model
+                console.log(`Model loaded successfully: ${modelPath}`);
+                
+                // Force a render to ensure the model is visible
+                renderer.render(scene, camera);
+                
+                // Zoom to fit with animation only if this is our first model
+                zoomToFit([modelInfo], models.length === 1);
+                
+                // Dispatch a model loaded event
+                dispatchEvent('modelLoaded', { 
+                    modelIndex: modelIndex,
+                    model: modelInfo 
+                });
+            }
+        },
+        (xhr) => {
+            // Update the progress indicator
+            if (xhr.lengthComputable) {
+                const percentComplete = xhr.loaded / xhr.total * 100;
+                progressElement.style.width = percentComplete + '%';
+            }
+        },
+        (error) => {
+            console.error(`Error loading model: ${modelPath}`, error);
+            progressElement.style.display = 'none';
+            
+            // Remove the model from our models array
+            models.splice(modelIndex, 1);
+            
+            // Show an error message
+            alert(`Failed to load model: ${modelPath}`);
         }
-
-        // Apply the material - use materialType instead of currentMaterial
-        applyMaterial(object, materialType);
-
-        // Add to the scene
-        scene.add(object);
-
-        // Position and scale the model
-        positionAndScaleModel(object);
-
-        // Add an outline to the model
-        const outline = createOutline(object);
-        if (outline) {
-            scene.add(outline);
-            modelInfo.outline = outline;
-        }
-
-        // Add to models array
-        models.push(modelInfo);
-
-        // Update the model list in the UI
-        updateModelListInSidebar();
-
-        // Return the index of the new model in the models array
-        return models.length - 1;
-    } catch (error) {
-        console.error(`Error loading model ${fileName}:`, error);
-        return null;
-    }
+    );
+    
+    return modelIndex;
 }
 
 // Add helper function to validate a geometry's bounding box
@@ -2135,51 +2247,85 @@ function fixGeometryBounds(geometry) {
 }
 
 // Update the positionAndScaleModel function to handle geometry issues
-function positionAndScaleModel(object) {
-    // Calculate the bounding box for the model
-    let box = new THREE.Box3().setFromObject(object);
-    
-    // Check for invalid bounding box
-    if (isNaN(box.min.x) || isNaN(box.min.y) || isNaN(box.min.z) ||
-        isNaN(box.max.x) || isNaN(box.max.y) || isNaN(box.max.z)) {
-        console.warn('Invalid bounding box detected, attempting to fix...');
+function positionAndScaleModel(object, model) {
+    try {
+        // Ensure the model is properly traversed to calculate accurate bounding box
+        const box = new THREE.Box3();
         
-        // Fix each mesh in the model
+        // Use recursive traversal to ensure we include all children in bounding box
         object.traverse(child => {
-            if (child instanceof THREE.Mesh) {
-                if (!validateGeometry(child.geometry)) {
-                    fixGeometryBounds(child.geometry);
+            if (child.isMesh) {
+                // Force geometry to update bounds
+                if (child.geometry) {
+                    child.geometry.computeBoundingBox();
+                    box.expandByObject(child);
                 }
             }
         });
         
-        // Recalculate the bounding box
-        box = new THREE.Box3().setFromObject(object);
-        
-        // If still invalid, create a default box
-        if (isNaN(box.min.x) || isNaN(box.min.y) || isNaN(box.min.z) ||
-            isNaN(box.max.x) || isNaN(box.max.y) || isNaN(box.max.z)) {
-            console.warn('Could not fix bounding box, using default');
-            box.min.set(-1, -1, -1);
-            box.max.set(1, 1, 1);
+        // Check if the bounding box is valid (not infinite)
+        if (!isValidBoundingBox(box)) {
+            console.warn('Invalid bounding box detected, attempting to fix...');
+            box.set(
+                new THREE.Vector3(-1, -1, -1),
+                new THREE.Vector3(1, 1, 1)
+            );
         }
-    }
-    
-    // Calculate model center
-    const center = new THREE.Vector3();
-    box.getCenter(center);
-    
-    // Move the model so its center is at the origin
-    object.position.sub(center);
-    
-    // Calculate the size
-    const size = box.getSize(new THREE.Vector3());
-    const maxDim = Math.max(size.x, size.y, size.z);
-    
-    // Scale the model if it's too large or too small
-    if (maxDim > 10 || maxDim < 0.1) {
-        const scale = maxDim > 10 ? 5 / maxDim : 1 / maxDim;
-        object.scale.multiplyScalar(scale);
+        
+        // Additional checks and logging for debugging
+        console.log('Model bounding box:', {
+            min: box.min,
+            max: box.max,
+            size: box.getSize(new THREE.Vector3())
+        });
+        
+        // Calculate center of the bounding box
+        const center = new THREE.Vector3();
+        box.getCenter(center);
+        
+        // Calculate the size of the bounding box
+        const size = new THREE.Vector3();
+        box.getSize(size);
+        
+        // Calculate the max dimension of the model
+        const maxDim = Math.max(size.x, size.y, size.z);
+        
+        // Set a scale factor based on the size
+        let scaleFactor = 1;
+        
+        // If the model is very small (common with CAD models), scale it up
+        if (maxDim < 0.1) {
+            scaleFactor = 10 / maxDim; // Scale to approximately 10 units
+            console.log(`Model is very small (${maxDim}), scaling up by ${scaleFactor}`);
+        }
+        // If the model is very large, scale it down
+        else if (maxDim > 100) {
+            scaleFactor = 50 / maxDim; // Scale to approximately 50 units
+            console.log(`Model is very large (${maxDim}), scaling down by ${scaleFactor}`);
+        }
+        
+        // Apply scaling if needed
+        if (scaleFactor !== 1) {
+            object.scale.set(scaleFactor, scaleFactor, scaleFactor);
+            
+            // Update the bounding box after scaling
+            box.setFromObject(object);
+            box.getCenter(center);
+            box.getSize(size);
+        }
+        
+        // Center the object at the origin
+        object.position.set(-center.x, -center.y, -center.z);
+        
+        // Store original position and scaling information in the model
+        model.originalPosition = center.clone();
+        model.originalScale = new THREE.Vector3(scaleFactor, scaleFactor, scaleFactor);
+        model.boundingBox = box.clone();
+        
+        return true;
+    } catch (error) {
+        console.error('Error positioning and scaling model:', error);
+        return false;
     }
 }
 
@@ -2632,3 +2778,16 @@ function onWheel(event) {
 }
 
 // Using existing validateGeometry and fixGeometryBounds functions defined earlier
+
+// Helper function to check if a bounding box is valid
+function isValidBoundingBox(box) {
+    // Check if the bounding box has valid dimensions
+    return (
+        !isNaN(box.min.x) && !isNaN(box.min.y) && !isNaN(box.min.z) &&
+        !isNaN(box.max.x) && !isNaN(box.max.y) && !isNaN(box.max.z) &&
+        isFinite(box.min.x) && isFinite(box.min.y) && isFinite(box.min.z) &&
+        isFinite(box.max.x) && isFinite(box.max.y) && isFinite(box.max.z) &&
+        box.max.x >= box.min.x && box.max.y >= box.min.y && box.max.z >= box.min.z
+    );
+}
+
