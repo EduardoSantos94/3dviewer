@@ -991,17 +991,24 @@ async function process3DMFile(bytes, filename) {
                     const meshVertices = mesh.vertices();
                     const meshFaces = mesh.faces();
                     
+                    let nanVertexCount = 0;
+                    
                     // Gather all valid vertices (skip NaN values)
                     for (let vi = 0; vi < meshVertices.count; vi++) {
                         const pt = meshVertices.get(vi);
                         
                         // Check for NaN values and use default (0,0,0) if found
                         if (isNaN(pt.x) || isNaN(pt.y) || isNaN(pt.z)) {
-                            console.warn(`Found NaN coordinates at vertex ${vi}, using (0,0,0) instead`);
+                            nanVertexCount++;
                             vertices.push(0, 0, 0);
                         } else {
                             vertices.push(pt.x, pt.y, pt.z);
                         }
+                    }
+                    
+                    // Log a summary of NaN vertices if any were found
+                    if (nanVertexCount > 0) {
+                        console.warn(`Found and fixed ${nanVertexCount} vertices with NaN coordinates in Brep mesh`);
                     }
                     
                     // Process mesh faces
@@ -1085,6 +1092,7 @@ async function process3DMFile(bytes, filename) {
                 
                 let vertices = [];
                 let triangleIndices = [];
+                let nanVertexCount = 0;
                 
                 // Gather all valid vertices (skip NaN values)
                 for (let vi = 0; vi < meshVertices.count; vi++) {
@@ -1092,11 +1100,16 @@ async function process3DMFile(bytes, filename) {
                     
                     // Check for NaN values and use default (0,0,0) if found
                     if (isNaN(pt.x) || isNaN(pt.y) || isNaN(pt.z)) {
-                        console.warn(`Found NaN coordinates at vertex ${vi}, using (0,0,0) instead`);
+                        nanVertexCount++;
                         vertices.push(0, 0, 0);
                     } else {
                         vertices.push(pt.x, pt.y, pt.z);
                     }
+                }
+                
+                // Log a summary of NaN vertices if any were found
+                if (nanVertexCount > 0) {
+                    console.warn(`Found and fixed ${nanVertexCount} vertices with NaN coordinates in Mesh object`);
                 }
                 
                 // Process mesh faces
@@ -1643,10 +1656,7 @@ function animate() {
         const delta = turntableClock.getDelta();
         selectedObject.rotation.y += turntableSpeed * delta;
         
-        // Keep rotation within 0-2PI range for better performance
-        if (selectedObject.rotation.y > Math.PI * 2) {
-            selectedObject.rotation.y -= Math.PI * 2;
-        }
+        // Removed rotation clamping to allow continuous rotation
     }
     
     // Render the scene with post-processing for better quality
