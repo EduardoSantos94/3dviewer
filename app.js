@@ -973,21 +973,30 @@ async function process3DMFile(buffer) {
             throw new Error('Failed to initialize rhino3dm');
         }
         
-        // Decode the 3DM file
+        // Decode the 3DM file using fromByteArray instead of readBuffer
         console.log('Decoding 3DM file with rhino instance:', rhino);
-        const doc = new rhino.File3dm();
-        const loadResult = doc.readBuffer(buffer);
+        let doc = null;
         
-        if (!loadResult) {
-            throw new Error('Failed to parse 3DM file');
+        try {
+            doc = rhino.File3dm.fromByteArray(buffer);
+        } catch (e) {
+            console.error('Error parsing 3DM file:', e);
+            throw new Error('Failed to parse 3DM file: ' + e.message);
+        }
+        
+        // Validate the doc
+        if (!doc) {
+            throw new Error('Failed to parse 3DM file - doc is null');
         }
         
         console.log('3DM file loaded successfully');
         const meshes = [];
         const materials = new Map();
+        const processedIds = new Set(); // Keep track of processed objects to avoid duplication
         
-        // Process objects from the file
-        const objCount = doc.objects().count();
+        // Process objects from the file - using count as a property, not a function
+        const objects = doc.objects();
+        const objCount = objects.count;
         console.log(`Processing ${objCount} objects in the 3DM file`);
         
         // Set up progress tracking
@@ -996,7 +1005,7 @@ async function process3DMFile(buffer) {
         
         // Process each object in the file
         for (let i = 0; i < objCount; i++) {
-            const rhinoObject = doc.objects().get(i);
+            const rhinoObject = objects.get(i);
             
             if (!rhinoObject) {
                 console.warn(`Object at index ${i} is null or undefined`);
@@ -1004,6 +1013,14 @@ async function process3DMFile(buffer) {
             }
             
             try {
+                // Check for duplicate object IDs
+                const objectId = rhinoObject.id ? rhinoObject.id : i;
+                if (processedIds.has(objectId)) {
+                    console.warn(`Skipping duplicate object with ID ${objectId}`);
+                    continue;
+                }
+                processedIds.add(objectId);
+                
                 const geometry = rhinoObject.geometry();
                 
                 if (!geometry) {
@@ -1013,11 +1030,26 @@ async function process3DMFile(buffer) {
                 
                 const attributes = rhinoObject.attributes();
                 const layerIndex = attributes.layerIndex();
-                const layer = doc.layers().findIndex(layerIndex);
+                
+                // Get the layer by index properly
+                const layers = doc.layers();
+                const layer = layerIndex >= 0 && layerIndex < layers.count ? layers.get(layerIndex) : null;
                 
                 // Get material information
                 let material;
                 let materialHash = null;
+                let layerName = "";
+                let isLayerVisible = false;
+                
+                // Get layer properties safely
+                if (layer) {
+                    try {
+                        isLayerVisible = typeof layer.visible === 'function' ? layer.visible() : layer.visible;
+                        layerName = typeof layer.name === 'function' ? layer.name() : layer.name;
+                    } catch (e) {
+                        console.warn('Error accessing layer properties:', e);
+                    }
+                }
                 
                 if (attributes.materialSource() === rhino.ObjectMaterialSource.MaterialFromObject) {
                     const rhinoMaterial = attributes.material();
@@ -1037,8 +1069,16 @@ async function process3DMFile(buffer) {
                             material = materials.get(materialHash);
                         }
                     }
-                } else if (layer && layer.visible()) {
-                    const layerColor = convertRhinoColorToTHREE(layer.color());
+                } else if (layer && isLayerVisible) {
+                    // Safely get the layer color
+                    let layerColor;
+                    try {
+                        layerColor = convertRhinoColorToTHREE(layer.color());
+                    } catch (e) {
+                        console.warn('Error getting layer color:', e);
+                        layerColor = new THREE.Color(0x808080); // Default gray fallback
+                    }
+                    
                     materialHash = layerColor.getHexString();
                     
                     if (!materials.has(materialHash)) {
@@ -1077,6 +1117,19 @@ async function process3DMFile(buffer) {
                 
                 // Add the mesh to our array if valid
                 if (mesh) {
+                    // Set a unique ID on the mesh to avoid duplication
+                    mesh.userData.rhinoId = objectId;
+                    
+                    // Add name from attributes if available
+                    const attributeName = typeof attributes.name === 'function' ? attributes.name() : attributes.name;
+                    if (attributeName) {
+                        mesh.name = attributeName;
+                    } else if (layerName) {
+                        mesh.name = `${layerName}_${i}`;
+                    } else {
+                        mesh.name = `Object_${i}`;
+                    }
+                    
                     meshes.push(mesh);
                 }
             } catch (e) {
