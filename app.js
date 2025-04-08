@@ -1,4 +1,4 @@
-import * as THREE from 'three';
+﻿import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
@@ -44,10 +44,10 @@ async function initRhino3dm() {
     try {
         console.log('Initializing rhino3dm...');
         rhino = await rhino3dm();
-        console.log('✅ rhino3dm initialized successfully');
+        console.log('âœ… rhino3dm initialized successfully');
         return rhino;
     } catch (error) {
-        console.error('❌ Failed to initialize rhino3dm:', error);
+        console.error('âŒ Failed to initialize rhino3dm:', error);
         throw error;
     }
 }
@@ -168,7 +168,7 @@ async function initializeApp() {
         // Start animation loop
         animate();
 
-        console.log('🛠️ App initialized successfully');
+        console.log('ðŸ› ï¸ App initialized successfully');
         hideLoadingIndicator();
         
         // Force a resize event to ensure proper rendering
@@ -298,14 +298,14 @@ function ClearScene() {
   loadedMeshes = [];
   models = [];
   selectedObject = null;
-  console.log("🧹 Scene cleared");
+  console.log("ðŸ§¹ Scene cleared");
 }
 
 // Function to add a model to the scene
 function AddModelToScene(mesh) {
   scene.add(mesh);
   loadedMeshes.push(mesh);
-  console.log("📦 Mesh added:", mesh.name || "Unnamed");
+  console.log("ðŸ“¦ Mesh added:", mesh.name || "Unnamed");
 }
 
 // Initialize the scene
@@ -1635,7 +1635,7 @@ function animate() {
         const delta = turntableClock.getDelta();
         selectedObject.rotation.y += turntableSpeed * delta;
         
-        // Keep rotation within 0-2π range for better performance
+        // Keep rotation within 0-2Ï€ range for better performance
         if (selectedObject.rotation.y > Math.PI * 2) {
             selectedObject.rotation.y -= Math.PI * 2;
         }
@@ -2431,78 +2431,5 @@ function convertRhinoColorToTHREE(rhinoColor) {
     return new THREE.Color(rhinoColor.r/255, rhinoColor.g/255, rhinoColor.b/255);
 }
 
-// Helper function to validate geometry has proper bounding box/sphere
-function validateGeometry(geometry) {
-    if (!geometry.boundingBox) {
-        geometry.computeBoundingBox();
-    }
-    
-    if (!geometry.boundingSphere) {
-        geometry.computeBoundingSphere();
-    }
-    
-    // Check if bounding box has any NaN values
-    const bbox = geometry.boundingBox;
-    if (!bbox || 
-        isNaN(bbox.min.x) || isNaN(bbox.min.y) || isNaN(bbox.min.z) ||
-        isNaN(bbox.max.x) || isNaN(bbox.max.y) || isNaN(bbox.max.z)) {
-        return false;
-    }
-    
-    // Check if bounding sphere has any NaN values
-    const bsphere = geometry.boundingSphere;
-    if (!bsphere || 
-        isNaN(bsphere.center.x) || isNaN(bsphere.center.y) || isNaN(bsphere.center.z) ||
-        isNaN(bsphere.radius)) {
-        return false;
-    }
-    
-    return true;
-}
-
-// Helper function to manually fix geometry bounds if they contain NaN values
-function fixGeometryBounds(geometry) {
-    // Get the position attribute
-    const posAttr = geometry.getAttribute('position');
-    
-    if (!posAttr || posAttr.count === 0) {
-        console.warn('Cannot fix geometry bounds: no position attribute or empty');
-        return;
-    }
-    
-    // Create a new bounding box
-    const bbox = new THREE.Box3();
-    const vector = new THREE.Vector3();
-    
-    // Find valid min/max values from all vertices
-    let hasValidPoints = false;
-    
-    for (let i = 0; i < posAttr.count; i++) {
-        vector.fromBufferAttribute(posAttr, i);
-        
-        if (!isNaN(vector.x) && !isNaN(vector.y) && !isNaN(vector.z)) {
-            bbox.expandByPoint(vector);
-            hasValidPoints = true;
-        }
-    }
-    
-    // If no valid points were found, create a default bounding box at origin
-    if (!hasValidPoints) {
-        bbox.min.set(-1, -1, -1);
-        bbox.max.set(1, 1, 1);
-        console.warn('No valid vertices found. Using default bounding box at origin.');
-    }
-    
-    // Assign the manually calculated bounding box
-    geometry.boundingBox = bbox;
-    
-    // Create bounding sphere from the bounding box
-    const sphere = new THREE.Sphere();
-    bbox.getBoundingSphere(sphere);
-    geometry.boundingSphere = sphere;
-    
-    console.log('Fixed geometry bounds:', {
-        box: { min: bbox.min.toArray(), max: bbox.max.toArray() },
-        sphere: { center: sphere.center.toArray(), radius: sphere.radius }
-    });
-}
+// Note: Duplicate validateGeometry and fixGeometryBounds functions removed to fix syntax errors
+// Note: Duplicate validateGeometry and fixGeometryBounds functions removed to fix syntax errors
