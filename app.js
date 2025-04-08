@@ -1,4 +1,4 @@
-import * as THREE from 'three';
+﻿import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
@@ -26,25 +26,47 @@ let animationId = null; // For tracking animation frames
 
 // Function to check if rhino3dm is loaded
 function isRhino3dmLoaded() {
-    return typeof rhino3dm !== 'undefined';
+    const loaded = typeof rhino3dm !== 'undefined';
+    console.log('Checking if rhino3dm is loaded:', loaded, typeof rhino3dm);
+    return loaded;
 }
 
 // Function to wait for rhino3dm to load with better error handling
 async function initRhino3dm() {
+    console.log('Starting rhino3dm initialization...');
+    
     if (!isRhino3dmLoaded()) {
         console.log('Waiting for rhino3dm to load...');
         // Wait for a short time to allow the script to load
         await new Promise(resolve => setTimeout(resolve, 2000));
         
         if (!isRhino3dmLoaded()) {
+            console.error('rhino3dm.js is not loaded after waiting. Library details:', { 
+                rhino3dm: typeof rhino3dm, 
+                window_rhino3dm: typeof window.rhino3dm
+            });
             throw new Error('rhino3dm.js is not loaded. Please check your internet connection and refresh the page.');
         }
     }
 
     try {
-        console.log('Initializing rhino3dm...');
+        console.log('Initializing rhino3dm...', typeof rhino3dm);
+        
+        // First check if we already have a global instance
+        if (rhino && typeof rhino.File3dm === 'function') {
+            console.log('Using existing rhino instance');
+            return rhino;
+        }
+        
+        // Initialize new instance
         rhino = await rhino3dm();
-        console.log('rhino3dm initialized successfully');
+        console.log('rhino3dm initialized successfully', rhino, 'File3dm constructor:', typeof rhino.File3dm);
+        
+        if (!rhino || typeof rhino.File3dm !== 'function') {
+            console.error('Initialized rhino object is invalid:', rhino);
+            throw new Error('Failed to properly initialize rhino3dm. File3dm constructor not available.');
+        }
+        
         return rhino;
     } catch (error) {
         console.error('Failed to initialize rhino3dm:', error);
@@ -857,8 +879,31 @@ async function handleFiles(files) {
                 // Process the file based on its extension
                 if (extension === '3dm') {
                     try {
+                        // Make sure rhino is initialized before processing
+                        if (!rhino) {
+                            await initRhino3dm();
+                        }
+                        
                         // Use the rhino3dm library directly
-                        object = await process3DMFile(fileBuffer, file.name);
+                        const meshes = await process3DMFile(fileBuffer, file.name);
+                        console.log('3DM processing result:', meshes);
+                        
+                        if (Array.isArray(meshes) && meshes.length > 0) {
+                            // Create a group for all meshes
+                            object = new THREE.Group();
+                            object.name = file.name;
+                            
+                            // Add all meshes to the group
+                            meshes.forEach(mesh => {
+                                if (mesh) {
+                                    object.add(mesh);
+                                }
+                            });
+                            
+                            console.log(`Created group for ${file.name} with ${meshes.length} meshes`);
+                        } else {
+                            throw new Error('No valid meshes were generated from the 3DM file');
+                        }
                     } catch (error) {
                         console.error(`Error processing 3DM file: ${error.message}`);
                         alert(`Failed to process ${file.name}: ${error.message}`);
@@ -919,14 +964,17 @@ async function handleFiles(files) {
 // Process a 3DM file and extract geometry
 async function process3DMFile(buffer) {
     try {
-        // Ensure rhino3dm is loaded
-        if (!isRhino3dmLoaded()) {
-            await initRhino3dm();
+        // Ensure rhino3dm is loaded and initialized
+        if (!rhino) {
+            rhino = await initRhino3dm();
+        }
+        
+        if (!rhino) {
+            throw new Error('Failed to initialize rhino3dm');
         }
         
         // Decode the 3DM file
-        console.log('Decoding 3DM file...');
-        const rhino = window.rhino3dm;
+        console.log('Decoding 3DM file with rhino instance:', rhino);
         const doc = new rhino.File3dm();
         const loadResult = doc.readBuffer(buffer);
         
@@ -1070,7 +1118,7 @@ function convertRhinoColorToTHREE(rhinoColor) {
 
 // Convert a Rhino geometry object to a THREE.js mesh
 function convertRhinoGeometryToMesh(geometry, material) {
-    const rhino = window.rhino3dm;
+    // Use the global rhino instance instead of window.rhino3dm
     const objectType = geometry.objectType;
     
     try {
