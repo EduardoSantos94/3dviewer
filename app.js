@@ -526,7 +526,14 @@ function getLoaderForFile(filename) {
         case 'stl':
             return new STLLoader();
         case 'obj':
-            return new OBJLoader();
+            console.log('Creating OBJLoader for OBJ file');
+            const objLoader = new OBJLoader();
+            // Configure the loader to use the local material search path
+            objLoader.setPath('./');
+            // Important: disable resource verification to avoid CSP issues
+            objLoader.setResourcePath('./');
+            objLoader.setCrossOrigin('anonymous');
+            return objLoader;
         case 'gltf':
         case 'glb':
             return new GLTFLoader();
@@ -539,6 +546,88 @@ function getLoaderForFile(filename) {
             console.log('No loader found for extension:', extension);
             return null;
     }
+}
+
+// Update the processOtherFile function to fix Content Security Policy issues when loading OBJ files
+async function processOtherFile(file) {
+    try {
+        const loader = getLoaderForFile(file.name);
+        if (!loader) {
+            throw new Error(`Unsupported file format: ${file.name.split('.').pop()}`);
+        }
+
+        // Create a blob URL instead of using data URL
+        const objectUrl = URL.createObjectURL(file);
+        
+        // Special handling for OBJ files
+        const extension = file.name.split('.').pop().toLowerCase();
+        if (extension === 'obj') {
+            console.log(`Processing OBJ file: ${file.name}`);
+            // For OBJ files we need to read the text content and pass it to the loader directly
+            try {
+                const fileContent = await readFileAsText(file);
+                
+                return new Promise((resolve, reject) => {
+                    try {
+                        // Parse OBJ content directly
+                        const object = loader.parse(fileContent);
+                        console.log(`[processOtherFile] Successfully parsed OBJ content for ${file.name}`);
+                        resolve(object);
+                    } catch (error) {
+                        console.error(`Error parsing OBJ content: ${error.message || 'Unknown error'}`);
+                        reject(new Error(`Failed to parse ${file.name}: ${error.message || 'Unknown error'}`));
+                    }
+                });
+            } catch (error) {
+                console.error(`Error reading OBJ file: ${error.message || 'Unknown error'}`);
+                throw new Error(`Failed to read ${file.name}: ${error.message || 'Unknown error'}`);
+            }
+        }
+        
+        // For other file types, use the blob URL loading approach
+        return new Promise((resolve, reject) => {
+            try {
+                loader.load(
+                    objectUrl, 
+                    (object) => {
+                        console.log(`[processOtherFile] Successfully loaded ${file.name}`);
+                        // Revoke the blob URL after successful loading
+                        URL.revokeObjectURL(objectUrl);
+                        resolve(object);
+                    },
+                    (progress) => {
+                        console.log(`Loading ${file.name}: ${Math.round(progress.loaded / progress.total * 100)}%`);
+                    },
+                    (error) => {
+                        // Revoke the blob URL on error as well
+                        URL.revokeObjectURL(objectUrl);
+                        reject(new Error(`Failed to load ${file.name}: ${error.message || 'Unknown error'}`));
+                    }
+                );
+            } catch (error) {
+                // Make sure to revoke the URL in case of exceptions
+                URL.revokeObjectURL(objectUrl);
+                reject(new Error(`Failed to process ${file.name}: ${error.message || 'Unknown error'}`));
+            }
+        });
+    } catch (error) {
+        console.error(`Error processing ${file.name}: ${error.message}`);
+        throw error;
+    }
+}
+
+// Helper function to read a file as text
+function readFileAsText(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            resolve(e.target.result);
+        };
+        reader.onerror = (e) => {
+            reject(new Error(`Error reading file: ${e.target.error}`));
+        };
+        reader.readAsText(file);
+    });
 }
 
 // Update meshing parameters for better quality
@@ -733,35 +822,7 @@ async function loadFile(file) {
     }
 }
 
-// Update the processOtherFile function to return the object rather than calling loadModel
-async function processOtherFile(file) {
-    const loader = getLoaderForFile(file.name);
-    if (!loader) {
-        throw new Error(`Unsupported file format: ${file.name.split('.').pop()}`);
-    }
-
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            loader.load(e.target.result, 
-                (object) => {
-                    console.log(`[processOtherFile] Successfully loaded ${file.name}`);
-                    resolve(object);
-                },
-                (progress) => {
-                    console.log(`Loading ${file.name}: ${Math.round(progress.loaded / progress.total * 100)}%`);
-                },
-                (error) => {
-                    reject(new Error(`Failed to load ${file.name}: ${error.message}`));
-                }
-            );
-        };
-        reader.onerror = () => reject(new Error(`Failed to read ${file.name}`));
-        reader.readAsDataURL(file);
-    });
-}
-
-// Update process3DMFile to use threejs JSON conversion when possible
+// Update the process3DMFile function to use threejs JSON conversion when possible
 async function process3DMFile(file) {
     if (!rhino) {
         throw new Error('rhino3dm is not initialized. Please refresh the page and try again.');
