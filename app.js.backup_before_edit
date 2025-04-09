@@ -203,11 +203,11 @@ async function initializeApp() {
     console.log('Initializing application...');
     
     try {
-        // Wait to make sure rhino3dm is available FIRST
-        await waitForRhino3dm();
-        
-        // THEN initialize Three.js scene
+        // Initialize Three.js scene
         await init();
+        
+        // Wait to make sure rhino3dm is available
+        await waitForRhino3dm();
         
         // Set up event listeners
         setupEventListeners();
@@ -449,10 +449,10 @@ async function init() {
     scene.add(groundPlane);
 
     // Setup event listeners after renderer is created
-    // REMOVED: setupEventListeners(); // This is now called in initializeApp() to avoid duplicates
+    setupEventListeners();
 
     // Start animation loop
-    // REMOVED: animate(); // This is now called in initializeApp() to avoid duplicates
+    animate();
 }
 
 // Update the setupEventListeners function to properly handle file selection
@@ -883,135 +883,58 @@ async function handleFiles(files) {
     }
 
     try {
-        showLoadingIndicator();
-        console.log(`Processing ${files.length} file(s)`);
+        console.log(`Centering ${models.length} models`);
         
-        // Force UI state before any processing
-        const frontpage = document.getElementById('frontpage');
-        if (frontpage) {
-            frontpage.style.display = 'none';
+        // If there's a selected object, just fit that one
+        if (selectedObject) {
+            console.log('Centering selected object');
+            // Use the zoomToFit function for the selected object
+            zoomToFit([selectedObject], true);
+            return;
         }
         
-        const dropZone = document.getElementById('drop-zone');
-        if (dropZone) {
-            dropZone.style.display = 'none';
-        }
+        // Create a combined bounding box for all valid models
+    const combinedBox = new THREE.Box3();
+        let validModelCount = 0;
         
-        const container = document.querySelector('.container');
-        if (container) {
-            container.style.display = 'block';
-        }
-        
-        // Ensure controls are visible
-        const controlsPanel = document.querySelector('.controls-panel');
-        if (controlsPanel) {
-            controlsPanel.style.display = 'block';
-        }
-        
-        const modelList = document.querySelector('.model-list');
-        if (modelList) {
-            modelList.style.display = 'block';
-        }
-        
-        const viewerContainer = document.getElementById('viewer-container');
-        if (viewerContainer) {
-            viewerContainer.style.display = 'block';
-        }
-
-        // Track newly added models for selection
-        const addedModelIndices = [];
-
-        // Process each file
-        for (let i = 0; i < files.length; i++) {
-            const file = files[i];
-            const extension = file.name.split('.').pop().toLowerCase();
-            
-            console.log(`Processing file: ${file.name} (${extension})`);
-            
+        // Safely expand the bounding box with each model
+        models.forEach((model, index) => {
             try {
-                // Check if we already have this file loaded
-                const alreadyLoaded = models.some(model => model.name === file.name);
-                if (alreadyLoaded) {
-                    console.log(`File ${file.name} is already loaded, skipping`);
-                    continue;
-                }
-                
-                let object;
-                
-                // Read the file as ArrayBuffer
-                const fileBuffer = await readFileAsArrayBuffer(file);
-                
-                // Process the file based on its extension
-                if (extension === '3dm') {
-                    try {
-                        // Process 3DM file
-                        const loadedMeshes = await process3DMFile(fileBuffer);
-                        if (loadedMeshes && loadedMeshes.length > 0) {
-                            // Create a group to hold all meshes
-                            object = new THREE.Group();
-                            object.name = file.name;
-                            
-                            // Add all loaded meshes to the group
-                            loadedMeshes.forEach(mesh => {
-                                object.add(mesh);
-                            });
-                            
-                            console.log(`Loaded ${loadedMeshes.length} objects from ${file.name}`);
-                        }
-                    } catch (error) {
-                        console.error(`Error processing 3DM file: ${error.message}`);
-                        alert(`Failed to process ${file.name}: ${error.message}`);
-                        continue;  // Skip to the next file
-                    }
-                } else {
-                    try {
-                        // For other file types
-                        object = await processOtherFile(file);
-                    } catch (error) {
-                        console.error(`Error processing file: ${error.message}`);
-                        alert(`Failed to process ${file.name}: ${error.message}`);
-                        continue;  // Skip to the next file
-                    }
-                }
-                
-                if (object) {
-                    // Add the object to the scene
-                    console.log(`Adding ${file.name} to model list and scene`);
-                    const modelIndex = loadModel(object, file.name);
+                if (model && model.object && model.visible !== false) {
+                    // Make sure the world matrix is updated
+                    model.object.updateMatrixWorld(true);
                     
-                    if (modelIndex >= 0) {
-                        addedModelIndices.push(modelIndex);
-                        console.log(`Successfully added ${file.name} to scene with index ${modelIndex}`);
+                    // Get or compute the bounding box
+                    const modelBox = model.boundingBox || new THREE.Box3().setFromObject(model.object);
+                    
+                    // Only use the box if it's valid
+                    if (isValidBoundingBox(modelBox)) {
+                        combinedBox.union(modelBox);
+                        validModelCount++;
+                        console.log(`Added model ${index} to combined bounding box`);
+                    } else {
+                        console.warn(`Model ${index} has invalid bounding box, skipping`);
                     }
                 }
-            } catch (error) {
-                console.error(`Failed to process ${file.name}:`, error);
-                alert(`Failed to process ${file.name}: ${error.message || 'Unknown error'}`);
+            } catch (err) {
+                console.error(`Error processing model ${index} for centering:`, err);
             }
+        });
+        
+        // If no valid models found, use a default box
+        if (validModelCount === 0) {
+            console.warn('No valid models found for centering, using default positioning');
+            combinedBox.set(
+                new THREE.Vector3(-1, -1, -1),
+                new THREE.Vector3(1, 1, 1)
+            );
         }
         
-        // Update the model list in the sidebar
-        updateModelListInSidebar();
-        
-        // Auto-select the first model that was added (if any)
-        if (addedModelIndices.length > 0) {
-            selectModel(addedModelIndices[0]);
-        }
-        
-        // After all models are loaded, center them in the scene
-        if (models.length > 0) {
-            centerModel();
-            console.log('Centered all models in scene');
-        }
-        
-        // Force a resize event to ensure proper rendering
-        window.dispatchEvent(new Event('resize'));
+        // Now use zoomToFit to handle the camera positioning
+        zoomToFit(models, true);
         
     } catch (error) {
-        console.error('Error handling files:', error);
-        alert(`Failed to process files: ${error.message || 'Unknown error'}`);
-    } finally {
-        hideLoadingIndicator();
+        console.error('Error in centerModel:', error);
     }
 }
 
@@ -1993,406 +1916,380 @@ function getModelMesh(model) {
     return model.object || model.mesh || null;
 }
 
-// Function to clear the scene (lowercase version for process3DMFile)
-function clearScene() {
-    // Just call the original ClearScene function
-    ClearScene();
-}
-
-// Function to fit camera to a collection of objects
-function fitCameraToObject(sceneToFit, objects, offset = 1.25) {
-    // Create a bounding box for all objects
-    const boundingBox = new THREE.Box3();
-    
-    // Handle both arrays and individual objects
-    const objectsToFit = Array.isArray(objects) ? objects : [objects];
-    
-    // Add each object to the bounding box
-    for (const object of objectsToFit) {
-        if (object) {
-            // Make sure world matrix is updated
-            object.updateMatrixWorld(true);
-            
-            // Create a temporary box for this object
-            const tempBox = new THREE.Box3().setFromObject(object);
-            
-            // Skip invalid boxes
-            if (tempBox.isEmpty() || 
-                !isFinite(tempBox.min.x) || !isFinite(tempBox.min.y) || !isFinite(tempBox.min.z) ||
-                !isFinite(tempBox.max.x) || !isFinite(tempBox.max.y) || !isFinite(tempBox.max.z)) {
-                continue;
-            }
-            
-            // Expand the main box
-            boundingBox.union(tempBox);
-        }
-    }
-    
-    // If the box is still empty or invalid, return
-    if (boundingBox.isEmpty() || 
-        !isFinite(boundingBox.min.x) || !isFinite(boundingBox.min.y) || !isFinite(boundingBox.min.z) ||
-        !isFinite(boundingBox.max.x) || !isFinite(boundingBox.max.y) || !isFinite(boundingBox.max.z)) {
-        console.warn('Invalid bounding box, cannot fit camera');
-        return;
-    }
-    
-    // Get the bounding sphere
-    const center = boundingBox.getCenter(new THREE.Vector3());
-    const size = boundingBox.getSize(new THREE.Vector3());
-    const maxDim = Math.max(size.x, size.y, size.z);
-    const fov = camera.fov * (Math.PI / 180);
-    
-    // Calculate optimal camera distance
-    let cameraDistance = (maxDim / 2) / Math.tan(fov / 2);
-    cameraDistance *= offset; // Add some padding
-    
-    // Position camera
-    const direction = new THREE.Vector3(1, 0.7, 1).normalize();
-    camera.position.copy(center).add(direction.multiplyScalar(cameraDistance));
-    camera.lookAt(center);
-    
-    // Update controls
-    if (controls) {
-        controls.target.copy(center);
-        controls.update();
-    }
-}
-
-// Function to validate mesh geometry
-function validateMeshGeometry(geometry) {
-    // Basic validation check for geometry
-    if (!geometry) return false;
-    
-    // Check for position attribute
-    if (!geometry.attributes || !geometry.attributes.position) return false;
-    
-    // Check that we have at least some vertices
-    const positionArray = geometry.attributes.position.array;
-    return positionArray && positionArray.length > 0;
-}
-
-// Converts Rhino mesh to THREE.js BufferGeometry
-function rhinoMeshToThreeGeometry(rhinoMesh) {
-    if (!rhinoMesh) return null;
-    
-    try {
-        // Extract vertices
-        const vertices = [];
-        const vertexCount = rhinoMesh.vertices().count;
-        
-        for (let i = 0; i < vertexCount; i++) {
-            const pt = rhinoMesh.vertices().get(i);
-            vertices.push(pt.x, pt.y, pt.z);
-        }
-        
-        // Extract faces
-        const indices = [];
-        const faceCount = rhinoMesh.faces().count;
-        
-        for (let i = 0; i < faceCount; i++) {
-            const face = rhinoMesh.faces().get(i);
-            indices.push(face.a, face.b, face.c);
-        }
-        
-        // Create geometry
-        const geometry = new THREE.BufferGeometry();
-        geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
-        geometry.setIndex(indices);
-        geometry.computeVertexNormals();
-        
-        return geometry;
-    } catch (error) {
-        console.error('Error converting Rhino mesh to THREE geometry:', error);
-        return null;
-    }
-}
-
 // Process 3DM file - using the simplified version from our last update
 async function process3DMFile(buffer) {
     try {
         showLoadingIndicator();
         
-        // Check if rhino3dm is loaded
-        if (!window.rhino3dm) {
-            await waitForRhino3dm();
+        // Initialize rhino3dm if not already done
+        if (!await initRhino3dm()) {
+            throw new Error('Failed to initialize rhino3dm');
         }
         
-        // Clear the scene before adding new objects
-        clearScene();
+        console.log('Using rhino3dm to process file');
         
-        // Decode 3DM file
-        const rhino = window.rhino3dm;
+        // Clear the scene
+        clearScene();
+
+        // Decode the 3DM file
+        console.log('Creating File3dm from buffer...');
         const doc = rhino.File3dm.fromByteArray(buffer);
         
-        // Get all the objects from the 3DM file
-        const objects = doc.objects();
-        const entries = objects.count;
+        if (!doc) {
+            throw new Error('Failed to decode 3DM file');
+        }
         
-        // Collection to hold all created meshes
-        let allMeshes = [];
-        
-        // Process each object
-        for (let i = 0; i < entries; i++) {
+        const meshes = [];
+        const objectCount = doc.objects().count;
+        console.log(`Processing ${objectCount} objects in the 3DM file`);
+
+        // Process each object in the file
+        for (let i = 0; i < objectCount; i++) {
             try {
-                const rhinoObject = objects.get(i);
-                const geometry = rhinoObject.geometry();
-                const attributes = rhinoObject.attributes();
+                // Get the object
+                const obj = doc.objects().get(i);
+                if (!obj) continue;
+
+                // Get geometry and attributes
+                const geometry = obj.geometry();
+                const attributes = obj.attributes();
                 
                 if (!geometry) continue;
+
+                // Use a gold material for jewelry
+                let material = createMeshMaterial();
+
+                // Get type and name
+                const geometryType = geometry.constructor.name;
+                const objName = attributes && attributes.name ? attributes.name : `Object_${i}`;
                 
-                // Handle different geometry types
-                let threeMesh = null;
-                
-                if (geometry.objectType === rhino.ObjectType.Mesh) {
-                    // Process Rhino mesh
-                    const rhinoMesh = geometry;
-                    const threeGeometry = rhinoMeshToThreeGeometry(rhinoMesh);
+                console.log(`Object ${i} (${objName}) is of type: ${geometryType}`);
+
+                // Our final THREE.js geometry
+                let threeGeometry = null;
+
+                // Try to create a mesh from the geometry
+                if (geometryType === 'Mesh' || (geometry.vertices && typeof geometry.vertices === 'function')) {
+                    // Direct mesh - easiest case
+                    console.log(`Processing direct Mesh object ${i}`);
+                    threeGeometry = rhinoMeshToThreeGeometry(geometry);
+                } 
+                else {
+                    // For all other types, try to get a mesh representation if possible
+                    console.log(`Trying to get mesh for ${geometryType} object ${i}`);
                     
-                    if (validateMeshGeometry(threeGeometry)) {
-                        const material = createMeshMaterial();
-                        threeMesh = new THREE.Mesh(threeGeometry, material);
+                    // First try standard mesh conversion
+                    let rhinoMesh = null;
+                    
+                    // Try with getMesh if available
+                    if (typeof geometry.getMesh === 'function') {
+                        console.log(`  Using getMesh() on ${geometryType}`);
+                        try {
+                            // For Breps, Surfaces, etc.
+                            rhinoMesh = geometry.getMesh(rhino.MeshType.Any);
+                        } catch (e) {
+                            console.warn(`  getMesh() failed:`, e);
+                        }
                     }
                     
-                    // Dispose of Rhino resources
-                    rhinoMesh.delete();
-                } 
-                else if (geometry.objectType === rhino.ObjectType.Brep) {
-                    // Convert Brep to mesh
-                    const meshingParameters = getMeshingParameters(rhino);
-                    const rhinoMesh = geometry.getMesh(meshingParameters);
-                    
-                    if (rhinoMesh) {
-                        const threeGeometry = rhinoMeshToThreeGeometry(rhinoMesh);
-                        
-                        if (validateMeshGeometry(threeGeometry)) {
-                            const material = createMeshMaterial();
-                            threeMesh = new THREE.Mesh(threeGeometry, material);
+                    // For curves and other non-mesh types, try a fallback
+                    if (!rhinoMesh && geometryType.includes('Curve')) {
+                        console.log(`  Creating line for Curve ${i}`);
+                        try {
+                            // Create a simple line
+                            if (typeof geometry.pointAt === 'function' && geometry.domain) {
+                                const domain = geometry.domain;
+                                const points = [];
+                                const steps = 20; // More points for smoother curves
+                                
+                                for (let j = 0; j <= steps; j++) {
+                                    const t = domain[0] + (domain[1] - domain[0]) * (j / steps);
+                                    const point = geometry.pointAt(t);
+                                    if (point) {
+                                        points.push(point.x, point.y, point.z);
+                                    }
+                                }
+                                
+                                if (points.length >= 6) {
+                                    threeGeometry = new THREE.BufferGeometry();
+                                    threeGeometry.setAttribute('position', new THREE.Float32BufferAttribute(points, 3));
+                                    material = new THREE.LineBasicMaterial({ color: 0x000000, linewidth: 2 });
+                                }
+                            }
+                        } catch (e) {
+                            console.warn(`  Failed to create curve:`, e);
                         }
-                        
-                        // Dispose of Rhino resources
-                        rhinoMesh.delete();
                     }
-                } 
-                else if (geometry.objectType === rhino.ObjectType.Surface) {
-                    // Convert Surface to mesh
-                    const meshingParameters = getMeshingParameters(rhino);
-                    const rhinoMesh = geometry.getMesh(meshingParameters);
                     
-                    if (rhinoMesh) {
-                        const threeGeometry = rhinoMeshToThreeGeometry(rhinoMesh);
-                        
-                        if (validateMeshGeometry(threeGeometry)) {
-                            const material = createMeshMaterial();
-                            threeMesh = new THREE.Mesh(threeGeometry, material);
+                    // For Breps and other 3D objects, try to get bounding box if all else fails
+                    if (!rhinoMesh && !threeGeometry && typeof geometry.getBoundingBox === 'function') {
+                        console.log(`  Falling back to bounding box for ${geometryType} ${i}`);
+                        try {
+                            // Create a box as last resort
+                            const bbox = geometry.getBoundingBox();
+                            if (bbox && bbox.min && bbox.max) {
+                                // Create a box from min/max points
+                                const min = bbox.min;
+                                const max = bbox.max;
+                                
+                                // Ensure valid coordinates
+                                if (isFinite(min.x) && isFinite(min.y) && isFinite(min.z) &&
+                                    isFinite(max.x) && isFinite(max.y) && isFinite(max.z)) {
+                                    
+                                    // Use BoxGeometry
+                                    const width = max.x - min.x;
+                                    const height = max.y - min.y;
+                                    const depth = max.z - min.z;
+                                    
+                                    if (width > 0 && height > 0 && depth > 0) {
+                                        threeGeometry = new THREE.BoxGeometry(width, height, depth);
+                                        // Center the box at its midpoint
+                                        const centerX = (min.x + max.x) / 2;
+                                        const centerY = (min.y + max.y) / 2;
+                                        const centerZ = (min.z + max.z) / 2;
+                                        
+                                        // Use a transparent material for bounding boxes
+                                        material = new THREE.MeshBasicMaterial({ 
+                                            color: 0xffaa00, 
+                                            transparent: true, 
+                                            opacity: 0.3,
+                                            wireframe: true
+                                        });
+                                        
+                                        // Position transform will be applied later
+                                        threeGeometry.userData.center = new THREE.Vector3(centerX, centerY, centerZ);
+                                    }
+                                }
+                            }
+                        } catch (e) {
+                            console.warn(`  Failed to create bounding box:`, e);
                         }
-                        
-                        // Dispose of Rhino resources
-                        rhinoMesh.delete();
+                    }
+                    
+                    // Convert the Rhino mesh to THREE.js geometry if we found one
+                    if (rhinoMesh && !threeGeometry) {
+                        console.log(`  Converting Rhino mesh to THREE geometry`);
+                        threeGeometry = rhinoMeshToThreeGeometry(rhinoMesh);
+                        // Cleanup
+                        if (typeof rhinoMesh.delete === 'function') {
+                            rhinoMesh.delete();
+                        }
                     }
                 }
-                
-                // If a mesh was created, add it to the collection
-                if (threeMesh) {
-                    allMeshes.push(threeMesh);
-                    scene.add(threeMesh);
+
+                // Only add valid geometries to the scene
+                if (threeGeometry && validateMeshGeometry(threeGeometry)) {
+                    let mesh;
+                    if (geometryType.includes('Curve')) {
+                        mesh = new THREE.Line(threeGeometry, material);
+                    } else {
+                        mesh = new THREE.Mesh(threeGeometry, material);
+                    }
+                    
+                    // Apply center offset if needed (for bounding box geometries)
+                    if (threeGeometry.userData && threeGeometry.userData.center) {
+                        mesh.position.copy(threeGeometry.userData.center);
+                    }
+                    
+                    mesh.name = objName;
+                    meshes.push(mesh);
+                    console.log(`✓ Added ${geometryType} ${i} to scene`);
+                } else {
+                    console.log(`✗ Object ${i} did not produce valid geometry`);
                 }
-                
-                // Dispose of Rhino resources
-                geometry.delete();
-                attributes.delete();
-                rhinoObject.delete();
-                
-            } catch (objError) {
-                console.error("Error processing 3DM object:", objError);
+
+                // Update progress
+                updateProgressBar((i + 1) / objectCount);
+            } catch (error) {
+                console.error(`Error processing object at index ${i}:`, error);
             }
         }
-        
-        // Focus camera on all loaded meshes
-        if (allMeshes.length > 0) {
-            fitCameraToObject(scene, allMeshes);
+
+        console.log(`Successfully processed ${meshes.length} out of ${objectCount} objects`);
+
+        // Add all meshes to the scene
+        for (const mesh of meshes) {
+            scene.add(mesh);
         }
-        
-        // Clean up Rhino resources
-        objects.delete();
+
+        // Center the camera on the loaded objects
+        if (meshes.length > 0) {
+            console.log(`Centering camera on ${meshes.length} meshes`);
+            fitCameraToObject(scene, meshes);
+        } else {
+            console.warn('No valid meshes were created from the 3DM file');
+        }
+
+        // Clean up
         doc.delete();
         
         hideLoadingIndicator();
-        return allMeshes; // Return the array of meshes instead of true
+        return meshes;
     } catch (error) {
-        console.error("Error processing 3DM file:", error);
         hideLoadingIndicator();
-        showErrorMessage("Failed to process 3DM file. " + error.message);
-        return []; // Return empty array on error
+        console.error('Error processing 3DM file:', error);
+        throw error;
     }
 }
 
-// Helper function to wait for rhino3dm to load
-function waitForRhino3dm() {
-    return new Promise((resolve, reject) => {
-        const maxAttempts = 20;
-        let attempts = 0;
-        
-        const checkRhino = () => {
-            attempts++;
-            if (window.rhino3dm) {
-                resolve();
-            } else if (attempts >= maxAttempts) {
-                reject(new Error("Failed to load rhino3dm after multiple attempts"));
-            } else {
-                setTimeout(checkRhino, 500);
-            }
-        };
-        
-        checkRhino();
-    });
-}
-
-// Helper function to clear the scene
-function clearScene() {
-    // Remove all meshes from the scene
-    while (scene.children.length > 0) {
-        const object = scene.children[0];
-        if (object.geometry) {
-            object.geometry.dispose();
-        }
-        if (object.material) {
-            if (Array.isArray(object.material)) {
-                object.material.forEach(material => material.dispose());
-            } else {
-                object.material.dispose();
-            }
-        }
-        scene.remove(object);
-    }
-}
-
-// Helper function to convert Rhino mesh to Three.js geometry
-function rhinoMeshToThreeGeometry(rhinoMesh) {
-    const geometry = new THREE.BufferGeometry();
-    
-    // Get vertices
-    const vertices = rhinoMesh.vertices();
-    const vertexCount = vertices.count;
-    const vertexPositions = new Float32Array(vertexCount * 3);
-    
-    for (let i = 0; i < vertexCount; i++) {
-        const vertex = vertices.get(i);
-        vertexPositions[i * 3] = vertex.x;
-        vertexPositions[i * 3 + 1] = vertex.y;
-        vertexPositions[i * 3 + 2] = vertex.z;
-    }
-    
-    // Get faces
-    const faces = rhinoMesh.faces();
-    const faceCount = faces.count;
-    const indices = [];
-    
-    for (let i = 0; i < faceCount; i++) {
-        const face = faces.get(i);
-        indices.push(face.a, face.b, face.c);
-    }
-    
-    // Set geometry attributes
-    geometry.setAttribute('position', new THREE.BufferAttribute(vertexPositions, 3));
-    geometry.setIndex(indices);
-    geometry.computeVertexNormals();
-    
-    return geometry;
-}
-
-// Helper function to create material for meshes
-function createMeshMaterial() {
-    return new THREE.MeshPhongMaterial({
-        color: 0xcccccc,
-        specular: 0x111111,
-        shininess: 100,
-        flatShading: false
-    });
-}
-
-// Helper function to validate mesh geometry
-function validateMeshGeometry(geometry) {
-    return geometry && 
-           geometry.attributes && 
-           geometry.attributes.position && 
-           geometry.attributes.position.count > 0;
-}
-
-// Helper function to get meshing parameters for Rhino
-function getMeshingParameters(rhino) {
-    const mp = new rhino.MeshingParameters();
-    mp.gridMaxCount = 64;
-    mp.gridAmplification = 1.0;
-    mp.gridAngle = 0.0;
-    mp.gridAspectRatio = 1.0;
-    mp.refineAngle = 15;
-    mp.refineGrid = true;
-    mp.simplePlanes = false;
-    return mp;
-}
-
-// Helper function to fit camera to objects
-function fitCameraToObject(scene, objects) {
-    const box = new THREE.Box3();
-    
-    // If objects is an array, compute the bounding box for all objects
-    if (Array.isArray(objects)) {
-        objects.forEach(object => {
-            box.expandByObject(object);
-        });
-    } else {
-        // Single object
-        box.expandByObject(objects);
-    }
-    
-    const center = new THREE.Vector3();
-    box.getCenter(center);
-    
-    // Get the size of the bounding box
-    const size = new THREE.Vector3();
-    box.getSize(size);
-    
-    // Calculate the distance based on the size
-    const maxDim = Math.max(size.x, size.y, size.z);
-    const fov = camera.fov * (Math.PI / 180);
-    let cameraDistance = Math.abs(maxDim / Math.sin(fov / 2));
-    
-    // Add a little padding
-    cameraDistance *= 1.5;
-    
-    // Set the camera position and look at the center
-    camera.position.set(center.x, center.y, center.z + cameraDistance);
-    camera.lookAt(center);
-    camera.updateProjectionMatrix();
-    
-    // Update controls to center on the objects
-    controls.target.copy(center);
-    controls.update();
-}
-
-// Initialize the application when the DOM content is loaded
+// Start initialization when the document is ready
 document.addEventListener('DOMContentLoaded', async () => {
-    // Show loading indicator
-    const loadingIndicator = document.getElementById('loading-indicator');
-    if (loadingIndicator) {
-        loadingIndicator.style.display = 'flex';
-    }
+    console.log('DOM content loaded, starting initialization...');
+    
+    // Show loading indicator during initialization
+    showLoadingIndicator();
     
     try {
-        // Initialize the application
-        await initializeApp();
+        // First check if rhino3dm is available
+        if (!isRhino3dmLoaded()) {
+            console.log('Waiting for rhino3dm to load...');
+            // Wait a bit for the script to load
+            for (let i = 0; i < 10; i++) {
+                await new Promise(resolve => setTimeout(resolve, 500));
+                if (isRhino3dmLoaded()) {
+                    console.log('rhino3dm loaded after waiting');
+                    break;
+                }
+            }
+        }
         
-        // Hide loading indicator
-        if (loadingIndicator) {
-            loadingIndicator.style.display = 'none';
-        }
+        // Initialize the app
+        await initializeApp();
+        console.log('Application initialized successfully');
     } catch (error) {
-        console.error('Error during initialization:', error);
-        // Hide loading indicator even if there's an error
-        if (loadingIndicator) {
-            loadingIndicator.style.display = 'none';
-        }
-        // Show error message
-        alert('Error initializing the application: ' + error.message);
+        console.error('Initialization error:', error);
+        alert('Failed to initialize 3D viewer. Please refresh the page and ensure you have a stable internet connection.');
+    } finally {
+        hideLoadingIndicator();
     }
 });
+
+// Function to handle ambient light intensity changes
+function handleAmbientLightChange(event) {
+    const value = parseFloat(event.target.value);
+    if (ambientLight) {
+        ambientLight.intensity = value;
+    }
+    document.documentElement.style.setProperty('--ambient-light', value);
+}
+
+// Function to handle directional light intensity changes
+function handleDirectionalLightChange(event) {
+    const value = parseFloat(event.target.value);
+    if (directionalLight) {
+        directionalLight.intensity = value;
+    }
+    document.documentElement.style.setProperty('--directional-light', value);
+}
+
+// Function to handle clicks on 3D objects for selection
+function handleClick(event) {
+    // Calculate mouse position in normalized device coordinates (-1 to +1)
+    const mouse = new THREE.Vector2();
+    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+    
+    // Create a raycaster
+    const raycaster = new THREE.Raycaster();
+    raycaster.setFromCamera(mouse, camera);
+    
+    // Get all meshes from the scene to check for intersection
+    const meshes = [];
+    scene.traverse((object) => {
+        if (object.isMesh && object.visible) {
+            meshes.push(object);
+        }
+    });
+    
+    // Find intersections
+    const intersects = raycaster.intersectObjects(meshes);
+    
+    // If we clicked on something
+    if (intersects.length > 0) {
+        const clickedObject = intersects[0].object;
+        
+        // Deselect previously selected object
+        if (selectedObject && selectedObject !== clickedObject) {
+            // Remove highlight from previous selection
+            if (selectedObject.userData.outline) {
+                scene.remove(selectedObject.userData.outline);
+                selectedObject.userData.outline = null;
+            }
+        }
+        
+        // Select the clicked object
+        selectedObject = clickedObject;
+        
+        // Create an outline for the selected object if it doesn't have one
+        if (!selectedObject.userData.outline) {
+            const outlineMaterial = new THREE.MeshBasicMaterial({
+                color: 0x00ff00, 
+                side: THREE.BackSide,
+                wireframe: true
+            });
+            
+            // Create a slightly larger geometry for the outline
+            const outlineGeometry = selectedObject.geometry.clone();
+            const outline = new THREE.Mesh(outlineGeometry, outlineMaterial);
+            outline.scale.multiplyScalar(1.01); // Make it slightly larger
+            
+            // Copy the position and rotation of the original object
+            outline.position.copy(selectedObject.position);
+            outline.rotation.copy(selectedObject.rotation);
+            outline.quaternion.copy(selectedObject.quaternion);
+            
+            // Store the outline and add it to the scene
+            selectedObject.userData.outline = outline;
+            scene.add(outline);
+        }
+        
+        // Update UI based on selection
+        updateModelListInSidebar();
+        
+        // Update material dropdown to match selected object
+        const materialSelect = document.getElementById('material-select');
+        if (materialSelect && selectedObject.userData.materialType) {
+            materialSelect.value = selectedObject.userData.materialType;
+        }
+    } else {
+        // If we clicked on empty space, deselect current object
+        if (selectedObject) {
+            // Remove outline
+            if (selectedObject.userData.outline) {
+                scene.remove(selectedObject.userData.outline);
+                selectedObject.userData.outline = null;
+            }
+            
+            selectedObject = null;
+            updateModelListInSidebar();
+        }
+    }
+}
+
+// Animation loop
+function animate() {
+    // Request the next frame
+    requestAnimationFrame(animate);
+    
+    // Update controls
+    if (controls) {
+        controls.update();
+    }
+    
+    // Handle turntable animation
+    if (isTurntableActive && selectedObject) {
+        const delta = turntableClock.getDelta();
+        selectedObject.rotation.y += 0.5 * delta; // Half a radian per second
+    }
+    
+    // Render the scene
+    if (renderer && scene && camera) {
+        if (composer) {
+            composer.render();
+        } else {
+            renderer.render(scene, camera);
+        }
+    }
+}
+
+
