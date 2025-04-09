@@ -1,0 +1,101 @@
+30:function isRhino3dmLoaded() {
+35:// Debug function to log available rhino3dm classes
+36:function debugRhino3dm() {
+67:                available = typeof rhino.Mesh[method] === 'function' ||
+68:                           (rhino.Mesh.prototype && typeof rhino.Mesh.prototype[method] === 'function');
+86:                available = typeof rhino.Brep[method] === 'function' ||
+87:                           (rhino.Brep.prototype && typeof rhino.Brep.prototype[method] === 'function');
+104:async function initRhino3dm() {
+133:function showLoadingIndicator() {
+141:function hideLoadingIndicator() {
+149:function showFrontpage() {
+169:function hideFrontpage() {
+202:async function initializeApp() {
+207:        await waitForRhino3dm();
+240:async function waitForRhino3dm(maxAttempts = 10, delay = 500) {
+349:function ClearScene() {
+368:function AddModelToScene(mesh) {
+375:async function init() {
+458:// Update the setupEventListeners function to properly handle file selection
+459:function setupEventListeners() {
+650:function getLoaderForFile(filename) {
+681:function getLoaderForPath(path) {
+692:    // For string paths, use the existing getLoaderForFile function
+696:// Update the processOtherFile function to fix Content Security Policy issues when loading OBJ files
+697:async function processOtherFile(file) {
+764:// Helper function to read a file as text
+765:function readFileAsText(file) {
+778:// Helper function to read a file as ArrayBuffer
+779:function readFileAsArrayBuffer(file) {
+789:function getMeshingParameters(rhino) {
+808:function createMeshMaterial(color = 0xffd700) {
+826:function updateTurntable() {
+845:function toggleTurntable() {
+878:// Improved handleFiles function with single path for loading 3DM files
+879:async function handleFiles(files) {
+1018:function toggleFloor() {
+1028:function toggleBackground() {
+1039:function toggleSidebar() {
+1047:function resetCamera() {
+1081:    function animateCamera() {
+1085:        // Ease in-out function for smooth animation
+1103:function setupKeyboardShortcuts() {
+1104:    window.addEventListener('keydown', function(event) {
+1135:// Improved zoom to fit function
+1136:function zoomToFit(selectedModels = null, animate = true) {
+1233:// Load model function that adds a model to the scene without duplicating geometry
+1234:function loadModel(modelPath, materialType = null) {
+1343:// Add helper function to validate a geometry's bounding box
+1344:function validateGeometry(geometry) {
+1380:// Add helper function to fix geometry with invalid bounding boxes
+1381:function fixGeometryBounds(geometry) {
+1431:// Update the positionAndScaleModel function to handle geometry issues
+1432:function positionAndScaleModel(object, model) {
+1515:// Add centerSelectedModel function back
+1516:function centerSelectedModel() {
+1532:// Add applyMaterial function back
+1533:function applyMaterial(mesh, materialType) {
+1550:function createOutline(object) {
+1604:// Helper function to create an outline for a single mesh
+1605:function createMeshOutline(mesh, outlineMaterial) {
+1625:// Add back updateModelListInSidebar function
+1626:function updateModelListInSidebar() {
+1712:function createJewelryEnvironmentMap(renderer) {
+1728:function createStudioScene() {
+1796:async function loadEnvironmentMap() {
+1813:// Add setupLights function that was referenced but not defined
+1814:function setupLights() {
+1848:// Add setupControls function that was referenced but not defined
+1849:function setupControls() {
+1866:function onWindowResize() {
+1880:// Show error message function
+1881:function showErrorMessage(message) {
+1913:function onWheel(event) {
+1952:// Using existing validateGeometry and fixGeometryBounds functions defined earlier
+1954:// Helper function to check if a bounding box is valid
+1955:function isValidBoundingBox(box) {
+1966:// Helper function to extract filename from path
+1967:function getFileNameFromPath(path) {
+1988:// Helper function to get a model's mesh regardless of structure
+1989:function getModelMesh(model) {
+1997:function clearScene() {
+1998:    // Just call the original ClearScene function
+2003:function fitCameraToObject(sceneToFit, objects, offset = 1.25) {
+2062:function validateMeshGeometry(geometry) {
+2075:function rhinoMeshToThreeGeometry(rhinoMesh) {
+2111:async function process3DMFile(buffer) {
+2117:            await waitForRhino3dm();
+2229:// Helper function to wait for rhino3dm to load
+2230:function waitForRhino3dm() {
+2250:// Helper function to clear the scene
+2251:function clearScene() {
+2269:// Helper function to convert Rhino mesh to Three.js geometry
+2270:function rhinoMeshToThreeGeometry(rhinoMesh) {
+2303:// Helper function to create material for meshes
+2304:function createMeshMaterial() {
+2313:// Helper function to validate mesh geometry
+2314:function validateMeshGeometry(geometry) {
+2321:// Helper function to get meshing parameters for Rhino
+2322:function getMeshingParameters(rhino) {
+2334:// Helper function to fit camera to objects
+2335:function fitCameraToObject(scene, objects) {

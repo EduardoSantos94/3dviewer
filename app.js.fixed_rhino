@@ -2248,13 +2248,75 @@ async function process3DMFile(buffer) {
 
 // REMOVED: Duplicate rhinoMeshToThreeGeometry function - already defined at line 2071
 
-// REMOVED: Duplicate createMeshMaterial function - already defined at line 804
+// Helper function to create material for meshes
+function createMeshMaterial() {
+    return new THREE.MeshPhongMaterial({
+        color: 0xcccccc,
+        specular: 0x111111,
+        shininess: 100,
+        flatShading: false
+    });
+}
 
-// REMOVED: Duplicate validateMeshGeometry function - already defined at line 2058
+// Helper function to validate mesh geometry
+function validateMeshGeometry(geometry) {
+    return geometry && 
+           geometry.attributes && 
+           geometry.attributes.position && 
+           geometry.attributes.position.count > 0;
+}
 
-// REMOVED: Duplicate getMeshingParameters function - already defined at line 785
+// Helper function to get meshing parameters for Rhino
+function getMeshingParameters(rhino) {
+    const mp = new rhino.MeshingParameters();
+    mp.gridMaxCount = 64;
+    mp.gridAmplification = 1.0;
+    mp.gridAngle = 0.0;
+    mp.gridAspectRatio = 1.0;
+    mp.refineAngle = 15;
+    mp.refineGrid = true;
+    mp.simplePlanes = false;
+    return mp;
+}
 
-// REMOVED: Duplicate fitCameraToObject function - already defined at line 1999
+// Helper function to fit camera to objects
+function fitCameraToObject(scene, objects) {
+    const box = new THREE.Box3();
+    
+    // If objects is an array, compute the bounding box for all objects
+    if (Array.isArray(objects)) {
+        objects.forEach(object => {
+            box.expandByObject(object);
+        });
+    } else {
+        // Single object
+        box.expandByObject(objects);
+    }
+    
+    const center = new THREE.Vector3();
+    box.getCenter(center);
+    
+    // Get the size of the bounding box
+    const size = new THREE.Vector3();
+    box.getSize(size);
+    
+    // Calculate the distance based on the size
+    const maxDim = Math.max(size.x, size.y, size.z);
+    const fov = camera.fov * (Math.PI / 180);
+    let cameraDistance = Math.abs(maxDim / Math.sin(fov / 2));
+    
+    // Add a little padding
+    cameraDistance *= 1.5;
+    
+    // Set the camera position and look at the center
+    camera.position.set(center.x, center.y, center.z + cameraDistance);
+    camera.lookAt(center);
+    camera.updateProjectionMatrix();
+    
+    // Update controls to center on the objects
+    controls.target.copy(center);
+    controls.update();
+}
 
 // Animation loop function
 function animate() {
@@ -2300,8 +2362,5 @@ document.addEventListener('DOMContentLoaded', async () => {
         alert('Error initializing the application: ' + error.message);
     }
 });
-
-
-
 
 
