@@ -434,7 +434,7 @@ async function init() {
     gridHelper.visible = false;
     scene.add(gridHelper);
     
-    // Create a ground plane
+    // Create a ground plane - hidden by default
     const groundGeometry = new THREE.PlaneGeometry(20, 20);
     const groundMaterial = new THREE.MeshStandardMaterial({
         color: 0xffffff,
@@ -443,11 +443,18 @@ async function init() {
         side: THREE.DoubleSide
     });
     groundPlane = new THREE.Mesh(groundGeometry, groundMaterial);
-    groundPlane.rotation.x = Math.PI / 2; // Rotate to be horizontal
-    groundPlane.position.y = 0; // Position at y=0
+    groundPlane.rotation.x = Math.PI / 2;
+    groundPlane.position.y = 0;
     groundPlane.receiveShadow = true;
+    groundPlane.visible = false; // Set to hidden by default
     scene.add(groundPlane);
 
+    // Update floor toggle button state
+    const toggleFloorBtn = document.getElementById('toggle-floor');
+    if (toggleFloorBtn) {
+        toggleFloorBtn.classList.remove('active');
+    }
+    
     // Note: setupEventListeners() and animate() are called in initializeApp()
     // to avoid duplicate initialization
 }
@@ -825,7 +832,7 @@ function updateTurntable() {
         const delta = turntableClock.getDelta();
         const rotationSpeed = turntableSpeed * delta;
         
-        // Apply smooth rotation
+        // Apply smooth rotation to the actual object
         selectedObject.rotation.y += rotationSpeed;
         
         // Reset rotation after full circle
@@ -833,42 +840,28 @@ function updateTurntable() {
             selectedObject.rotation.y = 0;
         }
         
-        // Request next frame
+        // Force a render update
+        renderer.render(scene, camera);
+        
+        // Continue the animation loop
         requestAnimationFrame(updateTurntable);
     }
 }
 
 // Toggle turntable animation with improved handling
 function toggleTurntable() {
-    console.log("Toggle turntable called, selectedObject:", selectedObject);
-    
-    if (!selectedObject) {
-        console.warn('No object selected for turntable animation');
-        alert('Please select an object first by clicking on it');
-        return;
-    }
-
     isTurntableActive = !isTurntableActive;
-    console.log("Turntable active:", isTurntableActive);
+    console.log('Turntable:', isTurntableActive ? 'ON' : 'OFF');
     
     // Update button state
-    const toggleTurntableBtn = document.getElementById('toggle-turntable');
-    if (toggleTurntableBtn) {
-        toggleTurntableBtn.classList.toggle('active', isTurntableActive);
+    const turntableButton = document.getElementById('toggle-turntable');
+    if (turntableButton) {
+        turntableButton.classList.toggle('active', isTurntableActive);
     }
     
-    if (isTurntableActive) {
-        console.log('Starting turntable animation');
-        controls.enableRotate = false; // Disable manual rotation during turntable
-        selectedObject.userData.initialRotation = selectedObject.rotation.y;
-        
-        // Reset and start the clock
-        turntableClock.stop();
-        turntableClock.start();
-    } else {
-        console.log('Stopping turntable animation');
-        turntableClock.stop();
-        controls.enableRotate = true; // Re-enable manual rotation
+    // Disable/enable orbit controls when turntable is active
+    if (controls) {
+        controls.enabled = !isTurntableActive;
     }
 }
 
@@ -890,7 +883,7 @@ async function handleFiles(files) {
             
             if (extension === '3dm') {
                 await process3DMFile(file);
-            } else {
+        } else {
                 await processOtherFile(file);
             }
         }
@@ -991,9 +984,9 @@ function setupKeyboardShortcuts() {
     window.addEventListener('keydown', function(event) {
         // Only process shortcuts if we're not in an input field
         if (event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA') {
-            return;
-        }
-        
+        return;
+    }
+
         switch(event.key.toLowerCase()) {
             case ' ': // Space key to reset camera
                 resetCamera();
@@ -1021,7 +1014,8 @@ function setupKeyboardShortcuts() {
 
 // Improved zoom to fit function
 function zoomToFit(selectedModels = null, animate = true) {
-    const modelsToFit = selectedModels || models;
+    // Convert single model to array if needed
+    const modelsToFit = Array.isArray(selectedModels) ? selectedModels : [selectedModels];
     
     if (!modelsToFit || modelsToFit.length === 0) {
         console.warn('No models to fit in view');
@@ -1035,7 +1029,7 @@ function zoomToFit(selectedModels = null, animate = true) {
     let foundValidGeometry = false;
     
     modelsToFit.forEach(model => {
-        if (model.object) {
+        if (model && model.object) {
             // Ensure we have a valid bounding box for the model
             if (!model.boundingBox) {
                 // If no bounding box stored, calculate it
@@ -1401,35 +1395,33 @@ function positionAndScaleModel(object, model) {
 
 // Add centerSelectedModel function back
 function centerSelectedModel() {
-    if (models.length === 0) {
-        console.warn('No models available to center');
-        return;
-    }
-
     if (selectedObject) {
-        // If an object is selected, center on that object
-        zoomToFit(selectedObject, camera, controls);
-        console.log('Centering selected model');
+        zoomToFit(selectedObject);
     } else {
-        // Otherwise center on all models
-        centerModel();
+        console.warn('No model selected to center');
     }
 }
 
-// Add applyMaterial function back
+// Update the original applyMaterial function
 function applyMaterial(mesh, materialType) {
-    if (!mesh || !materialPresets[materialType]) return;
+    if (!mesh) return;
     
-    const material = materialPresets[materialType].clone();
-    
-    if (mesh instanceof THREE.Group) {
-        mesh.traverse((child) => {
-            if (child instanceof THREE.Mesh) {
-                child.material = material;
+    // Handle both single mesh and group objects
+    const handleMesh = (mesh) => {
+        if (mesh instanceof THREE.Mesh && !mesh.userData.isOutline) {
+            const preset = materialPresets[materialType];
+            if (preset) {
+                // Clone the preset material to avoid sharing references
+                const newMaterial = preset.clone();
+                mesh.material = newMaterial;
             }
-        });
-    } else if (mesh instanceof THREE.Mesh) {
-        mesh.material = material;
+        }
+    };
+
+    if (mesh instanceof THREE.Group) {
+        mesh.traverse(handleMesh);
+    } else {
+        handleMesh(mesh);
     }
 }
 
@@ -1526,18 +1518,18 @@ function updateModelListInSidebar() {
         emptyMessage.textContent = 'No models loaded. Click "Add Model" to get started.';
         modelListElement.appendChild(emptyMessage);
     } else {
-        models.forEach((model, index) => {
-            const item = document.createElement('div');
-            item.className = `model-item ${model.selected ? 'selected' : ''}`;
+    models.forEach((model, index) => {
+        const item = document.createElement('div');
+        item.className = `model-item ${model.selected ? 'selected' : ''}`;
             
             const label = document.createElement('label');
             label.className = 'model-label';
-            
-            const checkbox = document.createElement('input');
-            checkbox.type = 'checkbox';
-            checkbox.checked = model.visible;
-            checkbox.addEventListener('change', () => toggleModelVisibility(index));
-            
+        
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.checked = model.visible;
+        checkbox.addEventListener('change', () => toggleModelVisibility(index));
+        
             const nameSpan = document.createElement('span');
             nameSpan.textContent = model.name;
             nameSpan.addEventListener('click', () => selectModel(index));
@@ -1553,10 +1545,10 @@ function updateModelListInSidebar() {
             visibilityBtn.addEventListener('click', () => toggleModelVisibility(index));
             
             // Material options
-            const materialBtn = document.createElement('button');
+        const materialBtn = document.createElement('button');
             materialBtn.className = 'model-btn material-btn';
             materialBtn.innerHTML = `<i class="fas fa-palette"></i>`;
-            materialBtn.title = 'Change Material';
+        materialBtn.title = 'Change Material';
             materialBtn.addEventListener('click', () => showMaterialDialog(index));
             
             // Delete button
@@ -1566,7 +1558,7 @@ function updateModelListInSidebar() {
             deleteBtn.title = 'Remove Model';
             deleteBtn.addEventListener('click', () => {
                 if (confirm(`Are you sure you want to remove "${model.name}"?`)) {
-                    removeModel(index);
+            removeModel(index);
                 }
             });
             
@@ -1578,7 +1570,7 @@ function updateModelListInSidebar() {
             // Assemble the item
             label.appendChild(checkbox);
             label.appendChild(nameSpan);
-            item.appendChild(label);
+        item.appendChild(label);
             item.appendChild(controlsDiv);
             modelListElement.appendChild(item);
         });
@@ -2107,34 +2099,22 @@ async function process3DMFile(file) {
             }
         }
 
-        // Center camera on loaded objects
-        if (meshes.length > 0) {
-            const box = new THREE.Box3().setFromObject(meshes[0]);
-            for (let i = 1; i < meshes.length; i++) {
-                box.expandByObject(meshes[i]);
-            }
-            
-            const center = box.getCenter(new THREE.Vector3());
-            const size = box.getSize(new THREE.Vector3());
-            const maxDim = Math.max(size.x, size.y, size.z);
-            const fov = camera.fov * (Math.PI / 180);
-            const cameraZ = Math.abs(maxDim / Math.tan(fov / 2));
-            
-            camera.position.set(center.x, center.y, center.z + cameraZ);
-            camera.lookAt(center);
-            controls.target.copy(center);
-            controls.update();
-        }
-
         // Clean up Rhino resources
         rhinoDoc.delete();
-        return meshes;
+        
+        // Update the model list
+        updateLoadedModelsUI();
+        
+        // Center and fit the camera to the loaded objects
+        if (meshes.length > 0) {
+            zoomToFit(meshes);
+        }
+        
+        hideLoadingIndicator();
     } catch (error) {
         console.error('Error processing 3DM file:', error);
-        showErrorMessage('Error processing 3DM file: ' + error.message);
-        throw error;
-    } finally {
         hideLoadingIndicator();
+        throw error;
     }
 }
 
@@ -2147,11 +2127,17 @@ function animate() {
         controls.update();
     }
     
+    // Update turntable if active
+    if (isTurntableActive && selectedObject) {
+        const delta = turntableClock.getDelta();
+        const rotationSpeed = turntableSpeed * delta;
+        selectedObject.rotation.y += rotationSpeed;
+    }
+    
     // Render the scene with composer for post-processing effects
     if (composer) {
         composer.render();
     } else if (renderer && scene && camera) {
-        // Fallback to regular renderer if composer is not available
         renderer.render(scene, camera);
     }
 }
@@ -2224,7 +2210,7 @@ function handleClick(event) {
 
         if (selectedMesh) {
             // Deselect previous selection
-            if (selectedObject) {
+        if (selectedObject) {
                 selectedObject.material.emissive.setHex(0x000000);
             }
 
@@ -2239,10 +2225,259 @@ function handleClick(event) {
         // Deselect if clicking empty space
         if (selectedObject) {
             selectedObject.material.emissive.setHex(0x000000);
-            selectedObject = null;
+        selectedObject = null;
             updateModelListInSidebar();
         }
     }
+}
+
+// Add selectModel function
+function selectModel(modelIndex) {
+    if (modelIndex < 0 || modelIndex >= models.length) return;
+    
+    // Deselect previous model
+    if (selectedObject !== null) {
+        const prevModel = models[selectedObject];
+        if (prevModel && prevModel.mesh) {
+            prevModel.mesh.traverse((child) => {
+                if (child instanceof THREE.Mesh && child.material) {
+                    child.material.emissive.setHex(0x000000);
+                }
+            });
+        }
+    }
+    
+    // Select new model
+    selectedObject = modelIndex;
+    const model = models[modelIndex];
+    if (model && model.mesh) {
+        model.mesh.traverse((child) => {
+            if (child instanceof THREE.Mesh && child.material) {
+                child.material.emissive.setHex(0x333333);
+                child.material.emissiveIntensity = 0.1;
+            }
+        });
+    }
+    
+    // Update UI
+    updateLoadedModelsUI();
+}
+
+// Update model list UI
+function updateLoadedModelsUI() {
+    const modelListContent = document.getElementById('model-list-content');
+    if (!modelListContent) return;
+    
+    // Clear existing content
+    modelListContent.innerHTML = '';
+    
+    if (models.length === 0) {
+        const emptyMessage = document.createElement('div');
+        emptyMessage.className = 'empty-model-list';
+        emptyMessage.textContent = 'No models loaded';
+        modelListContent.appendChild(emptyMessage);
+        return;
+    }
+    
+    // Create list items for each model
+    models.forEach((model, index) => {
+        const modelItem = document.createElement('div');
+        modelItem.className = `model-item ${index === selectedObject ? 'selected' : ''}`;
+        
+        const modelLabel = document.createElement('div');
+        modelLabel.className = 'model-label';
+        modelLabel.innerHTML = `<span>${model.name || `Model ${index + 1}`}</span>`;
+        
+        const modelControls = document.createElement('div');
+        modelControls.className = 'model-controls';
+        
+        // Visibility toggle
+        const visibilityBtn = document.createElement('button');
+        visibilityBtn.className = 'model-btn visibility-btn';
+        visibilityBtn.innerHTML = `<i class="fas fa-eye${model.visible ? '' : '-slash'}"></i>`;
+        visibilityBtn.title = 'Toggle Visibility';
+        visibilityBtn.onclick = (e) => {
+            e.stopPropagation();
+            toggleModelVisibility(index);
+        };
+        
+        // Material change button
+        const materialBtn = document.createElement('button');
+        materialBtn.className = 'model-btn material-btn';
+        materialBtn.innerHTML = '<i class="fas fa-palette"></i>';
+        materialBtn.title = 'Change Material';
+        materialBtn.onclick = (e) => {
+            e.stopPropagation();
+            showMaterialDialog(index);
+        };
+        
+        // Delete button
+        const deleteBtn = document.createElement('button');
+        deleteBtn.className = 'model-btn delete-btn';
+        deleteBtn.innerHTML = '<i class="fas fa-trash"></i>';
+        deleteBtn.title = 'Delete Model';
+        deleteBtn.onclick = (e) => {
+            e.stopPropagation();
+            removeModel(index);
+        };
+        
+        modelControls.appendChild(visibilityBtn);
+        modelControls.appendChild(materialBtn);
+        modelControls.appendChild(deleteBtn);
+        
+        modelItem.appendChild(modelLabel);
+        modelItem.appendChild(modelControls);
+        
+        // Add click handler for selection
+        modelItem.onclick = () => selectModel(index);
+        
+        modelListContent.appendChild(modelItem);
+    });
+}
+
+// Toggle model visibility
+function toggleModelVisibility(modelIndex) {
+    const model = models[modelIndex];
+    if (!model || !model.object) return;
+
+    model.visible = !model.visible;
+    model.object.visible = model.visible;
+    if (model.outline) {
+        model.outline.visible = model.visible;
+    }
+
+    // Update UI
+    const modelList = document.querySelector('.model-list');
+    if (modelList) {
+        const modelItem = modelList.children[modelIndex];
+        if (modelItem) {
+            const visibilityBtn = modelItem.querySelector('.visibility-toggle');
+            if (visibilityBtn) {
+                visibilityBtn.innerHTML = `<i class="fas fa-eye${model.visible ? '' : '-slash'}"></i>`;
+            }
+        }
+    }
+
+    // Force a render update
+    renderer.render(scene, camera);
+}
+
+// Add applyMaterialToModel function
+function applyMaterialToModel(modelIndex, materialType) {
+    if (modelIndex < 0 || modelIndex >= models.length) return;
+    
+    const model = models[modelIndex];
+    if (!model || !model.object) return;
+    
+    // Apply material to the object and all its children
+    model.object.traverse((child) => {
+        if (child.isMesh) {
+            applyMaterial(child, materialType);
+        }
+    });
+    
+    // Update the model's material type
+    model.materialType = materialType;
+    
+    // Force a render update
+    renderer.render(scene, camera);
+}
+
+// Update showMaterialDialog function
+function showMaterialDialog(modelIndex) {
+    // Create dialog container
+    const dialog = document.createElement('div');
+    dialog.className = 'material-dialog';
+    
+    // Create dialog content
+    const content = document.createElement('div');
+    content.className = 'dialog-content';
+    
+    // Add title
+    const title = document.createElement('h3');
+    title.textContent = 'Select Material';
+    content.appendChild(title);
+    
+    // Create material select
+    const select = document.createElement('select');
+    select.innerHTML = `
+        <option value="gold">Yellow Gold (High Quality)</option>
+        <option value="rose-gold">Rose Gold (High Quality)</option>
+        <option value="white-gold">White Gold (High Quality)</option>
+        <option value="fast-gold">Yellow Gold (Fast Render)</option>
+        <option value="fast-rose-gold">Rose Gold (Fast Render)</option>
+        <option value="fast-white-gold">White Gold (Fast Render)</option>
+    `;
+    content.appendChild(select);
+    
+    // Create buttons container
+    const buttons = document.createElement('div');
+    buttons.className = 'dialog-buttons';
+    
+    // Create apply button
+    const applyBtn = document.createElement('button');
+    applyBtn.textContent = 'Apply';
+    applyBtn.onclick = () => {
+        applyMaterialToModel(modelIndex, select.value);
+        document.body.removeChild(dialog);
+    };
+    
+    // Create cancel button
+    const cancelBtn = document.createElement('button');
+    cancelBtn.textContent = 'Cancel';
+    cancelBtn.onclick = () => {
+        document.body.removeChild(dialog);
+    };
+    
+    buttons.appendChild(applyBtn);
+    buttons.appendChild(cancelBtn);
+    content.appendChild(buttons);
+    
+    // Add content to dialog
+    dialog.appendChild(content);
+    
+    // Add dialog to body
+    document.body.appendChild(dialog);
+}
+
+// Remove a model from the scene
+function removeModel(modelIndex) {
+    const model = models[modelIndex];
+    if (!model) return;
+
+    // Remove from scene
+    if (model.object) {
+        scene.remove(model.object);
+        if (model.object.geometry) model.object.geometry.dispose();
+        if (model.object.material) {
+            if (Array.isArray(model.object.material)) {
+                model.object.material.forEach(mat => mat.dispose());
+            } else {
+                model.object.material.dispose();
+            }
+        }
+    }
+
+    // Remove outline if exists
+    if (model.outline) {
+        scene.remove(model.outline);
+        if (model.outline.geometry) model.outline.geometry.dispose();
+        if (model.outline.material) model.outline.material.dispose();
+    }
+
+    // Remove from models array
+    models.splice(modelIndex, 1);
+
+    // Update UI
+    updateLoadedModelsUI();
+
+    // Reset selection if needed
+    if (selectedObject === model.object) {
+        selectedObject = null;
+    }
+
+    // Force a render update
+    renderer.render(scene, camera);
 }
 
 
