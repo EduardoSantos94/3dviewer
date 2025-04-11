@@ -1,4 +1,4 @@
-import * as THREE from 'three';
+﻿import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
@@ -874,139 +874,29 @@ function toggleTurntable() {
 
 // Improved handleFiles function with single path for loading 3DM files
 async function handleFiles(files) {
-    if (!files || files.length === 0) {
-        console.log('No files selected');
-        return;
-    }
-
     try {
+        // Show loading indicator
         showLoadingIndicator();
-        console.log(`Processing ${files.length} file(s)`);
         
-        // Force UI state before any processing
-        const frontpage = document.getElementById('frontpage');
-        if (frontpage) {
-            frontpage.style.display = 'none';
-        }
-        
-        const dropZone = document.getElementById('drop-zone');
-        if (dropZone) {
-            dropZone.style.display = 'none';
-        }
-        
-        const container = document.querySelector('.container');
-        if (container) {
-            container.style.display = 'block';
-        }
-        
-        // Ensure controls are visible
-        const controlsPanel = document.querySelector('.controls-panel');
-        if (controlsPanel) {
-            controlsPanel.style.display = 'block';
-        }
-        
-        const modelList = document.querySelector('.model-list');
-        if (modelList) {
-            modelList.style.display = 'block';
-        }
-        
-        const viewerContainer = document.getElementById('viewer-container');
-        if (viewerContainer) {
-            viewerContainer.style.display = 'block';
-        }
-
-        // Track newly added models for selection
-        const addedModelIndices = [];
-
         // Process each file
-        for (let i = 0; i < files.length; i++) {
-            const file = files[i];
+        for (const file of files) {
+            if (!(file instanceof Blob)) {
+                console.error('Invalid file object:', file);
+                continue;
+            }
+            
             const extension = file.name.split('.').pop().toLowerCase();
+            console.log('Processing file:', file.name, 'with extension:', extension);
             
-            console.log(`Processing file: ${file.name} (${extension})`);
-            
-            try {
-                // Check if we already have this file loaded
-                const alreadyLoaded = models.some(model => model.name === file.name);
-                if (alreadyLoaded) {
-                    console.log(`File ${file.name} is already loaded, skipping`);
-                    continue;
-                }
-                
-                let object;
-                
-                // Read the file as ArrayBuffer
-                const fileBuffer = await readFileAsArrayBuffer(file);
-                
-                // Process the file based on its extension
-                if (extension === '3dm') {
-                    try {
-                        // Process 3DM file
-                        const loadedMeshes = await process3DMFile(fileBuffer);
-                        if (loadedMeshes && loadedMeshes.length > 0) {
-                            // Create a group to hold all meshes
-                            object = new THREE.Group();
-                            object.name = file.name;
-                            
-                            // Add all loaded meshes to the group
-                            loadedMeshes.forEach(mesh => {
-                                object.add(mesh);
-                            });
-                            
-                            console.log(`Loaded ${loadedMeshes.length} objects from ${file.name}`);
-                        }
-                    } catch (error) {
-                        console.error(`Error processing 3DM file: ${error.message}`);
-                        alert(`Failed to process ${file.name}: ${error.message}`);
-                        continue;  // Skip to the next file
-                    }
-                } else {
-                    try {
-                        // For other file types
-                        object = await processOtherFile(file);
-                    } catch (error) {
-                        console.error(`Error processing file: ${error.message}`);
-                        alert(`Failed to process ${file.name}: ${error.message}`);
-                        continue;  // Skip to the next file
-                    }
-                }
-                
-                if (object) {
-                    // Add the object to the scene
-                    console.log(`Adding ${file.name} to model list and scene`);
-                    const modelIndex = loadModel(object, file.name);
-                    
-                    if (modelIndex >= 0) {
-                        addedModelIndices.push(modelIndex);
-                        console.log(`Successfully added ${file.name} to scene with index ${modelIndex}`);
-                    }
-                }
-            } catch (error) {
-                console.error(`Failed to process ${file.name}:`, error);
-                alert(`Failed to process ${file.name}: ${error.message || 'Unknown error'}`);
+            if (extension === '3dm') {
+                await process3DMFile(file);
+            } else {
+                await processOtherFile(file);
             }
         }
-        
-        // Update the model list in the sidebar
-        updateModelListInSidebar();
-        
-        // Auto-select the first model that was added (if any)
-        if (addedModelIndices.length > 0) {
-            selectModel(addedModelIndices[0]);
-        }
-        
-        // After all models are loaded, center them in the scene
-        if (models.length > 0) {
-            centerModel();
-            console.log('Centered all models in scene');
-        }
-        
-        // Force a resize event to ensure proper rendering
-        window.dispatchEvent(new Event('resize'));
-        
     } catch (error) {
-        console.error('Error handling files:', error);
-        alert(`Failed to process files: ${error.message || 'Unknown error'}`);
+        console.error('Error processing files:', error);
+        showErrorMessage('Error processing files: ' + error.message);
     } finally {
         hideLoadingIndicator();
     }
@@ -2105,156 +1995,148 @@ function rhinoMeshToThreeGeometry(rhinoMesh) {
 }
 
 // Process 3DM file - using the simplified version from our last update
-async function process3DMFile(buffer) {
+async function process3DMFile(file) {
     try {
         showLoadingIndicator();
         
-        // Check if rhino3dm is loaded
+        // Check if rhino3dm is loaded and initialize it if needed
         if (!window.rhino3dm) {
-            await waitForRhino3dm();
+            throw new Error('rhino3dm library not loaded');
+        }
+        
+        // Initialize rhino3dm
+        const rhino = await window.rhino3dm();
+        if (!rhino) {
+            throw new Error('Failed to initialize rhino3dm');
         }
         
         // Clear the scene before adding new objects
         clearScene();
         
-        // Decode 3DM file
-        const rhino = window.rhino3dm;
-        const doc = rhino.File3dm.fromByteArray(buffer);
-        
-        // Get all the objects from the 3DM file
-        const objects = doc.objects();
-        const entries = objects.count;
-        
-        // Collection to hold all created meshes
-        let allMeshes = [];
-        
-        // Process each object
-        for (let i = 0; i < entries; i++) {
+        // Verify file is a valid Blob
+        if (!(file instanceof Blob)) {
+            throw new Error('Invalid file object - not a Blob');
+        }
+
+        // Load and parse the 3DM file
+        const arrayBuffer = await readFileAsArrayBuffer(file);
+        const rhinoDoc = await rhino.File3dm.fromByteArray(arrayBuffer);
+        if (!rhinoDoc) {
+            throw new Error('Failed to decode 3DM file');
+        }
+
+        // Process objects in the document
+        const objects = rhinoDoc.objects();
+        console.log('Found', objects.count, 'objects in 3DM file');
+
+        // Process all objects in the document
+        const rhinoObjects = rhinoDoc.objects();
+        const meshes = [];
+
+        for (let i = 0; i < rhinoObjects.count; i++) {
+            const rhinoObject = rhinoObjects.get(i);
+            const rhinoGeometry = rhinoObject.geometry();
+            const objectType = rhinoGeometry.objectType;
+
             try {
-                const rhinoObject = objects.get(i);
-                const geometry = rhinoObject.geometry();
-                const attributes = rhinoObject.attributes();
-                
-                if (!geometry) continue;
-                
-                // Handle different geometry types
-                let threeMesh = null;
-                
-                if (geometry.objectType === rhino.ObjectType.Mesh) {
-                    // Process Rhino mesh
-                    const rhinoMesh = geometry;
-                    const threeGeometry = rhinoMeshToThreeGeometry(rhinoMesh);
+                if (objectType === rhino.ObjectType.Mesh) {
+                    // Direct mesh conversion
+                    const threeJson = rhinoGeometry.toThreejsJSON();
+                    const geometry = new THREE.BufferGeometry();
+                    geometry.setAttribute('position', new THREE.Float32BufferAttribute(threeJson.data.attributes.position.array, 3));
+                    geometry.setAttribute('normal', new THREE.Float32BufferAttribute(threeJson.data.attributes.normal.array, 3));
+                    geometry.setIndex(new THREE.Uint32BufferAttribute(threeJson.data.index.array, 1));
+                    geometry.computeBoundingSphere();
                     
-                    if (validateMeshGeometry(threeGeometry)) {
-                        const material = createMeshMaterial();
-                        threeMesh = new THREE.Mesh(threeGeometry, material);
-                    }
-                    
-                    // Dispose of Rhino resources
-                    rhinoMesh.delete();
-                } 
-                else if (geometry.objectType === rhino.ObjectType.Brep) {
+                    const mesh = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial());
+                    meshes.push(mesh);
+                    scene.add(mesh);
+                } else if (objectType === rhino.ObjectType.Brep) {
                     // Convert Brep to mesh
-                    const meshingParameters = getMeshingParameters(rhino);
-                    const rhinoMesh = geometry.getMesh(meshingParameters);
+                    const rhinoMesh = new rhino.Mesh();
+                    const faces = rhinoGeometry.faces();
                     
-                    if (rhinoMesh) {
-                        const threeGeometry = rhinoMeshToThreeGeometry(rhinoMesh);
-                        
-                        if (validateMeshGeometry(threeGeometry)) {
-                            const material = createMeshMaterial();
-                            threeMesh = new THREE.Mesh(threeGeometry, material);
+                    for (let j = 0; j < faces.count; j++) {
+                        const face = faces.get(j);
+                        const faceMesh = face.getMesh(rhino.MeshType.Any);
+                        if (faceMesh) {
+                            rhinoMesh.append(faceMesh);
+                            faceMesh.delete();
                         }
-                        
-                        // Dispose of Rhino resources
-                        rhinoMesh.delete();
+                        face.delete();
                     }
-                } 
-                else if (geometry.objectType === rhino.ObjectType.Surface) {
-                    // Convert Surface to mesh
-                    const meshingParameters = getMeshingParameters(rhino);
-                    const rhinoMesh = geometry.getMesh(meshingParameters);
+                    faces.delete();
                     
-                    if (rhinoMesh) {
-                        const threeGeometry = rhinoMeshToThreeGeometry(rhinoMesh);
-                        
-                        if (validateMeshGeometry(threeGeometry)) {
-                            const material = createMeshMaterial();
-                            threeMesh = new THREE.Mesh(threeGeometry, material);
-                        }
-                        
-                        // Dispose of Rhino resources
-                        rhinoMesh.delete();
+                    rhinoMesh.compact();
+                    const threeJson = rhinoMesh.toThreejsJSON();
+                    const geometry = new THREE.BufferGeometry();
+                    geometry.setAttribute('position', new THREE.Float32BufferAttribute(threeJson.data.attributes.position.array, 3));
+                    geometry.setAttribute('normal', new THREE.Float32BufferAttribute(threeJson.data.attributes.normal.array, 3));
+                    geometry.setIndex(new THREE.Uint32BufferAttribute(threeJson.data.index.array, 1));
+                    geometry.computeBoundingSphere();
+                    
+                    const mesh = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial());
+                    meshes.push(mesh);
+                    scene.add(mesh);
+                    rhinoMesh.delete();
+                } else if (objectType === rhino.ObjectType.Curve) {
+                    // Convert curve to line geometry
+                    const points = [];
+                    const domainLength = rhinoGeometry.domain[1] - rhinoGeometry.domain[0];
+                    const segmentCount = Math.max(parseInt(domainLength / 0.2, 10), 1);
+                    const segmentLength = domainLength / segmentCount;
+                    
+                    for (let j = 0; j <= segmentCount; j++) {
+                        const t = rhinoGeometry.domain[0] + j * segmentLength;
+                        const point = rhinoGeometry.pointAt(t);
+                        points.push(new THREE.Vector3(point.x, point.y, point.z));
                     }
+                    
+                    if (rhinoGeometry.isClosed) {
+                        points.push(points[0]);
+                    }
+                    
+                    const geometry = new THREE.BufferGeometry().setFromPoints(points);
+                    const material = new THREE.LineBasicMaterial({ color: 0x000000 });
+                    const line = new THREE.Line(geometry, material);
+                    meshes.push(line);
+                    scene.add(line);
                 }
-                
-                // If a mesh was created, add it to the collection
-                if (threeMesh) {
-                    allMeshes.push(threeMesh);
-                    scene.add(threeMesh);
-                }
-                
-                // Dispose of Rhino resources
-                geometry.delete();
-                attributes.delete();
-                rhinoObject.delete();
-                
-            } catch (objError) {
-                console.error("Error processing 3DM object:", objError);
+            } catch (error) {
+                console.error(`Error processing object ${i}:`, error);
             }
         }
-        
-        // Focus camera on all loaded meshes
-        if (allMeshes.length > 0) {
-            fitCameraToObject(scene, allMeshes);
+
+        // Center camera on loaded objects
+        if (meshes.length > 0) {
+            const box = new THREE.Box3().setFromObject(meshes[0]);
+            for (let i = 1; i < meshes.length; i++) {
+                box.expandByObject(meshes[i]);
+            }
+            
+            const center = box.getCenter(new THREE.Vector3());
+            const size = box.getSize(new THREE.Vector3());
+            const maxDim = Math.max(size.x, size.y, size.z);
+            const fov = camera.fov * (Math.PI / 180);
+            const cameraZ = Math.abs(maxDim / Math.tan(fov / 2));
+            
+            camera.position.set(center.x, center.y, center.z + cameraZ);
+            camera.lookAt(center);
+            controls.target.copy(center);
+            controls.update();
         }
-        
+
         // Clean up Rhino resources
-        objects.delete();
-        doc.delete();
-        
-        hideLoadingIndicator();
-        return allMeshes; // Return the array of meshes instead of true
+        rhinoDoc.delete();
+        return meshes;
     } catch (error) {
-        console.error("Error processing 3DM file:", error);
+        console.error('Error processing 3DM file:', error);
+        showErrorMessage('Error processing 3DM file: ' + error.message);
+        throw error;
+    } finally {
         hideLoadingIndicator();
-        showErrorMessage("Failed to process 3DM file. " + error.message);
-        return []; // Return empty array on error
     }
 }
-
-// The waitForRhino3dm function is already defined at line 240
-// Removed line: // Function removed to avoid duplicate declaration
-// Removed line:     return new Promise((resolve, reject) => {
-// Removed line:         const maxAttempts = 20;
-// Removed line:         let attempts = 0;
-// Removed line:         
-// Removed line:         const checkRhino = () => {
-// Removed line:             attempts++;
-// Removed line:             if (window.rhino3dm) {
-// Removed line:                 resolve();
-// Removed line:             } else if (attempts >= maxAttempts) {
-// Removed line:                 reject(new Error("Failed to load rhino3dm after multiple attempts"));
-// Removed line:             } else {
-// Removed line:                 setTimeout(checkRhino, 500);
-// Removed line:             }
-// Removed line:         };
-// Removed line:         
-// Removed line:         checkRhino();
-// Removed line:     });
-// End of removed duplicate function
-
-// REMOVED: Duplicate clearScene function - already defined at line 1994
-
-// REMOVED: Duplicate rhinoMeshToThreeGeometry function - already defined at line 2071
-
-// REMOVED: Duplicate createMeshMaterial function - already defined at line 804
-
-// REMOVED: Duplicate validateMeshGeometry function - already defined at line 2058
-
-// REMOVED: Duplicate getMeshingParameters function - already defined at line 785
-
-// REMOVED: Duplicate fitCameraToObject function - already defined at line 1999
 
 // Animation loop function
 function animate() {
@@ -2300,6 +2182,68 @@ document.addEventListener('DOMContentLoaded', async () => {
         alert('Error initializing the application: ' + error.message);
     }
 });
+
+function handleAmbientLightChange(event) {
+    const intensity = parseFloat(event.target.value);
+    if (ambientLight) {
+        ambientLight.intensity = intensity;
+    }
+}
+
+function handleDirectionalLightChange(event) {
+    if (!directionalLight) return;
+    
+    const intensity = parseFloat(event.target.value);
+    directionalLight.intensity = intensity;
+    
+    // Update the scene to reflect the changes
+    renderer.render(scene, camera);
+}
+
+function handleClick(event) {
+    if (!renderer || !camera || !scene) return;
+
+    // Calculate mouse position in normalized device coordinates
+    const mouse = new THREE.Vector2();
+    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+    // Create raycaster
+    const raycaster = new THREE.Raycaster();
+    raycaster.setFromCamera(mouse, camera);
+
+    // Find intersections
+    const intersects = raycaster.intersectObjects(scene.children, true);
+
+    if (intersects.length > 0) {
+        // Find the first mesh in the intersection
+        let selectedMesh = intersects[0].object;
+        while (selectedMesh && !(selectedMesh instanceof THREE.Mesh)) {
+            selectedMesh = selectedMesh.parent;
+        }
+
+        if (selectedMesh) {
+            // Deselect previous selection
+            if (selectedObject) {
+                selectedObject.material.emissive.setHex(0x000000);
+            }
+
+            // Select new object
+            selectedObject = selectedMesh;
+            selectedObject.material.emissive.setHex(0x333333);
+
+            // Update model selection in the UI
+            updateModelListInSidebar();
+        }
+    } else {
+        // Deselect if clicking empty space
+        if (selectedObject) {
+            selectedObject.material.emissive.setHex(0x000000);
+            selectedObject = null;
+            updateModelListInSidebar();
+        }
+    }
+}
 
 
 
