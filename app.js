@@ -721,6 +721,35 @@ async function processOtherFile(file) {
                         // Parse OBJ content directly
                         const object = loader.parse(fileContent);
                         console.log(`[processOtherFile] Successfully parsed OBJ content for ${file.name}`);
+                        
+                        // Create model info object
+                        const modelInfo = {
+                            path: file.name,
+                            name: file.name.split('/').pop().split('.')[0],
+                            object: object,
+                            originalPosition: new THREE.Vector3(),
+                            originalScale: new THREE.Vector3(1, 1, 1),
+                            boundingBox: new THREE.Box3().setFromObject(object),
+                            selected: false,
+                            visible: true,
+                            material: null
+                        };
+
+                        // Add the model to the scene
+                        scene.add(object);
+                        
+                        // Calculate bounding box
+                        modelInfo.boundingBox = new THREE.Box3().setFromObject(object);
+                        
+                        // Add to models array
+                        models.push(modelInfo);
+                        
+                        // Update UI
+                        updateLoadedModelsUI();
+                        
+                        // Zoom to fit the new model
+                        zoomToFit([modelInfo]);
+                        
                         resolve(object);
                     } catch (error) {
                         console.error(`Error parsing OBJ content: ${error.message || 'Unknown error'}`);
@@ -740,6 +769,35 @@ async function processOtherFile(file) {
                     objectUrl, 
                     (object) => {
                         console.log(`[processOtherFile] Successfully loaded ${file.name}`);
+                        
+                        // Create model info object
+                        const modelInfo = {
+                            path: file.name,
+                            name: file.name.split('/').pop().split('.')[0],
+                            object: object,
+                            originalPosition: new THREE.Vector3(),
+                            originalScale: new THREE.Vector3(1, 1, 1),
+                            boundingBox: new THREE.Box3().setFromObject(object),
+                            selected: false,
+                            visible: true,
+                            material: null
+                        };
+
+                        // Add the model to the scene
+                        scene.add(object);
+                        
+                        // Calculate bounding box
+                        modelInfo.boundingBox = new THREE.Box3().setFromObject(object);
+                        
+                        // Add to models array
+                        models.push(modelInfo);
+                        
+                        // Update UI
+                        updateLoadedModelsUI();
+                        
+                        // Zoom to fit the new model
+                        zoomToFit([modelInfo]);
+                        
                         // Revoke the blob URL after successful loading
                         URL.revokeObjectURL(objectUrl);
                         resolve(object);
@@ -809,21 +867,30 @@ function getMeshingParameters(rhino) {
 }
 
 // Create mesh with improved material settings
-function createMeshMaterial(color = 0xffd700) {
-    return new THREE.MeshPhysicalMaterial({
-        color: color,
-        metalness: 0.8,
-        roughness: 0.15,
-        clearcoat: 0.5,
-        clearcoatRoughness: 0.1,
-        reflectivity: 0.9,
-        envMapIntensity: 1.0,
-        side: THREE.DoubleSide,
-        flatShading: false,
-        vertexColors: false,
-        wireframe: false,
-        precision: 'highp'
-    });
+function createMeshMaterial(color = 0xffd700, type = 'standard') {
+    let material;
+    
+    if (type === 'standard') {
+        material = new THREE.MeshStandardMaterial({
+            color: color,
+            metalness: 0.9,
+            roughness: 0.1,
+            envMapIntensity: 1.0,
+            side: THREE.DoubleSide
+        });
+    } else if (type === 'physical') {
+        material = new THREE.MeshPhysicalMaterial({
+            color: color,
+            metalness: 0.9,
+            roughness: 0.1,
+            clearcoat: 1.0,
+            clearcoatRoughness: 0.1,
+            envMapIntensity: 1.0,
+            side: THREE.DoubleSide
+        });
+    }
+
+    return material;
 }
 
 // Update turntable animation
@@ -839,12 +906,6 @@ function updateTurntable() {
         if (selectedObject.rotation.y >= Math.PI * 2) {
             selectedObject.rotation.y = 0;
         }
-        
-        // Force a render update
-        renderer.render(scene, camera);
-        
-        // Continue the animation loop
-        requestAnimationFrame(updateTurntable);
     }
 }
 
@@ -900,7 +961,7 @@ function toggleFloor() {
         groundPlane.visible = !groundPlane.visible;
         const toggleFloorBtn = document.getElementById('toggle-floor');
         if (toggleFloorBtn) {
-            toggleFloorBtn.classList.toggle('active');
+            toggleFloorBtn.classList.toggle('active', groundPlane.visible);
         }
     }
 }
@@ -1013,102 +1074,54 @@ function setupKeyboardShortcuts() {
 }
 
 // Improved zoom to fit function
-function zoomToFit(selectedModels = null, animate = true) {
-    // Convert single model to array if needed
-    const modelsToFit = Array.isArray(selectedModels) ? selectedModels : [selectedModels];
-    
-    if (!modelsToFit || modelsToFit.length === 0) {
-        console.warn('No models to fit in view');
+function zoomToFit(models) {
+    if (!models || models.length === 0) {
+        console.warn('No models provided to zoomToFit');
         return;
     }
-    
-    // Create a new bounding box encompassing all models to fit
-    const box = new THREE.Box3();
-    
-    // Track whether we've found any valid geometry
-    let foundValidGeometry = false;
-    
-    modelsToFit.forEach(model => {
-        if (model && model.object) {
-            // Ensure we have a valid bounding box for the model
-            if (!model.boundingBox) {
-                // If no bounding box stored, calculate it
-                model.boundingBox = new THREE.Box3().setFromObject(model.object);
-            }
-            
-            // Only expand the overall box if the model's box is valid
-            if (isValidBoundingBox(model.boundingBox)) {
-                box.union(model.boundingBox);
-                foundValidGeometry = true;
-            }
+
+    // Create a bounding box that will contain all models
+    const boundingBox = new THREE.Box3();
+
+    // Expand the bounding box to include all models
+    models.forEach(model => {
+        if (model.boundingBox) {
+            boundingBox.union(model.boundingBox);
         }
     });
-    
-    // If we didn't find any valid geometry, return
-    if (!foundValidGeometry) {
+
+    // Check if we have a valid bounding box
+    if (boundingBox.isEmpty()) {
         console.warn('No valid geometry found to fit in view');
         return;
     }
-    
-    // Calculate the center of the box
-    const center = new THREE.Vector3();
-    box.getCenter(center);
-    
-    // Calculate the size of the box
-    const size = new THREE.Vector3();
-    box.getSize(size);
-    
-    // Log for debugging
-    console.log('Zooming to fit box:', {
-        center: center,
-        size: size
-    });
-    
-    // Get the max dimension of the bounding box
+
+    // Calculate the center and size of the bounding box
+    const center = boundingBox.getCenter(new THREE.Vector3());
+    const size = boundingBox.getSize(new THREE.Vector3());
+
+    // Calculate the maximum dimension
     const maxDim = Math.max(size.x, size.y, size.z);
-    
-    // Calculate the distance based on the field of view and size
     const fov = camera.fov * (Math.PI / 180);
-    
-    // Add padding factor to ensure models fit comfortably in view
-    const padding = 1.5;
-    
-    // Calculate the camera distance, ensuring we're not too close
-    let distance = Math.max(
-        (maxDim * padding) / (2 * Math.tan(fov / 2)),
-        5 // Minimum distance to avoid clipping
-    );
-    
-    // Calculate the target position (center of models)
-    const targetPosition = center.clone();
-    
-    // Calculate the new camera position
-    // Position the camera to look at the models from a front-top-right perspective
-    const offset = new THREE.Vector3(1, 0.7, 1).normalize().multiplyScalar(distance);
-    const newPosition = targetPosition.clone().add(offset);
-    
-    // Set the camera target (controls target)
-    if (animate) {
-        // Animate the movement
-        new TWEEN.Tween(controls.target)
-            .to(targetPosition, 1000)
-            .easing(TWEEN.Easing.Cubic.Out)
-            .start();
-            
-        // Animate the camera position
-        new TWEEN.Tween(camera.position)
-            .to(newPosition, 1000)
-            .easing(TWEEN.Easing.Cubic.Out)
-            .start();
-    } else {
-        // Set immediately
-        controls.target.copy(targetPosition);
-        camera.position.copy(newPosition);
-        controls.update();
-    }
-    
-    // Reset camera up vector to ensure consistent orientation
-    camera.up.set(0, 1, 0);
+    let cameraZ = Math.abs(maxDim / Math.tan(fov / 2));
+
+    // Add some padding
+    cameraZ *= 1.5;
+
+    // Position the camera
+    camera.position.set(center.x, center.y, center.z + cameraZ);
+    camera.lookAt(center);
+
+    // Update camera controls
+    controls.target.copy(center);
+    controls.update();
+
+    // Update the camera's near and far planes based on the model size
+    const minZ = Math.min(0.1, maxDim * 0.01);
+    const maxZ = Math.max(1000, maxDim * 10);
+    camera.near = minZ;
+    camera.far = maxZ;
+    camera.updateProjectionMatrix();
 }
 
 // Load model function that adds a model to the scene without duplicating geometry
@@ -1403,25 +1416,31 @@ function centerSelectedModel() {
 }
 
 // Update the original applyMaterial function
-function applyMaterial(mesh, materialType) {
-    if (!mesh) return;
-    
-    // Handle both single mesh and group objects
+function applyMaterial(object, materialType) {
+    if (!object) return;
+
+    // If materialType is already a material instance, clone it
+    const material = (materialType instanceof THREE.Material) 
+        ? materialType.clone() 
+        : (materialPresets[materialType] || materialPresets['gold']).clone();
+
     const handleMesh = (mesh) => {
-        if (mesh instanceof THREE.Mesh && !mesh.userData.isOutline) {
-            const preset = materialPresets[materialType];
-            if (preset) {
-                // Clone the preset material to avoid sharing references
-                const newMaterial = preset.clone();
-                mesh.material = newMaterial;
-            }
+        if (!mesh.isMesh) return;
+        
+        // Preserve any existing material properties that should persist
+        if (mesh.material) {
+            material.envMap = mesh.material.envMap || material.envMap;
+            material.envMapIntensity = mesh.material.envMapIntensity || material.envMapIntensity;
         }
+
+        mesh.material = material;
+        mesh.material.needsUpdate = true;
     };
 
-    if (mesh instanceof THREE.Group) {
-        mesh.traverse(handleMesh);
+    if (object.isGroup) {
+        object.traverse(child => handleMesh(child));
     } else {
-        handleMesh(mesh);
+        handleMesh(object);
     }
 }
 
@@ -1691,37 +1710,24 @@ async function loadEnvironmentMap() {
 
 // Add setupLights function that was referenced but not defined
 function setupLights() {
-    // Ambient light - increased for better overall illumination
-    ambientLight = new THREE.AmbientLight(0xffffff, 0.4); // Increased from 0.2
+    // Ambient light
+    ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
     scene.add(ambientLight);
-    
-    // Key light - main directional light from front-top-right
-    directionalLight = new THREE.DirectionalLight(0xffffff, 0.7); // Increased from 0.5
+
+    // Directional light
+    directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
     directionalLight.position.set(5, 5, 5);
     directionalLight.castShadow = true;
-    directionalLight.shadow.mapSize.width = 2048;
-    directionalLight.shadow.mapSize.height = 2048;
-    directionalLight.shadow.camera.near = 0.1;
-    directionalLight.shadow.camera.far = 500;
-    directionalLight.shadow.bias = -0.0001;
     scene.add(directionalLight);
-    
-    // Fill light - softer light from opposite side
-    const fillLight = new THREE.DirectionalLight(0xfffaf0, 0.5); // Increased from 0.3
-    fillLight.position.set(-5, 3, -2);
+
+    // Add additional lights for better material rendering
+    const fillLight = new THREE.DirectionalLight(0xffffff, 0.3);
+    fillLight.position.set(-5, 5, -5);
     scene.add(fillLight);
-    
-    // Rim light - from behind to highlight edges
-    const rimLight = new THREE.DirectionalLight(0xf0f8ff, 0.3); // Increased from 0.2
-    rimLight.position.set(0, -5, -5);
+
+    const rimLight = new THREE.DirectionalLight(0xffffff, 0.2);
+    rimLight.position.set(0, -5, 5);
     scene.add(rimLight);
-    
-    // Update sliders to match light intensities
-    const ambientSlider = document.getElementById('ambient-light');
-    if (ambientSlider) ambientSlider.value = ambientLight.intensity;
-    
-    const directionalSlider = document.getElementById('directional-light');
-    if (directionalSlider) directionalSlider.value = directionalLight.intensity;
 }
 
 // Add setupControls function that was referenced but not defined
@@ -2002,9 +2008,6 @@ async function process3DMFile(file) {
             throw new Error('Failed to initialize rhino3dm');
         }
         
-        // Clear the scene before adding new objects
-        clearScene();
-        
         // Verify file is a valid Blob
         if (!(file instanceof Blob)) {
             throw new Error('Invalid file object - not a Blob');
@@ -2023,7 +2026,17 @@ async function process3DMFile(file) {
 
         // Process all objects in the document
         const rhinoObjects = rhinoDoc.objects();
-        const meshes = [];
+        const modelInfo = {
+            path: file.name,
+            name: file.name.split('/').pop().split('.')[0],
+            object: new THREE.Group(),
+            originalPosition: new THREE.Vector3(),
+            originalScale: new THREE.Vector3(1, 1, 1),
+            boundingBox: null,
+            selected: false,
+            visible: true,
+            material: currentMaterial || 'gold'
+        };
 
         for (let i = 0; i < rhinoObjects.count; i++) {
             const rhinoObject = rhinoObjects.get(i);
@@ -2041,8 +2054,7 @@ async function process3DMFile(file) {
                     geometry.computeBoundingSphere();
                     
                     const mesh = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial());
-                    meshes.push(mesh);
-                    scene.add(mesh);
+                    modelInfo.object.add(mesh);
                 } else if (objectType === rhino.ObjectType.Brep) {
                     // Convert Brep to mesh
                     const rhinoMesh = new rhino.Mesh();
@@ -2068,31 +2080,8 @@ async function process3DMFile(file) {
                     geometry.computeBoundingSphere();
                     
                     const mesh = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial());
-                    meshes.push(mesh);
-                    scene.add(mesh);
+                    modelInfo.object.add(mesh);
                     rhinoMesh.delete();
-                } else if (objectType === rhino.ObjectType.Curve) {
-                    // Convert curve to line geometry
-                    const points = [];
-                    const domainLength = rhinoGeometry.domain[1] - rhinoGeometry.domain[0];
-                    const segmentCount = Math.max(parseInt(domainLength / 0.2, 10), 1);
-                    const segmentLength = domainLength / segmentCount;
-                    
-                    for (let j = 0; j <= segmentCount; j++) {
-                        const t = rhinoGeometry.domain[0] + j * segmentLength;
-                        const point = rhinoGeometry.pointAt(t);
-                        points.push(new THREE.Vector3(point.x, point.y, point.z));
-                    }
-                    
-                    if (rhinoGeometry.isClosed) {
-                        points.push(points[0]);
-                    }
-                    
-                    const geometry = new THREE.BufferGeometry().setFromPoints(points);
-                    const material = new THREE.LineBasicMaterial({ color: 0x000000 });
-                    const line = new THREE.Line(geometry, material);
-                    meshes.push(line);
-                    scene.add(line);
                 }
             } catch (error) {
                 console.error(`Error processing object ${i}:`, error);
@@ -2102,12 +2091,22 @@ async function process3DMFile(file) {
         // Clean up Rhino resources
         rhinoDoc.delete();
         
-        // Update the model list
-        updateLoadedModelsUI();
-        
-        // Center and fit the camera to the loaded objects
-        if (meshes.length > 0) {
-            zoomToFit(meshes);
+        // Add the model to the scene and apply material
+        if (modelInfo.object.children.length > 0) {
+            scene.add(modelInfo.object);
+            applyMaterial(modelInfo.object, modelInfo.material);
+            
+            // Calculate bounding box
+            modelInfo.boundingBox = new THREE.Box3().setFromObject(modelInfo.object);
+            
+            // Add to models array
+            models.push(modelInfo);
+            
+            // Update UI
+            updateLoadedModelsUI();
+            
+            // Center and fit the camera
+            zoomToFit([modelInfo]);
         }
         
         hideLoadingIndicator();
@@ -2208,24 +2207,26 @@ function handleClick(event) {
             selectedMesh = selectedMesh.parent;
         }
 
-        if (selectedMesh) {
+        if (selectedMesh && selectedMesh.material) {
             // Deselect previous selection
-        if (selectedObject) {
+            if (selectedObject && selectedObject.material) {
                 selectedObject.material.emissive.setHex(0x000000);
             }
 
             // Select new object
             selectedObject = selectedMesh;
-            selectedObject.material.emissive.setHex(0x333333);
+            if (selectedObject.material) {
+                selectedObject.material.emissive.setHex(0x333333);
+            }
 
             // Update model selection in the UI
             updateModelListInSidebar();
         }
     } else {
         // Deselect if clicking empty space
-        if (selectedObject) {
+        if (selectedObject && selectedObject.material) {
             selectedObject.material.emissive.setHex(0x000000);
-        selectedObject = null;
+            selectedObject = null;
             updateModelListInSidebar();
         }
     }
@@ -2267,76 +2268,54 @@ function selectModel(modelIndex) {
 function updateLoadedModelsUI() {
     const modelListContent = document.getElementById('model-list-content');
     if (!modelListContent) return;
-    
+
     // Clear existing content
     modelListContent.innerHTML = '';
-    
+
     if (models.length === 0) {
-        const emptyMessage = document.createElement('div');
-        emptyMessage.className = 'empty-model-list';
-        emptyMessage.textContent = 'No models loaded';
-        modelListContent.appendChild(emptyMessage);
+        modelListContent.innerHTML = '<div class="empty-model-list">No models loaded</div>';
         return;
     }
-    
-    // Create list items for each model
+
+    // Create model list items
     models.forEach((model, index) => {
         const modelItem = document.createElement('div');
-        modelItem.className = `model-item ${index === selectedObject ? 'selected' : ''}`;
+        modelItem.className = `model-item ${model.selected ? 'selected' : ''}`;
         
         const modelLabel = document.createElement('div');
         modelLabel.className = 'model-label';
-        modelLabel.innerHTML = `<span>${model.name || `Model ${index + 1}`}</span>`;
-        
-        const modelControls = document.createElement('div');
-        modelControls.className = 'model-controls';
-        
-        // Visibility toggle
-        const visibilityBtn = document.createElement('button');
-        visibilityBtn.className = 'model-btn visibility-btn';
-        visibilityBtn.innerHTML = `<i class="fas fa-eye${model.visible ? '' : '-slash'}"></i>`;
-        visibilityBtn.title = 'Toggle Visibility';
-        visibilityBtn.onclick = (e) => {
-            e.stopPropagation();
-            toggleModelVisibility(index);
-        };
-        
-        // Material change button
-        const materialBtn = document.createElement('button');
-        materialBtn.className = 'model-btn material-btn';
-        materialBtn.innerHTML = '<i class="fas fa-palette"></i>';
-        materialBtn.title = 'Change Material';
-        materialBtn.onclick = (e) => {
-            e.stopPropagation();
-            showMaterialDialog(index);
-        };
-        
-        // Delete button
-        const deleteBtn = document.createElement('button');
-        deleteBtn.className = 'model-btn delete-btn';
-        deleteBtn.innerHTML = '<i class="fas fa-trash"></i>';
-        deleteBtn.title = 'Delete Model';
-        deleteBtn.onclick = (e) => {
-            e.stopPropagation();
-            removeModel(index);
-        };
-        
-        modelControls.appendChild(visibilityBtn);
-        modelControls.appendChild(materialBtn);
-        modelControls.appendChild(deleteBtn);
-        
+        modelLabel.innerHTML = `
+            <span>${model.name}</span>
+            <div class="model-controls">
+                <button class="model-btn visibility-btn" title="Toggle Visibility" onclick="toggleModelVisibility(${index})">
+                    <i class="fas ${model.visible ? 'fa-eye' : 'fa-eye-slash'}"></i>
+                </button>
+                <button class="model-btn material-btn" title="Change Material" onclick="showMaterialDialog(${index})">
+                    <i class="fas fa-palette"></i>
+                </button>
+                <button class="model-btn delete-btn" title="Remove Model" onclick="removeModel(${index})">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </div>
+        `;
+
+        modelLabel.onclick = () => selectModel(index);
         modelItem.appendChild(modelLabel);
-        modelItem.appendChild(modelControls);
-        
-        // Add click handler for selection
-        modelItem.onclick = () => selectModel(index);
-        
         modelListContent.appendChild(modelItem);
     });
+
+    // Add "Add More Files" button at the bottom
+    const addMoreButton = document.createElement('button');
+    addMoreButton.className = 'add-more-models-btn';
+    addMoreButton.innerHTML = '<i class="fas fa-plus"></i> Add More Files';
+    addMoreButton.onclick = () => {
+        document.getElementById('file-input').click();
+    };
+    modelListContent.appendChild(addMoreButton);
 }
 
-// Toggle model visibility
-function toggleModelVisibility(modelIndex) {
+// Expose functions to global scope
+window.toggleModelVisibility = function(modelIndex) {
     const model = models[modelIndex];
     if (!model || !model.object) return;
 
@@ -2351,40 +2330,18 @@ function toggleModelVisibility(modelIndex) {
     if (modelList) {
         const modelItem = modelList.children[modelIndex];
         if (modelItem) {
-            const visibilityBtn = modelItem.querySelector('.visibility-toggle');
+            const visibilityBtn = modelItem.querySelector('.visibility-btn');
             if (visibilityBtn) {
-                visibilityBtn.innerHTML = `<i class="fas fa-eye${model.visible ? '' : '-slash'}"></i>`;
+                visibilityBtn.innerHTML = `<i class="fas ${model.visible ? 'fa-eye' : 'fa-eye-slash'}"></i>`;
             }
         }
     }
 
     // Force a render update
     renderer.render(scene, camera);
-}
+};
 
-// Add applyMaterialToModel function
-function applyMaterialToModel(modelIndex, materialType) {
-    if (modelIndex < 0 || modelIndex >= models.length) return;
-    
-    const model = models[modelIndex];
-    if (!model || !model.object) return;
-    
-    // Apply material to the object and all its children
-    model.object.traverse((child) => {
-        if (child.isMesh) {
-            applyMaterial(child, materialType);
-        }
-    });
-    
-    // Update the model's material type
-    model.materialType = materialType;
-    
-    // Force a render update
-    renderer.render(scene, camera);
-}
-
-// Update showMaterialDialog function
-function showMaterialDialog(modelIndex) {
+window.showMaterialDialog = function(modelIndex) {
     // Create dialog container
     const dialog = document.createElement('div');
     dialog.className = 'material-dialog';
@@ -2438,10 +2395,9 @@ function showMaterialDialog(modelIndex) {
     
     // Add dialog to body
     document.body.appendChild(dialog);
-}
+};
 
-// Remove a model from the scene
-function removeModel(modelIndex) {
+window.removeModel = function(modelIndex) {
     const model = models[modelIndex];
     if (!model) return;
 
@@ -2458,24 +2414,33 @@ function removeModel(modelIndex) {
         }
     }
 
-    // Remove outline if exists
-    if (model.outline) {
-        scene.remove(model.outline);
-        if (model.outline.geometry) model.outline.geometry.dispose();
-        if (model.outline.material) model.outline.material.dispose();
-    }
-
     // Remove from models array
     models.splice(modelIndex, 1);
 
     // Update UI
     updateLoadedModelsUI();
 
-    // Reset selection if needed
-    if (selectedObject === model.object) {
-        selectedObject = null;
-    }
+    // Force a render update
+    renderer.render(scene, camera);
+};
 
+// Add applyMaterialToModel function
+function applyMaterialToModel(modelIndex, materialType) {
+    if (modelIndex < 0 || modelIndex >= models.length) return;
+    
+    const model = models[modelIndex];
+    if (!model || !model.object) return;
+    
+    // Apply material to the object and all its children
+    model.object.traverse((child) => {
+        if (child.isMesh) {
+            applyMaterial(child, materialType);
+        }
+    });
+    
+    // Update the model's material type
+    model.materialType = materialType;
+    
     // Force a render update
     renderer.render(scene, camera);
 }

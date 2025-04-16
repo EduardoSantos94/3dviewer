@@ -1,0 +1,65 @@
+Rhino3dm.js References and Resources
+===================================
+
+Official Documentation and Samples:
+---------------------------------
+1. Rhino3dm.js GitHub Repository
+   - https://github.com/mcneel/rhino-developer-samples/tree/8/rhino3dm
+   - Contains official samples and documentation
+
+2. Advanced Viewer Sample
+   - https://github.com/mcneel/rhino-developer-samples/tree/8/rhino3dm/js/SampleViewer/02_advanced
+   - Advanced implementation with material handling and UI features
+
+3. NPM Package
+   - https://www.npmjs.com/package/rhino3dm
+   - Official NPM package with documentation and examples
+
+4. Three.js Integration
+   - https://threejs.org/docs/#manual/en/introduction/Installation
+   - Three.js documentation for 3D rendering
+
+Material Handling References:
+---------------------------
+1. Three.js Material Documentation
+   - https://threejs.org/docs/#api/en/materials/MeshStandardMaterial
+   - Standard material properties and settings
+
+2. Advanced Material Examples
+   - https://threejs.org/examples/#webgl_materials_physical
+   - Physical material examples for realistic rendering
+
+3. Material Conversion Guide
+   - https://discourse.threejs.org/t/issues-with-model-textures-not-displaying-in-three-js-material-conversion-problem/78733
+   - Discussion on material conversion and handling
+
+Development Resources:
+--------------------
+1. Rhino3dm.js API Reference
+   - https://mcneel.github.io/rhino3dm/javascript/api/index.html
+   - Complete API documentation
+
+2. Three.js Examples
+   - https://threejs.org/examples/
+   - Collection of Three.js examples and implementations
+
+3. WebGL Fundamentals
+   - https://webglfundamentals.org/
+   - Understanding WebGL and 3D graphics basics
+
+Best Practices:
+--------------
+1. Material Optimization
+   - Use MeshStandardMaterial for realistic metals
+   - Implement proper lighting for material effects
+   - Consider using environment maps for reflections
+
+2. Performance Tips
+   - Use BufferGeometry for better performance
+   - Implement proper cleanup of resources
+   - Optimize material properties for real-time rendering
+
+3. UI/UX Guidelines
+   - Provide clear material selection interface
+   - Implement proper error handling
+   - Show loading states during material changes 
