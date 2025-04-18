@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jewelry Viewer - Login</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <script>
+        // Initialize Supabase client
+        const supabaseUrl = 'https://lwmcnwwkgdauqgxukwhn.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx3bWNud3drZ2RhdXFneHVrd2huIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQ5NzcwNzcsImV4cCI6MjA2MDU1MzA3N30._NfRA6_3PL9JLEG9-X9P3Tzg5E59NuXtcmQzOdkraNE';
+        const supabase = supabase.createClient(supabaseUrl, supabaseKey);
+
+        // Check if user is already logged in
+        async function checkAuth() {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                window.location.href = 'index.html';
+            }
+        }
+
+        // Handle login
+        async function handleLogin(event) {
+            event.preventDefault();
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            
+            const { data, error } = await supabase.auth.signInWithPassword({
+                email: email,
+                password: password
+            });
+
+            if (error) {
+                showError(error.message);
+            } else {
+                window.location.href = 'index.html';
+            }
+        }
+
+        // Handle signup
+        async function handleSignup(event) {
+            event.preventDefault();
+            const email = document.getElementById('signup-email').value;
+            const password = document.getElementById('signup-password').value;
+            
+            const { data, error } = await supabase.auth.signUp({
+                email: email,
+                password: password
+            });
+
+            if (error) {
+                showError(error.message);
+            } else {
+                showSuccess('Please check your email for verification link');
+            }
+        }
+
+        // Show error message
+        function showError(message) {
+            const errorDiv = document.getElementById('error-message');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+            setTimeout(() => {
+                errorDiv.style.display = 'none';
+            }, 5000);
+        }
+
+        // Show success message
+        function showSuccess(message) {
+            const successDiv = document.getElementById('success-message');
+            successDiv.textContent = message;
+            successDiv.style.display = 'block';
+            setTimeout(() => {
+                successDiv.style.display = 'none';
+            }, 5000);
+        }
+
+        // Toggle between login and signup forms
+        function toggleForms() {
+            const loginForm = document.getElementById('login-form');
+            const signupForm = document.getElementById('signup-form');
+            const toggleText = document.getElementById('toggle-text');
+            
+            if (loginForm.style.display === 'none') {
+                loginForm.style.display = 'block';
+                signupForm.style.display = 'none';
+                toggleText.textContent = 'Need an account? Sign up';
+            } else {
+                loginForm.style.display = 'none';
+                signupForm.style.display = 'block';
+                toggleText.textContent = 'Already have an account? Log in';
+            }
+        }
+
+        // Check auth status on page load
+        document.addEventListener('DOMContentLoaded', checkAuth);
+    </script>
+</head>
+<body>
+    <div class="auth-container">
+        <div class="auth-box">
+            <h1>Jewelry Viewer</h1>
+            <p class="subtitle">Sign in to access your private 3D models</p>
+
+            <div id="error-message" class="error-message"></div>
+            <div id="success-message" class="success-message"></div>
+
+            <!-- Login Form -->
+            <form id="login-form" onsubmit="handleLogin(event)">
+                <div class="form-group">
+                    <label for="email">Email</label>
+                    <input type="email" id="email" required>
+                </div>
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" required>
+                </div>
+                <button type="submit" class="auth-button">Log In</button>
+            </form>
+
+            <!-- Signup Form -->
+            <form id="signup-form" onsubmit="handleSignup(event)" style="display: none;">
+                <div class="form-group">
+                    <label for="signup-email">Email</label>
+                    <input type="email" id="signup-email" required>
+                </div>
+                <div class="form-group">
+                    <label for="signup-password">Password</label>
+                    <input type="password" id="signup-password" required>
+                </div>
+                <button type="submit" class="auth-button">Sign Up</button>
+            </form>
+
+            <p id="toggle-text" class="toggle-text" onclick="toggleForms()">Need an account? Sign up</p>
+        </div>
+    </div>
+</body>
+</html> 
