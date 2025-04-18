@@ -224,25 +224,20 @@
             const { data: { user }, error } = await supabase.auth.getUser();
             if (error) throw error;
             
+            // Get DOM elements, checking if they exist
             const userInfo = document.getElementById('user-info');
             const loginInfo = document.getElementById('login-info');
             const userEmail = document.getElementById('user-email');
+            
+            if (!userInfo || !loginInfo || !userEmail) {
+                console.error('Required DOM elements not found');
+                return;
+            }
             
             if (user) {
                 userInfo.style.display = 'flex';
                 loginInfo.style.display = 'none';
                 userEmail.textContent = user.email;
-                
-                // Check if there's a model to load
-                const modelUrl = localStorage.getItem('selectedModel');
-                if (modelUrl) {
-                    try {
-                        await loadModel(modelUrl);
-                    } catch (error) {
-                        console.error('Failed to load model:', error);
-                        localStorage.removeItem('selectedModel');
-                    }
-                }
             } else {
                 userInfo.style.display = 'none';
                 loginInfo.style.display = 'flex';
@@ -253,22 +248,33 @@
     }
     
     // Handle file selection
-    document.getElementById('file-input').addEventListener('change', async (e) => {
-        const file = e.target.files[0];
+    document.getElementById('file-input')?.addEventListener('change', async (e) => {
+        const file = e.target.files?.[0];
         if (!file) return;
         
         try {
-            // Upload file to Supabase storage
+            // Create a unique filename
+            const timestamp = Date.now();
+            const safeFileName = encodeURIComponent(file.name);
+            const filePath = `${timestamp}-${safeFileName}`;
+            
+            // Upload file to Supabase storage with proper headers
             const { data, error } = await supabase.storage
                 .from('client-files')
-                .upload(`${Date.now()}-${file.name}`, file);
+                .upload(filePath, file, {
+                    cacheControl: '3600',
+                    contentType: file.type,
+                    upsert: false
+                });
             
             if (error) throw error;
             
-            // Get public URL
-            const { data: { publicUrl } } = supabase.storage
+            // Get public URL with error handling
+            const { data: { publicUrl }, error: urlError } = supabase.storage
                 .from('client-files')
                 .getPublicUrl(data.path);
+            
+            if (urlError) throw urlError;
             
             // Store URL and load model
             localStorage.setItem('selectedModel', publicUrl);
@@ -281,7 +287,7 @@
     });
     
     // Handle logout
-    document.getElementById('logout-btn').addEventListener('click', async () => {
+    document.getElementById('logout-btn')?.addEventListener('click', async () => {
         try {
             const { error } = await supabase.auth.signOut();
             if (error) throw error;
@@ -294,7 +300,9 @@
     });
     
     // Check auth on page load
-    checkAuth();
+    document.addEventListener('DOMContentLoaded', () => {
+        checkAuth();
+    });
 </script>
 </body>
 </html> 
