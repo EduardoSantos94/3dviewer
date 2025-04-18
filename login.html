@@ -9,27 +9,6 @@
     <link rel="stylesheet" href="styles.css">
     <!-- Load Supabase JS library -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script>
-        // Initialize Supabase client
-        const supabaseUrl = 'https://lwmcnwwkgdauqgxukwhn.supabase.co';
-        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx3bWNud3drZ2RhdXFneHVrd2huIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQ5NzcwNzcsImV4cCI6MjA2MDU1MzA3N30._NfRA6_3PL9JLEG9-X9P3Tzg5E59NuXtcmQzOdkraNE';
-        const supabase = supabase.createClient(supabaseUrl, supabaseKey);
-
-        // Check authentication status - only redirect if there's an active session
-        async function checkAuth() {
-            try {
-                const { data: { session }, error } = await supabase.auth.getSession();
-                if (session) {
-                    window.location.href = 'upload.html';
-                }
-            } catch (error) {
-                console.error('Auth check error:', error.message);
-            }
-        }
-
-        // Wait for DOM to load before checking auth
-        document.addEventListener('DOMContentLoaded', checkAuth);
-    </script>
 </head>
 <body>
     <div class="auth-container">
@@ -67,6 +46,23 @@
     </div>
 
     <script>
+        // Initialize Supabase client
+        const supabaseUrl = 'https://lwmcnwwkgdauqgxukwhn.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx3bWNud3drZ2RhdXFneHVrd2huIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQ5NzcwNzcsImV4cCI6MjA2MDU1MzA3N30._NfRA6_3PL9JLEG9-X9P3Tzg5E59NuXtcmQzOdkraNE';
+        const supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
+
+        // Check authentication status - only redirect if there's an active session
+        async function checkAuth() {
+            try {
+                const { data: { session }, error } = await supabaseClient.auth.getSession();
+                if (session) {
+                    window.location.href = 'upload.html';
+                }
+            } catch (error) {
+                console.error('Auth check error:', error.message);
+            }
+        }
+
         // Handle login
         async function handleLogin(event) {
             event.preventDefault();
@@ -74,7 +70,7 @@
             const password = document.getElementById('password').value;
 
             try {
-                const { data, error } = await supabase.auth.signInWithPassword({
+                const { data, error } = await supabaseClient.auth.signInWithPassword({
                     email,
                     password,
                     options: {
@@ -87,7 +83,6 @@
                     showError('Login failed: ' + error.message);
                 } else {
                     showSuccess('Login successful!');
-                    // Redirect after successful login
                     window.location.href = 'upload.html';
                 }
             } catch (error) {
@@ -103,7 +98,7 @@
             const password = document.getElementById('signup-password').value;
 
             try {
-                const { data, error } = await supabase.auth.signUp({
+                const { data, error } = await supabaseClient.auth.signUp({
                     email,
                     password,
                     options: {
@@ -159,9 +154,12 @@
         }
 
         // Add event listeners
-        document.getElementById('login-form').addEventListener('submit', handleLogin);
-        document.getElementById('signup-form').addEventListener('submit', handleSignup);
-        document.getElementById('toggle-text').addEventListener('click', toggleForms);
+        document.addEventListener('DOMContentLoaded', () => {
+            checkAuth();
+            document.getElementById('login-form').addEventListener('submit', handleLogin);
+            document.getElementById('signup-form').addEventListener('submit', handleSignup);
+            document.getElementById('toggle-text').addEventListener('click', toggleForms);
+        });
     </script>
 </body>
 </html> 
