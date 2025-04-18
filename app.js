@@ -2368,7 +2368,7 @@ export async function loadModel(modelPath, materialType = null) {
         }
 
         // Fix bounds if needed
-        fixGeometryBounds(model);
+        fixModelBounds(model);
 
         // Apply material if specified
         if (materialType) {
@@ -2404,7 +2404,7 @@ function validateModelGeometry(model) {
 }
 
 // Helper function to fix geometry bounds
-function fixGeometryBounds(model) {
+function fixModelBounds(model) {
     if (model.geometry) {
         model.geometry.computeBoundingBox();
         model.geometry.computeBoundingSphere();
