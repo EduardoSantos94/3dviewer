@@ -225,6 +225,8 @@ async function checkAuth() {
         
         if (error) {
             console.error('Auth check error:', error);
+            document.getElementById('user-info').style.display = 'none';
+            document.getElementById('login-info').style.display = 'block';
             return;
         }
         
@@ -257,11 +259,11 @@ function updateAuthUI(session) {
     const userInfo = document.getElementById('user-info');
     const loginInfo = document.getElementById('login-info');
     
-    if (userInfo && loginInfo) {
-        document.getElementById('user-email').textContent = session.user.email;
-        userInfo.style.display = 'block';
-        loginInfo.style.display = 'none';
-    }
+    if (!userInfo || !loginInfo) return;
+    
+    document.getElementById('user-email').textContent = session.user.email;
+    userInfo.style.display = 'block';
+    loginInfo.style.display = 'none';
 }
 
 // Handle logout
@@ -277,13 +279,31 @@ async function handleLogout() {
 
 // Initialize
 document.addEventListener('DOMContentLoaded', async () => {
+    // Run auth check immediately
     await checkAuth();
-    document.getElementById('logout-btn')?.addEventListener('click', handleLogout);
-    document.getElementById('start-viewing')?.addEventListener('click', () => {
-        document.getElementById('frontpage').style.display = 'none';
-        document.getElementById('drop-zone').style.display = 'flex';
-    });
+    
+    // Set up event listeners
+    const logoutBtn = document.getElementById('logout-btn');
+    if (logoutBtn) {
+        logoutBtn.addEventListener('click', handleLogout);
+    }
+    
+    const startViewingBtn = document.getElementById('start-viewing');
+    if (startViewingBtn) {
+        startViewingBtn.addEventListener('click', () => {
+            const frontpage = document.getElementById('frontpage');
+            const dropZone = document.getElementById('drop-zone');
+            const container = document.getElementById('container');
+            
+            if (frontpage) frontpage.style.display = 'none';
+            if (dropZone) dropZone.style.display = 'flex';
+            if (container) container.style.display = 'block';
+        });
+    }
 });
+
+// Run auth check immediately when the script loads
+checkAuth();
 </script>
 </body>
 </html> 

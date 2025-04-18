@@ -2447,6 +2447,7 @@ function applyMaterialToModel(modelIndex, materialType) {
     renderer.render(scene, camera);
 }
 
+// Export the loadModel function
 export async function loadModel(modelPath, materialType = null) {
     try {
         showLoadingIndicator();
