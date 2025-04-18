@@ -2445,6 +2445,82 @@ function applyMaterialToModel(modelIndex, materialType) {
     renderer.render(scene, camera);
 }
 
+export async function loadModel(modelPath, materialType = null) {
+    try {
+        showLoadingIndicator();
+
+        // Check if model is already loaded
+        const existingModel = loadedModels.find(m => m.path === modelPath);
+        if (existingModel) {
+            selectModel(existingModel.index);
+            hideLoadingIndicator();
+            return existingModel;
+        }
+
+        // Determine material type if not provided
+        if (!materialType) {
+            materialType = 'phong'; // Default material type
+        }
+
+        // Get appropriate loader for the file path
+        const loader = getLoaderForPath(modelPath);
+        if (!loader) {
+            throw new Error('Unsupported file format');
+        }
+
+        // Load the model
+        const result = await new Promise((resolve, reject) => {
+            loader.load(
+                modelPath,
+                (object) => resolve(object),
+                null,
+                (error) => reject(error)
+            );
+        });
+
+        // Process the loaded model
+        let model = {
+            path: modelPath,
+            name: getFileNameFromPath(modelPath),
+            object: result,
+            index: loadedModels.length,
+            materialType: materialType
+        };
+
+        // Apply materials and add to scene
+        if (result.scene) {
+            result.scene.traverse((child) => {
+                if (child.isMesh) {
+                    applyMaterial(child, materialType);
+                    validateGeometry(child.geometry);
+                }
+            });
+            AddModelToScene(result.scene);
+            model.object = result.scene;
+        } else if (result.isMesh) {
+            applyMaterial(result, materialType);
+            validateGeometry(result.geometry);
+            AddModelToScene(result);
+            model.object = result;
+        }
+
+        // Store model information
+        loadedModels.push(model);
+        updateModelList();
+
+        // Position and scale the model
+        positionAndScaleModel(model.object, model);
+
+        hideLoadingIndicator();
+        return model;
+    } catch (error) {
+        hideLoadingIndicator();
+        console.error('Error loading model:', error);
+        showError('Failed to load model: ' + error.message);
+        throw error;
+    }
+}
+
 
 
 

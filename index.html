@@ -242,7 +242,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.querySelector('.frontpage').style.display = 'none';
         document.querySelector('.container').style.display = 'block';
         // Load the model
-        await loadModel(modelToLoad);
+        try {
+            await loadModel(modelToLoad);
+        } catch (error) {
+            console.error('Error loading model:', error);
+            // Show error message to user
+            alert('Failed to load model: ' + error.message);
+        }
     }
 });
 </script>
