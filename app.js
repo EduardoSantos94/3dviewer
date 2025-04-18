@@ -2226,7 +2226,7 @@ function handleClick(event) {
         // Deselect if clicking empty space
         if (selectedObject && selectedObject.material) {
             selectedObject.material.emissive.setHex(0x000000);
-            selectedObject = null;
+        selectedObject = null;
             updateModelListInSidebar();
         }
     }

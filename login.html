@@ -7,18 +7,23 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
-    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <!-- Load Supabase JS library -->
+    <script src="https://unpkg.com/@supabase/supabase-js@2.39.3/dist/umd/supabase.min.js"></script>
     <script>
         // Initialize Supabase client
         const supabaseUrl = 'https://lwmcnwwkgdauqgxukwhn.supabase.co';
         const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx3bWNud3drZ2RhdXFneHVrd2huIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQ5NzcwNzcsImV4cCI6MjA2MDU1MzA3N30._NfRA6_3PL9JLEG9-X9P3Tzg5E59NuXtcmQzOdkraNE';
-        const supabase = createClient(supabaseUrl, supabaseKey);
+        const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
 
         // Check if user is already logged in
         async function checkAuth() {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (user) {
-                window.location.href = 'index.html';
+            try {
+                const { data: { user }, error } = await supabase.auth.getUser();
+                if (user) {
+                    window.location.href = 'index.html';
+                }
+            } catch (error) {
+                console.error('Error checking auth:', error.message);
             }
         }
 
@@ -28,15 +33,23 @@
             const email = document.getElementById('email').value;
             const password = document.getElementById('password').value;
             
-            const { data, error } = await supabase.auth.signInWithPassword({
-                email: email,
-                password: password
-            });
+            try {
+                const { data, error } = await supabase.auth.signInWithPassword({
+                    email: email,
+                    password: password
+                });
 
-            if (error) {
-                showError(error.message);
-            } else {
-                window.location.href = 'index.html';
+                if (error) {
+                    showError(error.message);
+                } else {
+                    showSuccess('Login successful! Redirecting...');
+                    setTimeout(() => {
+                        window.location.href = 'index.html';
+                    }, 1000);
+                }
+            } catch (error) {
+                showError('An unexpected error occurred. Please try again.');
+                console.error('Login error:', error);
             }
         }
 
@@ -46,15 +59,20 @@
             const email = document.getElementById('signup-email').value;
             const password = document.getElementById('signup-password').value;
             
-            const { data, error } = await supabase.auth.signUp({
-                email: email,
-                password: password
-            });
+            try {
+                const { data, error } = await supabase.auth.signUp({
+                    email: email,
+                    password: password
+                });
 
-            if (error) {
-                showError(error.message);
-            } else {
-                showSuccess('Please check your email for verification link');
+                if (error) {
+                    showError(error.message);
+                } else {
+                    showSuccess('Please check your email for verification link');
+                }
+            } catch (error) {
+                showError('An unexpected error occurred. Please try again.');
+                console.error('Signup error:', error);
             }
         }
 
