@@ -1126,116 +1126,9 @@ function zoomToFit(models) {
     camera.updateProjectionMatrix();
 }
 
-// Load model function that adds a model to the scene without duplicating geometry
-function loadModel(modelPath, materialType = null) {
-    // Create a progress indicator
-    const progressContainer = document.getElementById('progress-container');
-    const progressElement = document.getElementById('progress');
-    progressContainer.style.display = 'block';
-    progressElement.style.width = '0%';
+// Function has been moved to the exported version at line 2451
+// Removed to fix duplicate declaration error
     
-    // Check if we already have this model loaded
-    const existingModelIndex = models.findIndex(model => model.path === modelPath);
-    if (existingModelIndex >= 0) {
-        console.log(`Model ${modelPath} already loaded`);
-        progressContainer.style.display = 'none';
-        return existingModelIndex;
-    }
-    
-    // Determine which material to use, with better fallback handling
-    let materialToUse = currentMaterial || 'gold';
-    if (materialType && materialPresets[materialType]) {
-        materialToUse = materialType;
-    } else if (!materialPresets[materialToUse]) {
-        materialToUse = 'gold'; // Default fallback
-    }
-    
-    // Create a placeholder for this model
-    const modelInfo = {
-        path: modelPath,
-        name: getFileNameFromPath(modelPath),
-        object: null,
-        originalPosition: new THREE.Vector3(),
-        originalScale: new THREE.Vector3(1, 1, 1),
-        boundingBox: null,
-        selected: false,
-        visible: true,
-        material: materialToUse
-    };
-    
-    // Add the model to our models array
-    const modelIndex = models.push(modelInfo) - 1;
-    
-    console.log(`Loading model: ${modelPath} with material: ${materialToUse}`);
-    
-    // Load the model
-    const loader = getLoaderForPath(modelPath);
-    loader.load(
-        modelPath,
-        (object) => {
-            // Apply the material to the model
-            applyMaterial(object, materialPresets[materialToUse]);
-            
-            // Add the loaded object to the model info
-            modelInfo.object = object;
-            
-            // Position and scale the model
-            if (positionAndScaleModel(object, modelInfo)) {
-                // Add the object to the scene
-                scene.add(object);
-                
-                // Create an outline for the object
-                modelInfo.outline = createOutline(object, materialToUse);
-                if (modelInfo.outline) {
-                    scene.add(modelInfo.outline);
-                }
-                
-                // Hide the progress indicator
-                progressContainer.style.display = 'none';
-                progressElement.style.width = '0%';
-                
-                // Update UI to reflect the new model
-                updateLoadedModelsUI();
-                
-                // Log and zoom to fit the newly loaded model
-                console.log(`Model loaded successfully: ${modelPath}`);
-                
-                // Force a render to ensure the model is visible
-                renderer.render(scene, camera);
-                
-                // Zoom to fit with animation only if this is our first model
-                zoomToFit([modelInfo], models.length === 1);
-                
-                // Dispatch a model loaded event
-                dispatchEvent('modelLoaded', { 
-                    modelIndex: modelIndex,
-                    model: modelInfo 
-                });
-            }
-        },
-        (xhr) => {
-            // Update the progress indicator
-            if (xhr.lengthComputable) {
-                const percentComplete = xhr.loaded / xhr.total * 100;
-                progressElement.style.width = percentComplete + '%';
-            }
-        },
-        (error) => {
-            console.error(`Error loading model: ${modelPath}`, error);
-            progressContainer.style.display = 'none';
-            progressElement.style.width = '0%';
-            
-            // Remove the model from our models array
-            models.splice(modelIndex, 1);
-            
-            // Show an error message
-            alert(`Failed to load model: ${modelPath}`);
-        }
-    );
-    
-    return modelIndex;
-}
-
 // Add helper function to validate a geometry's bounding box
 function validateGeometry(geometry) {
     if (!geometry) return false;
@@ -2449,51 +2342,52 @@ function applyMaterialToModel(modelIndex, materialType) {
 
 // Export the loadModel function
 export async function loadModel(modelPath, materialType = null) {
-    try {
-        showLoadingIndicator();
-        
-        // Check if model is already loaded
-        if (scene.getObjectByName(getFileNameFromPath(modelPath))) {
-            throw new Error('Model already loaded');
-        }
+    // Check if model is already loaded
+    const existingModel = scene.children.find(child => child.name === getFileNameFromPath(modelPath));
+    if (existingModel) {
+        showErrorMessage('Model is already loaded');
+        return;
+    }
 
-        // Get file extension and select appropriate loader
-        const extension = modelPath.split('.').pop().toLowerCase();
+    // Show loading indicator
+    showLoadingIndicator();
+
+    try {
+        // Get appropriate loader based on file extension
         const loader = getLoaderForPath(modelPath);
-        
         if (!loader) {
-            throw new Error(`Unsupported file format: ${extension}`);
+            throw new Error('Unsupported file format');
         }
 
         // Load the model
         const model = await loader.loadAsync(modelPath);
-        
+
         // Validate geometry
         if (!validateGeometry(model)) {
             throw new Error('Invalid model geometry');
         }
 
-        // Fix geometry bounds if needed
+        // Fix bounds if needed
         fixGeometryBounds(model);
 
-        // Apply material
+        // Apply material if specified
         if (materialType) {
             applyMaterial(model, materialType);
         }
 
-        // Add to scene and position
+        // Add model to scene
         AddModelToScene(model);
+
+        // Position and scale the model
         positionAndScaleModel(model);
 
         // Update UI
         updateModelListInSidebar();
         hideLoadingIndicator();
-
-        return model;
     } catch (error) {
+        console.error('Error loading model:', error);
+        showErrorMessage(`Failed to load model: ${error.message}`);
         hideLoadingIndicator();
-        showErrorMessage(error.message);
-        throw error;
     }
 }
 
