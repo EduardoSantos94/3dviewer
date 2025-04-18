@@ -75,6 +75,9 @@
             const { data, error } = await supabaseClient.auth.signInWithPassword({
                 email,
                 password,
+                options: {
+                    redirectTo: window.location.origin + '/upload.html'
+                }
             });
 
             if (error) {
@@ -82,9 +85,10 @@
                 showError('Login failed: ' + error.message);
             } else {
                 showSuccess('Login successful!');
-                setTimeout(() => {
+                // Use the session data to redirect
+                if (data?.session) {
                     window.location.href = 'upload.html';
-                }, 1000);
+                }
             }
         }
 
