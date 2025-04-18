@@ -1352,4 +1352,64 @@ select:focus {
     color: #666;
     font-size: 0.9rem;
     margin-top: 1rem;
+}
+
+/* Auth Status */
+.auth-status {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 1001;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background-color: rgba(255, 255, 255, 0.95);
+    padding: 6px 12px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.auth-btn {
+    background-color: #007AFF;
+    color: white;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.auth-btn:hover {
+    background-color: #0056b3;
+}
+
+#user-email {
+    color: #333;
+    font-size: 14px;
+    margin-right: 8px;
+}
+
+#upload-btn {
+    background-color: #28a745;
+    padding: 6px 12px;
+}
+
+#upload-btn:hover {
+    background-color: #218838;
+}
+
+#logout-btn {
+    background-color: transparent;
+    color: #666;
+    padding: 4px 8px;
+    border: 1px solid #ddd;
+}
+
+#logout-btn:hover {
+    background-color: #f8f9fa;
+    color: #333;
 } 

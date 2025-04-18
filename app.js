@@ -2342,120 +2342,55 @@ function applyMaterialToModel(modelIndex, materialType) {
 
 // Export the loadModel function
 export async function loadModel(modelPath, materialType = null) {
-    // Check if model is already loaded
-    const existingModel = scene.children.find(child => child.name === getFileNameFromPath(modelPath));
-    if (existingModel) {
-        showErrorMessage('Model is already loaded');
-        return;
-    }
-
-    // Show loading indicator
-    showLoadingIndicator();
-
     try {
-        // Get appropriate loader based on file extension
+        showLoadingIndicator();
+        
+        // Clear any existing models
+        ClearScene();
+        
+        // Load the model
         const loader = getLoaderForPath(modelPath);
         if (!loader) {
             throw new Error('Unsupported file format');
         }
-
-        // Load the model
+        
         const model = await loader.loadAsync(modelPath);
-
+        
         // Validate geometry
         if (!validateModelGeometry(model)) {
             throw new Error('Invalid model geometry');
         }
-
+        
         // Fix bounds if needed
         fixModelBounds(model);
-
+        
         // Apply material if specified
         if (materialType) {
             applyMaterial(model, materialType);
         }
-
+        
         // Add model to scene
         AddModelToScene(model);
-
+        
         // Position and scale the model
         fitModelToView(model);
-
+        
         // Update UI
         updateModelListInSidebar();
+        
+        // Hide loading indicator and show viewer
         hideLoadingIndicator();
+        document.getElementById('frontpage').style.display = 'none';
+        document.getElementById('drop-zone').style.display = 'none';
+        document.getElementById('container').style.display = 'block';
+        
     } catch (error) {
         console.error('Error loading model:', error);
         showErrorMessage(`Failed to load model: ${error.message}`);
         hideLoadingIndicator();
     }
 }
-// Function has been moved to the exported version at line 686
-// Removed to fix duplicate declaration error
 
-// Helper function to validate geometry
-function validateModelGeometry(model) {
-    if (model.geometry) {
-        return model.geometry.boundingBox && 
-               model.geometry.boundingBox.min && 
-               model.geometry.boundingBox.max;
-    }
-    return false;
-}
-
-// Helper function to fix geometry bounds
-function fixModelBounds(model) {
-    if (model.geometry) {
-        model.geometry.computeBoundingBox();
-        model.geometry.computeBoundingSphere();
-    }
-}
-
-// Helper function to position and scale model
-function centerModel(model) {
-    const box = new THREE.Box3().setFromObject(model);
-    const center = box.getCenter(new THREE.Vector3());
-    const size = box.getSize(new THREE.Vector3());
-    
-    // Center the model
-    model.position.sub(center);
-    
-    // Scale to fit in view
-    const maxDim = Math.max(size.x, size.y, size.z);
-    const scale = 1 / maxDim;
-    model.scale.setScalar(scale);
-    
-    // Update camera to fit model
-    const camera = scene.getObjectByName('camera');
-    if (camera) {
-        const distance = maxDim * 2;
-        camera.position.set(0, 0, distance);
-        camera.lookAt(0, 0, 0);
-    }
-}
-
-// ... existing code ...
-function fitModelToView(model) {
-    const box = new THREE.Box3().setFromObject(model);
-    const center = box.getCenter(new THREE.Vector3());
-    const size = box.getSize(new THREE.Vector3());
-    
-    // Center the model
-    model.position.sub(center);
-    
-    // Scale to fit in view
-    const maxDim = Math.max(size.x, size.y, size.z);
-    const scale = 1 / maxDim;
-    model.scale.setScalar(scale);
-    
-    // Update camera to fit model
-    const camera = scene.getObjectByName('camera');
-    if (camera) {
-        const distance = maxDim * 2;
-        camera.position.set(0, 0, distance);
-        camera.lookAt(0, 0, 0);
-    }
-}
 // ... existing code ...
 
 

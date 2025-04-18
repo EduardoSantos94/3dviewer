@@ -210,100 +210,91 @@
 </style>
 
 <script type="module">
-// Initialize Supabase client
-const supabaseUrl = 'https://lwmcnwwkgdauqgxukwhn.supabase.co';
-const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx3bWNud3drZ2RhdXFneHVrd2huIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQ5NzcwNzcsImV4cCI6MjA2MDU1MzA3N30._NfRA6_3PL9JLEG9-X9P3Tzg5E59NuXtcmQzOdkraNE';
-const supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
-
-// Import loadModel from app.js
-import { loadModel } from './app.js';
-
-// Check auth status and update UI
-async function checkAuth() {
-    try {
-        const { data: { session }, error } = await supabaseClient.auth.getSession();
-        
-        if (error) {
-            console.error('Auth check error:', error);
-            document.getElementById('user-info').style.display = 'none';
-            document.getElementById('login-info').style.display = 'block';
-            return;
-        }
-        
-        if (session) {
-            updateAuthUI(session);
-            // Load model if one was selected
-            const modelUrl = localStorage.getItem('modelToLoad');
-            if (modelUrl) {
-                try {
-                    await loadModel(modelUrl);
-                    localStorage.removeItem('modelToLoad');
-                } catch (err) {
-                    console.error('Error loading model:', err);
-                    showError('Failed to load model');
-                }
-            }
-        } else {
-            document.getElementById('user-info').style.display = 'none';
-            document.getElementById('login-info').style.display = 'block';
-        }
-    } catch (err) {
-        console.error('Auth check failed:', err);
-        document.getElementById('user-info').style.display = 'none';
-        document.getElementById('login-info').style.display = 'block';
-    }
-}
-
-// Update auth UI
-function updateAuthUI(session) {
-    const userInfo = document.getElementById('user-info');
-    const loginInfo = document.getElementById('login-info');
+    import { loadModel } from './app.js';
     
-    if (!userInfo || !loginInfo) return;
+    // Initialize Supabase client
+    const supabaseUrl = 'YOUR_SUPABASE_URL';
+    const supabaseKey = 'YOUR_SUPABASE_KEY';
+    const supabase = supabase.createClient(supabaseUrl, supabaseKey);
     
-    document.getElementById('user-email').textContent = session.user.email;
-    userInfo.style.display = 'block';
-    loginInfo.style.display = 'none';
-}
-
-// Handle logout
-async function handleLogout() {
-    try {
-        const { error } = await supabaseClient.auth.signOut();
-        if (error) throw error;
-        window.location.reload();
-    } catch (err) {
-        console.error('Logout error:', err);
-    }
-}
-
-// Initialize
-document.addEventListener('DOMContentLoaded', async () => {
-    // Run auth check immediately
-    await checkAuth();
-    
-    // Set up event listeners
-    const logoutBtn = document.getElementById('logout-btn');
-    if (logoutBtn) {
-        logoutBtn.addEventListener('click', handleLogout);
-    }
-    
-    const startViewingBtn = document.getElementById('start-viewing');
-    if (startViewingBtn) {
-        startViewingBtn.addEventListener('click', () => {
-            const frontpage = document.getElementById('frontpage');
-            const dropZone = document.getElementById('drop-zone');
-            const container = document.getElementById('container');
+    // Check authentication status
+    async function checkAuth() {
+        try {
+            const { data: { user }, error } = await supabase.auth.getUser();
+            if (error) throw error;
             
-            if (frontpage) frontpage.style.display = 'none';
-            if (dropZone) dropZone.style.display = 'flex';
-            if (container) container.style.display = 'block';
-        });
+            const authStatus = document.getElementById('auth-status');
+            const uploadBtn = document.getElementById('upload-btn');
+            const logoutBtn = document.getElementById('logout-btn');
+            
+            if (user) {
+                authStatus.textContent = `Logged in as: ${user.email}`;
+                uploadBtn.style.display = 'inline-block';
+                logoutBtn.style.display = 'inline-block';
+                
+                // Check if there's a model to load
+                const modelUrl = localStorage.getItem('selectedModel');
+                if (modelUrl) {
+                    try {
+                        await loadModel(modelUrl);
+                    } catch (error) {
+                        console.error('Failed to load model:', error);
+                        localStorage.removeItem('selectedModel');
+                    }
+                }
+            } else {
+                authStatus.textContent = 'Not logged in';
+                uploadBtn.style.display = 'none';
+                logoutBtn.style.display = 'none';
+            }
+        } catch (error) {
+            console.error('Auth check failed:', error);
+        }
     }
-});
-
-// Run auth check immediately when the script loads
-checkAuth();
+    
+    // Handle file selection
+    document.getElementById('file-input').addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        
+        try {
+            // Upload file to Supabase storage
+            const { data, error } = await supabase.storage
+                .from('client-files')
+                .upload(`${Date.now()}-${file.name}`, file);
+            
+            if (error) throw error;
+            
+            // Get public URL
+            const { data: { publicUrl } } = supabase.storage
+                .from('client-files')
+                .getPublicUrl(data.path);
+            
+            // Store URL and load model
+            localStorage.setItem('selectedModel', publicUrl);
+            await loadModel(publicUrl);
+            
+        } catch (error) {
+            console.error('Upload failed:', error);
+            alert('Failed to upload file. Please try again.');
+        }
+    });
+    
+    // Handle logout
+    document.getElementById('logout-btn').addEventListener('click', async () => {
+        try {
+            const { error } = await supabase.auth.signOut();
+            if (error) throw error;
+            
+            localStorage.removeItem('selectedModel');
+            location.reload();
+        } catch (error) {
+            console.error('Logout failed:', error);
+        }
+    });
+    
+    // Check auth on page load
+    checkAuth();
 </script>
 </body>
 </html> 
