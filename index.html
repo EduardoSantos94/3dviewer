@@ -30,8 +30,20 @@
     
     <!-- App script loads last -->
     <script src="app.js" type="module"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
+    <!-- Auth Status -->
+    <div class="auth-status">
+        <div id="user-info" style="display: none;">
+            <span id="user-email"></span>
+            <button id="logout-btn" class="auth-btn">Logout</button>
+        </div>
+        <div id="login-info">
+            <button id="login-btn" class="auth-btn" onclick="window.location.href='login.html'">Login</button>
+        </div>
+    </div>
+
     <!-- Loading Indicator -->
     <div id="loading-indicator">
         <div class="spinner"></div>
@@ -137,5 +149,88 @@
             </div>
         </div>
     </div>
+
+<style>
+.auth-status {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 1001;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background-color: rgba(255, 255, 255, 0.9);
+    padding: 8px 12px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.auth-btn {
+    background-color: #007AFF;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.2s ease;
+}
+
+.auth-btn:hover {
+    background-color: #0056b3;
+}
+
+#user-email {
+    color: #333;
+    font-size: 14px;
+    margin-right: 10px;
+}
+
+#logout-btn {
+    background-color: #dc3545;
+}
+
+#logout-btn:hover {
+    background-color: #c82333;
+}
+</style>
+
+<script>
+// Initialize Supabase client
+const supabaseUrl = 'https://lwmcnwwkgdauqgxukwhn.supabase.co';
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx3bWNud3drZ2RhdXFneHVrd2huIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQ5NzcwNzcsImV4cCI6MjA2MDU1MzA3N30._NfRA6_3PL9JLEG9-X9P3Tzg5E59NuXtcmQzOdkraNE';
+const supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
+
+// Check auth status and update UI
+async function checkAndUpdateAuthStatus() {
+    const { data: { session }, error } = await supabaseClient.auth.getSession();
+    const userInfo = document.getElementById('user-info');
+    const loginInfo = document.getElementById('login-info');
+    const userEmail = document.getElementById('user-email');
+
+    if (session) {
+        userEmail.textContent = session.user.email;
+        userInfo.style.display = 'flex';
+        loginInfo.style.display = 'none';
+    } else {
+        userInfo.style.display = 'none';
+        loginInfo.style.display = 'flex';
+    }
+}
+
+// Handle logout
+async function handleLogout() {
+    const { error } = await supabaseClient.auth.signOut();
+    if (!error) {
+        window.location.reload();
+    }
+}
+
+// Add event listeners
+document.addEventListener('DOMContentLoaded', () => {
+    checkAndUpdateAuthStatus();
+    document.getElementById('logout-btn')?.addEventListener('click', handleLogout);
+});
+</script>
 </body>
 </html> 

@@ -3,184 +3,407 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Upload 3D Files - Jewelry Viewer</title>
+    <title>Upload Models - Jewelry Viewer</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=SF+Pro+Display:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
-    <!-- Load Supabase JS library -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script>
-        // Initialize Supabase client
-        const supabaseUrl = 'https://lwmcnwwkgdauqgxukwhn.supabase.co';
-        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx3bWNud3drZ2RhdXFneHVrd2huIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQ5NzcwNzcsImV4cCI6MjA2MDU1MzA3N30._NfRA6_3PL9JLEG9-X9P3Tzg5E59NuXtcmQzOdkraNE';
-        const supabaseClient = supabase.createClient(supabaseUrl, supabaseKey);
-
-        // Check authentication status
-        async function checkAuth() {
-            const { data: { session } } = await supabaseClient.auth.getSession();
-            if (!session) {
-                window.location.href = 'login.html';
-            }
-        }
-
-        // Check auth on page load
-        document.addEventListener('DOMContentLoaded', checkAuth);
-    </script>
 </head>
 <body>
+    <!-- Auth Status -->
+    <div class="auth-status">
+        <div id="user-info" style="display: none;">
+            <span id="user-email"></span>
+            <button id="logout-btn" class="auth-btn">Logout</button>
+        </div>
+        <div id="login-info">
+            <button id="login-btn" class="auth-btn" onclick="window.location.href='login.html'">Login</button>
+        </div>
+    </div>
+
     <div class="upload-container">
         <div class="upload-box">
-            <h1>Upload 3D Files</h1>
-            <p class="subtitle">Upload your 3D jewelry models to your private storage</p>
+            <nav class="navigation-links">
+                <a href="index.html" class="nav-link"><i class="fas fa-chevron-left"></i> Back to Viewer</a>
+            </nav>
 
-            <div id="error-message" class="error-message"></div>
-            <div id="success-message" class="success-message"></div>
+            <header class="upload-header">
+                <h1>Your 3D Models</h1>
+                <button id="add-files-btn" class="add-files-btn">
+                    <i class="fas fa-plus"></i>
+                    Add Files
+                </button>
+            </header>
 
-            <div class="upload-area">
-                <div class="drop-zone" id="drop-zone">
+            <div class="upload-area" id="upload-area" style="display: none;">
+                <div class="drop-zone" id="upload-drop-zone">
                     <i class="fas fa-cloud-upload-alt"></i>
                     <h2>Drop your files here</h2>
                     <p>or</p>
-                    <button id="select-files" class="select-files-btn">
+                    <button class="select-files-btn">
                         <i class="fas fa-folder-open"></i>
                         Select Files
                     </button>
                     <input type="file" id="file-input" accept=".3dm,.obj,.stl,.glb,.gltf" multiple style="display: none;">
                     <p class="supported-formats">Supported formats: 3DM, OBJ, STL, GLB/GLTF</p>
                 </div>
-
-                <div id="upload-progress" class="upload-progress" style="display: none;">
-                    <div class="progress-bar"></div>
-                    <p class="progress-text">Uploading...</p>
-                </div>
-
-                <div id="uploaded-files" class="uploaded-files">
-                    <h3>Uploaded Files</h3>
-                    <div id="file-list"></div>
-                </div>
             </div>
 
-            <div class="upload-actions">
-                <button id="view-models" class="auth-button" onclick="window.location.href='index.html'">
-                    <i class="fas fa-eye"></i> View Models
-                </button>
-                <button id="logout" class="auth-button" onclick="handleLogout()">
-                    <i class="fas fa-sign-out-alt"></i> Logout
-                </button>
+            <div class="upload-progress" style="display: none;">
+                <div class="progress-bar"></div>
+                <p class="progress-text">Uploading...</p>
+            </div>
+
+            <div class="uploaded-files">
+                <div id="file-list"></div>
+                <div id="empty-state" class="empty-state">
+                    <i class="fas fa-cube"></i>
+                    <p>No files uploaded yet</p>
+                    <button class="add-files-btn-secondary" onclick="showUploadArea()">
+                        Add Your First Model
+                    </button>
+                </div>
             </div>
         </div>
     </div>
 
+    <style>
+    body {
+        font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        background-color: #f5f5f7;
+        color: #1d1d1f;
+    }
+
+    .upload-container {
+        padding: 2rem;
+        max-width: 1200px;
+        margin: 0 auto;
+    }
+
+    .upload-box {
+        background-color: white;
+        border-radius: 20px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+        padding: 2rem;
+    }
+
+    .navigation-links {
+        margin-bottom: 2rem;
+    }
+
+    .nav-link {
+        color: #06c;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 1rem;
+        transition: color 0.2s;
+    }
+
+    .nav-link:hover {
+        color: #004499;
+    }
+
+    .upload-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 2rem;
+    }
+
+    .upload-header h1 {
+        font-size: 2rem;
+        font-weight: 600;
+        color: #1d1d1f;
+    }
+
+    .add-files-btn {
+        background-color: #06c;
+        color: white;
+        border: none;
+        padding: 0.75rem 1.5rem;
+        border-radius: 8px;
+        font-size: 1rem;
+        font-weight: 500;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        transition: all 0.2s ease;
+    }
+
+    .add-files-btn:hover {
+        background-color: #004499;
+        transform: translateY(-1px);
+    }
+
+    .add-files-btn-secondary {
+        background-color: #06c;
+        color: white;
+        border: none;
+        padding: 0.75rem 1.5rem;
+        border-radius: 8px;
+        font-size: 1rem;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+    .add-files-btn-secondary:hover {
+        background-color: #004499;
+    }
+
+    .drop-zone {
+        border: 2px dashed #06c;
+        border-radius: 16px;
+        padding: 3rem;
+        text-align: center;
+        transition: all 0.3s ease;
+        background-color: #f5f5f7;
+    }
+
+    .drop-zone.dragover {
+        border-color: #004499;
+        background-color: rgba(0, 102, 204, 0.05);
+    }
+
+    .drop-zone i {
+        font-size: 3rem;
+        color: #06c;
+        margin-bottom: 1rem;
+    }
+
+    .file-item {
+        display: flex;
+        align-items: center;
+        padding: 1rem;
+        background-color: #f5f5f7;
+        border-radius: 12px;
+        margin-bottom: 0.75rem;
+        transition: all 0.2s ease;
+    }
+
+    .file-item:hover {
+        background-color: #e5e5e7;
+    }
+
+    .file-item i {
+        color: #06c;
+        font-size: 1.25rem;
+        margin-right: 1rem;
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 4rem 2rem;
+        color: #86868b;
+    }
+
+    .empty-state i {
+        font-size: 3rem;
+        margin-bottom: 1rem;
+        color: #06c;
+    }
+
+    .empty-state p {
+        margin-bottom: 1.5rem;
+        font-size: 1.1rem;
+    }
+
+    .auth-status {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 1001;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        background-color: rgba(255, 255, 255, 0.9);
+        padding: 8px 12px;
+        border-radius: 12px;
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+    }
+
+    .auth-btn {
+        background-color: #06c;
+        color: white;
+        border: none;
+        padding: 8px 16px;
+        border-radius: 8px;
+        font-size: 14px;
+        transition: all 0.2s ease;
+    }
+
+    #logout-btn {
+        background-color: #ff3b30;
+    }
+
+    #logout-btn:hover {
+        background-color: #d63029;
+    }
+    </style>
+
     <script>
-        // Handle file selection
-        document.getElementById('select-files').addEventListener('click', () => {
+    // Initialize Supabase client
+    const supabaseUrl = 'https://lwmcnwwkgdauqgxukwhn.supabase.co';
+    const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx3bWNud3drZ2RhdXFneHVrd2huIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQ5NzcwNzcsImV4cCI6MjA2MDU1MzA3N30._NfRA6_3PL9JLEG9-X9P3Tzg5E59NuXtcmQzOdkraNE';
+    const supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
+
+    // Check auth status and redirect if not logged in
+    async function checkAuth() {
+        const { data: { session }, error } = await supabaseClient.auth.getSession();
+        if (!session) {
+            window.location.href = 'login.html';
+            return;
+        }
+        updateAuthUI(session);
+        updateEmptyState();
+    }
+
+    // Update auth UI
+    function updateAuthUI(session) {
+        const userInfo = document.getElementById('user-info');
+        const loginInfo = document.getElementById('login-info');
+        const userEmail = document.getElementById('user-email');
+
+        if (session) {
+            userEmail.textContent = session.user.email;
+            userInfo.style.display = 'flex';
+            loginInfo.style.display = 'none';
+        } else {
+            userInfo.style.display = 'none';
+            loginInfo.style.display = 'flex';
+        }
+    }
+
+    // Update empty state visibility
+    function updateEmptyState() {
+        const fileList = document.getElementById('file-list');
+        const emptyState = document.getElementById('empty-state');
+        
+        if (fileList.children.length === 0) {
+            emptyState.style.display = 'block';
+        } else {
+            emptyState.style.display = 'none';
+        }
+    }
+
+    // Handle logout
+    async function handleLogout() {
+        const { error } = await supabaseClient.auth.signOut();
+        if (!error) {
+            window.location.href = 'login.html';
+        }
+    }
+
+    // Show upload area and optionally trigger file input
+    function showUploadArea(triggerFileInput = false) {
+        const uploadArea = document.getElementById('upload-area');
+        uploadArea.style.display = 'block';
+        
+        if (triggerFileInput) {
             document.getElementById('file-input').click();
+        }
+    }
+
+    // Toggle upload area (for the Add Files button in header)
+    function toggleUploadArea() {
+        const uploadArea = document.getElementById('upload-area');
+        uploadArea.style.display = uploadArea.style.display === 'none' ? 'block' : 'none';
+    }
+
+    // File upload handling
+    function setupFileUpload() {
+        const dropZone = document.getElementById('upload-drop-zone');
+        const fileInput = document.getElementById('file-input');
+        const selectButton = dropZone.querySelector('.select-files-btn');
+        const addFilesBtn = document.getElementById('add-files-btn');
+
+        // Add Files button in header
+        addFilesBtn.addEventListener('click', () => showUploadArea());
+
+        // Select files button in drop zone
+        selectButton.addEventListener('click', () => {
+            fileInput.click();
         });
 
-        // Handle file input change
-        document.getElementById('file-input').addEventListener('change', handleFiles);
+        // File input change
+        fileInput.addEventListener('change', handleFiles);
 
-        // Handle drag and drop
-        const dropZone = document.getElementById('drop-zone');
-        dropZone.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            dropZone.classList.add('dragover');
+        // Prevent default drag behaviors
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, preventDefaults, false);
+            document.body.addEventListener(eventName, preventDefaults, false);
         });
 
-        dropZone.addEventListener('dragleave', () => {
-            dropZone.classList.remove('dragover');
+        // Highlight drop zone when dragging over it
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, highlight, false);
         });
 
-        dropZone.addEventListener('drop', (e) => {
-            e.preventDefault();
-            dropZone.classList.remove('dragover');
-            handleFiles({ target: { files: e.dataTransfer.files } });
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, unhighlight, false);
         });
 
-        // Handle file upload
-        async function handleFiles(event) {
-            const files = event.target.files;
-            if (!files.length) return;
+        // Handle dropped files
+        dropZone.addEventListener('drop', handleDrop, false);
+    }
 
-            const progressBar = document.getElementById('upload-progress');
-            const progressText = progressBar.querySelector('.progress-text');
-            const fileList = document.getElementById('file-list');
+    function preventDefaults(e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
 
-            progressBar.style.display = 'block';
+    function highlight(e) {
+        document.getElementById('upload-drop-zone').classList.add('dragover');
+    }
 
-            for (let i = 0; i < files.length; i++) {
-                const file = files[i];
-                const fileExtension = file.name.split('.').pop().toLowerCase();
-                
-                if (!['3dm', 'obj', 'stl', 'glb', 'gltf'].includes(fileExtension)) {
-                    showError(`Unsupported file format: ${file.name}`);
-                    continue;
-                }
+    function unhighlight(e) {
+        document.getElementById('upload-drop-zone').classList.remove('dragover');
+    }
 
-                progressText.textContent = `Uploading ${file.name}...`;
-                
-                try {
-                    const { data, error } = await supabaseClient.storage
-                        .from('client-files')
-                        .upload(`uploads/${file.name}`, file);
+    function handleDrop(e) {
+        const dt = e.dataTransfer;
+        const files = dt.files;
+        handleFiles({ target: { files } });
+    }
 
-                    if (error) throw error;
+    function handleFiles(e) {
+        const files = [...e.target.files];
+        files.forEach(uploadFile);
+        toggleUploadArea(); // Hide upload area after files are selected
+    }
 
-                    // Add file to list
-                    const fileItem = document.createElement('div');
-                    fileItem.className = 'file-item';
-                    fileItem.innerHTML = `
-                        <i class="fas fa-file"></i>
-                        <span>${file.name}</span>
-                        <span class="file-size">${formatFileSize(file.size)}</span>
-                    `;
-                    fileList.appendChild(fileItem);
+    async function uploadFile(file) {
+        // Here you would implement the file upload logic to your server or storage
+        // For now, we'll just add it to the list
+        const fileList = document.getElementById('file-list');
+        const fileItem = document.createElement('div');
+        fileItem.className = 'file-item';
+        fileItem.innerHTML = `
+            <i class="fas fa-cube"></i>
+            <span>${file.name}</span>
+            <span class="file-size">${formatFileSize(file.size)}</span>
+        `;
+        fileList.appendChild(fileItem);
+        updateEmptyState();
+    }
 
-                    showSuccess(`${file.name} uploaded successfully!`);
-                } catch (error) {
-                    showError(`Failed to upload ${file.name}: ${error.message}`);
-                }
-            }
+    function formatFileSize(bytes) {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
 
-            progressBar.style.display = 'none';
-        }
-
-        // Handle logout
-        async function handleLogout() {
-            const { error } = await supabaseClient.auth.signOut();
-            if (error) {
-                showError('Logout failed: ' + error.message);
-            } else {
-                window.location.href = 'login.html';
-            }
-        }
-
-        // Helper functions
-        function formatFileSize(bytes) {
-            if (bytes === 0) return '0 Bytes';
-            const k = 1024;
-            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-            const i = Math.floor(Math.log(bytes) / Math.log(k));
-            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-        }
-
-        function showError(message) {
-            const errorDiv = document.getElementById('error-message');
-            errorDiv.textContent = message;
-            errorDiv.style.display = 'block';
-            setTimeout(() => {
-                errorDiv.style.display = 'none';
-            }, 5000);
-        }
-
-        function showSuccess(message) {
-            const successDiv = document.getElementById('success-message');
-            successDiv.textContent = message;
-            successDiv.style.display = 'block';
-            setTimeout(() => {
-                successDiv.style.display = 'none';
-            }, 5000);
-        }
+    // Initialize
+    document.addEventListener('DOMContentLoaded', () => {
+        checkAuth();
+        setupFileUpload();
+        document.getElementById('logout-btn')?.addEventListener('click', handleLogout);
+    });
     </script>
 </body>
 </html> 
