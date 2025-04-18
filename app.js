@@ -2379,7 +2379,7 @@ export async function loadModel(modelPath, materialType = null) {
         AddModelToScene(model);
 
         // Position and scale the model
-        centerModel(model);
+        fitModelToView(model);
 
         // Update UI
         updateModelListInSidebar();
@@ -2435,7 +2435,7 @@ function centerModel(model) {
 }
 
 // ... existing code ...
-function centerModel(model) {
+function fitModelToView(model) {
     const box = new THREE.Box3().setFromObject(model);
     const center = box.getCenter(new THREE.Vector3());
     const size = box.getSize(new THREE.Vector3());
@@ -2456,6 +2456,7 @@ function centerModel(model) {
         camera.lookAt(0, 0, 0);
     }
 }
+// ... existing code ...
 
 
 
