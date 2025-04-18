@@ -37,6 +37,9 @@
     <div class="auth-status">
         <div id="user-info" style="display: none;">
             <span id="user-email"></span>
+            <button id="upload-btn" class="auth-btn" onclick="window.location.href='upload.html'">
+                <i class="fas fa-upload"></i> Upload
+            </button>
             <button id="logout-btn" class="auth-btn">Logout</button>
         </div>
         <div id="login-info">
@@ -174,6 +177,9 @@
     cursor: pointer;
     font-size: 14px;
     transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 5px;
 }
 
 .auth-btn:hover {
@@ -186,6 +192,14 @@
     margin-right: 10px;
 }
 
+#upload-btn {
+    background-color: #28a745;
+}
+
+#upload-btn:hover {
+    background-color: #218838;
+}
+
 #logout-btn {
     background-color: #dc3545;
 }
@@ -195,11 +209,14 @@
 }
 </style>
 
-<script>
+<script type="module">
 // Initialize Supabase client
 const supabaseUrl = 'https://lwmcnwwkgdauqgxukwhn.supabase.co';
 const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx3bWNud3drZ2RhdXFneHVrd2huIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQ5NzcwNzcsImV4cCI6MjA2MDU1MzA3N30._NfRA6_3PL9JLEG9-X9P3Tzg5E59NuXtcmQzOdkraNE';
 const supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
+
+// Import loadModel function
+import { loadModel } from './app.js';
 
 // Check auth status and update UI
 async function checkAndUpdateAuthStatus() {
