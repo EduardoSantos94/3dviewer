@@ -7,6 +7,14 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
+    <!-- Load Supabase JS library -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script>
+        // Initialize Supabase client
+        const supabaseUrl = 'https://lwmcnwwkgdauqgxukwhn.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx3bWNud3drZ2RhdXFneHVrd2huIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQ5NzcwNzcsImV4cCI6MjA2MDU1MzA3N30._NfRA6_3PL9JLEG9-X9P3Tzg5E59NuXtcmQzOdkraNE';
+        const supabase = supabase.createClient(supabaseUrl, supabaseKey);
+    </script>
 </head>
 <body>
     <div class="auth-container">
@@ -20,14 +28,12 @@
             <!-- Login Form -->
             <form id="login-form">
                 <div class="form-group">
-                    <label for="email">Email</label>
-                    <input type="email" id="email" required>
+                    <input type="email" id="email" placeholder="Email" required />
                 </div>
                 <div class="form-group">
-                    <label for="password">Password</label>
-                    <input type="password" id="password" required>
+                    <input type="password" id="password" placeholder="Password" required />
                 </div>
-                <button type="submit" class="auth-button">Log In</button>
+                <button type="submit" class="auth-button">Login</button>
             </form>
 
             <!-- Signup Form -->
@@ -47,15 +53,7 @@
         </div>
     </div>
 
-    <!-- Load Supabase JS library -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script>
-        // Initialize Supabase client
-        const supabase = supabase.createClient(
-            'https://lwmcnwwkgdauqgxukwhn.supabase.co',
-            'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx3bWNud3drZ2RhdXFneHVrd2huIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQ5NzcwNzcsImV4cCI6MjA2MDU1MzA3N30._NfRA6_3PL9JLEG9-X9P3Tzg5E59NuXtcmQzOdkraNE'
-        );
-
         // Handle login
         async function handleLogin(event) {
             event.preventDefault();
@@ -68,11 +66,12 @@
             });
 
             if (error) {
-                showError("Login error: " + error.message);
+                console.error('Login error:', error.message);
+                showError('Login failed: ' + error.message);
             } else {
-                showSuccess("Login successful!");
+                showSuccess('Login successful!');
                 setTimeout(() => {
-                    window.location.href = "index.html";
+                    window.location.href = 'index.html';
                 }, 1000);
             }
         }
