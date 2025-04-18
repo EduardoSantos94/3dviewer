@@ -14,6 +14,18 @@
         const supabaseUrl = 'https://lwmcnwwkgdauqgxukwhn.supabase.co';
         const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx3bWNud3drZ2RhdXFneHVrd2huIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQ5NzcwNzcsImV4cCI6MjA2MDU1MzA3N30._NfRA6_3PL9JLEG9-X9P3Tzg5E59NuXtcmQzOdkraNE';
         const supabaseClient = supabase.createClient(supabaseUrl, supabaseKey);
+
+        // Check authentication status
+        async function checkAuth() {
+            const { data: { session } } = await supabaseClient.auth.getSession();
+            if (session) {
+                // Only redirect if there's an active session
+                window.location.href = 'index.html';
+            }
+        }
+
+        // Check auth on page load
+        document.addEventListener('DOMContentLoaded', checkAuth);
     </script>
 </head>
 <body>
@@ -71,7 +83,7 @@
             } else {
                 showSuccess('Login successful!');
                 setTimeout(() => {
-                    window.location.href = 'index.html';
+                    window.location.href = 'upload.html';
                 }, 1000);
             }
         }
@@ -135,17 +147,6 @@
         document.getElementById('login-form').addEventListener('submit', handleLogin);
         document.getElementById('signup-form').addEventListener('submit', handleSignup);
         document.getElementById('toggle-text').addEventListener('click', toggleForms);
-
-        // Check if user is already logged in
-        async function checkAuth() {
-            const { data: { user } } = await supabaseClient.auth.getUser();
-            if (user) {
-                window.location.href = 'index.html';
-            }
-        }
-
-        // Check auth status on page load
-        document.addEventListener('DOMContentLoaded', checkAuth);
     </script>
 </body>
 </html> 
