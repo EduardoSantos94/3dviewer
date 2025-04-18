@@ -417,6 +417,11 @@
                 </button>
             </div>
         `;
+
+        // Add click handler to the view button
+        const viewBtn = fileItem.querySelector('.view-btn');
+        viewBtn.addEventListener('click', () => handleViewClick(file.path));
+
         return fileItem;
     }
 
@@ -528,6 +533,12 @@
     // View model in the viewer
     async function handleViewClick(modelPath) {
         try {
+            // Show loading indicator
+            const loadingIndicator = document.getElementById('loading-indicator');
+            if (loadingIndicator) {
+                loadingIndicator.style.display = 'flex';
+            }
+
             // Get signed URL for the model
             const { data: urlData, error: urlError } = await supabase.storage
                 .from('client-files')
@@ -539,11 +550,17 @@
             localStorage.setItem('selectedModel', urlData.signedUrl);
             localStorage.setItem('viewerState', 'fromUpload');
             
-            // Redirect to viewer with model ID
+            // Redirect to viewer with model path
             window.location.href = `index.html?model=${encodeURIComponent(modelPath)}`;
         } catch (error) {
             console.error('Error getting model URL:', error);
-            alert('Failed to view model. Please try again.');
+            showError('Failed to view model. Please try again.');
+        } finally {
+            // Hide loading indicator
+            const loadingIndicator = document.getElementById('loading-indicator');
+            if (loadingIndicator) {
+                loadingIndicator.style.display = 'none';
+            }
         }
     }
 
@@ -702,14 +719,6 @@
         const i = Math.floor(Math.log(bytes) / Math.log(k));
         return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
     }
-
-    // Add click handlers to view buttons
-    document.querySelectorAll('.view-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            const modelPath = e.target.closest('.file-item').dataset.modelPath;
-            handleViewClick(modelPath);
-        });
-    });
 
     // Initialize
     document.addEventListener('DOMContentLoaded', () => {
