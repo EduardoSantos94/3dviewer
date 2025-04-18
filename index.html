@@ -218,13 +218,67 @@
     const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx3bWNud3drZ2RhdXFneHVrd2huIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQ5NzcwNzcsImV4cCI6MjA2MDU1MzA3N30._NfRA6_3PL9JLEG9-X9P3Tzg5E59NuXtcmQzOdkraNE';
     const supabase = createClient(supabaseUrl, supabaseKey);
     
+    // Handle file selection
+    document.getElementById('file-input')?.addEventListener('change', async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        
+        try {
+            // Show loading indicator
+            const loadingIndicator = document.getElementById('loading-indicator');
+            if (loadingIndicator) {
+                loadingIndicator.style.display = 'flex';
+            }
+            
+            // Create a unique filename with proper encoding
+            const timestamp = Date.now();
+            const safeFileName = encodeURIComponent(file.name).replace(/%20/g, '_');
+            const filePath = `${timestamp}-${safeFileName}`;
+            
+            // Upload file to Supabase storage with proper headers
+            const { data, error } = await supabase.storage
+                .from('client-files')
+                .upload(filePath, file, {
+                    cacheControl: '3600',
+                    contentType: file.type || 'application/octet-stream',
+                    upsert: false
+                });
+            
+            if (error) {
+                throw error;
+            }
+            
+            // Get public URL
+            const { data: urlData } = await supabase.storage
+                .from('client-files')
+                .createSignedUrl(data.path, 60 * 60); // 1 hour expiry
+            
+            if (!urlData?.signedUrl) {
+                throw new Error('Failed to generate signed URL');
+            }
+            
+            // Store URL and load model
+            localStorage.setItem('selectedModel', urlData.signedUrl);
+            await loadModel(urlData.signedUrl);
+            
+        } catch (error) {
+            console.error('Upload failed:', error);
+            alert('Failed to upload file. Please try again.');
+        } finally {
+            // Hide loading indicator
+            const loadingIndicator = document.getElementById('loading-indicator');
+            if (loadingIndicator) {
+                loadingIndicator.style.display = 'none';
+            }
+        }
+    });
+    
     // Check authentication status
     async function checkAuth() {
         try {
             const { data: { user }, error } = await supabase.auth.getUser();
             if (error) throw error;
             
-            // Get DOM elements, checking if they exist
             const userInfo = document.getElementById('user-info');
             const loginInfo = document.getElementById('login-info');
             const userEmail = document.getElementById('user-email');
@@ -238,6 +292,24 @@
                 userInfo.style.display = 'flex';
                 loginInfo.style.display = 'none';
                 userEmail.textContent = user.email;
+                
+                // Check if there's a model to load
+                const modelUrl = localStorage.getItem('selectedModel');
+                if (modelUrl) {
+                    try {
+                        // Verify URL is still valid
+                        const response = await fetch(modelUrl, { method: 'HEAD' });
+                        if (!response.ok) {
+                            // URL expired, remove it
+                            localStorage.removeItem('selectedModel');
+                            return;
+                        }
+                        await loadModel(modelUrl);
+                    } catch (error) {
+                        console.error('Failed to load model:', error);
+                        localStorage.removeItem('selectedModel');
+                    }
+                }
             } else {
                 userInfo.style.display = 'none';
                 loginInfo.style.display = 'flex';
@@ -246,45 +318,6 @@
             console.error('Auth check failed:', error);
         }
     }
-    
-    // Handle file selection
-    document.getElementById('file-input')?.addEventListener('change', async (e) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-        
-        try {
-            // Create a unique filename
-            const timestamp = Date.now();
-            const safeFileName = encodeURIComponent(file.name);
-            const filePath = `${timestamp}-${safeFileName}`;
-            
-            // Upload file to Supabase storage with proper headers
-            const { data, error } = await supabase.storage
-                .from('client-files')
-                .upload(filePath, file, {
-                    cacheControl: '3600',
-                    contentType: file.type,
-                    upsert: false
-                });
-            
-            if (error) throw error;
-            
-            // Get public URL with error handling
-            const { data: { publicUrl }, error: urlError } = supabase.storage
-                .from('client-files')
-                .getPublicUrl(data.path);
-            
-            if (urlError) throw urlError;
-            
-            // Store URL and load model
-            localStorage.setItem('selectedModel', publicUrl);
-            await loadModel(publicUrl);
-            
-        } catch (error) {
-            console.error('Upload failed:', error);
-            alert('Failed to upload file. Please try again.');
-        }
-    });
     
     // Handle logout
     document.getElementById('logout-btn')?.addEventListener('click', async () => {
