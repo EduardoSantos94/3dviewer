@@ -2390,26 +2390,8 @@ export async function loadModel(modelPath, materialType = null) {
         hideLoadingIndicator();
     }
 }
-
-// Helper function to get loader based on file extension
-function getLoaderForPath(path) {
-    const extension = path.split('.').pop().toLowerCase();
-    switch (extension) {
-        case 'glb':
-        case 'gltf':
-            return new GLTFLoader();
-        case 'obj':
-            return new OBJLoader();
-        case 'stl':
-            return new STLLoader();
-        case 'ply':
-            return new PLYLoader();
-        case 'fbx':
-            return new FBXLoader();
-        default:
-            return null;
-    }
-}
+// Function has been moved to the exported version at line 686
+// Removed to fix duplicate declaration error
 
 // Helper function to validate geometry
 function validateGeometry(model) {
