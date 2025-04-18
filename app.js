@@ -2447,25 +2447,25 @@ function applyMaterialToModel(modelIndex, materialType) {
     renderer.render(scene, camera);
 }
 
-export async function loadModel(url, materialType = null) {
+export async function loadModel(modelPath, materialType = null) {
     try {
         showLoadingIndicator();
         
         // Check if model is already loaded
-        if (scene.getObjectByName(getFileNameFromPath(url))) {
+        if (scene.getObjectByName(getFileNameFromPath(modelPath))) {
             throw new Error('Model already loaded');
         }
 
         // Get file extension and select appropriate loader
-        const extension = url.split('.').pop().toLowerCase();
-        const loader = getLoaderForPath(url);
+        const extension = modelPath.split('.').pop().toLowerCase();
+        const loader = getLoaderForPath(modelPath);
         
         if (!loader) {
             throw new Error(`Unsupported file format: ${extension}`);
         }
 
         // Load the model
-        const model = await loader.loadAsync(url);
+        const model = await loader.loadAsync(modelPath);
         
         // Validate geometry
         if (!validateGeometry(model)) {

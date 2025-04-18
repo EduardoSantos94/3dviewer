@@ -223,6 +223,11 @@ async function checkAuth() {
     try {
         const { data: { session }, error } = await supabaseClient.auth.getSession();
         
+        if (error) {
+            console.error('Auth check error:', error);
+            return;
+        }
+        
         if (session) {
             updateAuthUI(session);
             // Load model if one was selected
@@ -271,9 +276,13 @@ async function handleLogout() {
 }
 
 // Initialize
-document.addEventListener('DOMContentLoaded', () => {
-    checkAuth();
+document.addEventListener('DOMContentLoaded', async () => {
+    await checkAuth();
     document.getElementById('logout-btn')?.addEventListener('click', handleLogout);
+    document.getElementById('start-viewing')?.addEventListener('click', () => {
+        document.getElementById('frontpage').style.display = 'none';
+        document.getElementById('drop-zone').style.display = 'flex';
+    });
 });
 </script>
 </body>
