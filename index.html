@@ -34,7 +34,7 @@
 </head>
 <body>
     <!-- Auth Status -->
-    <div class="auth-status">
+    <div id="auth-status" class="auth-status">
         <div id="user-info" style="display: none;">
             <span id="user-email"></span>
             <button id="upload-btn" class="auth-btn" onclick="window.location.href='upload.html'">
@@ -224,14 +224,14 @@
             const { data: { user }, error } = await supabase.auth.getUser();
             if (error) throw error;
             
-            const authStatus = document.getElementById('auth-status');
-            const uploadBtn = document.getElementById('upload-btn');
-            const logoutBtn = document.getElementById('logout-btn');
+            const userInfo = document.getElementById('user-info');
+            const loginInfo = document.getElementById('login-info');
+            const userEmail = document.getElementById('user-email');
             
             if (user) {
-                authStatus.textContent = `Logged in as: ${user.email}`;
-                uploadBtn.style.display = 'inline-block';
-                logoutBtn.style.display = 'inline-block';
+                userInfo.style.display = 'flex';
+                loginInfo.style.display = 'none';
+                userEmail.textContent = user.email;
                 
                 // Check if there's a model to load
                 const modelUrl = localStorage.getItem('selectedModel');
@@ -244,9 +244,8 @@
                     }
                 }
             } else {
-                authStatus.textContent = 'Not logged in';
-                uploadBtn.style.display = 'none';
-                logoutBtn.style.display = 'none';
+                userInfo.style.display = 'none';
+                loginInfo.style.display = 'flex';
             }
         } catch (error) {
             console.error('Auth check failed:', error);
