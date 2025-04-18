@@ -2363,7 +2363,7 @@ export async function loadModel(modelPath, materialType = null) {
         const model = await loader.loadAsync(modelPath);
 
         // Validate geometry
-        if (!validateGeometry(model)) {
+        if (!validateModelGeometry(model)) {
             throw new Error('Invalid model geometry');
         }
 
@@ -2394,7 +2394,7 @@ export async function loadModel(modelPath, materialType = null) {
 // Removed to fix duplicate declaration error
 
 // Helper function to validate geometry
-function validateGeometry(model) {
+function validateModelGeometry(model) {
     if (model.geometry) {
         return model.geometry.boundingBox && 
                model.geometry.boundingBox.min && 
