@@ -8,6 +8,8 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { Rhino3dmLoader } from 'three/addons/loaders/3DMLoader.js';
 import * as TWEEN from './lib/tween/tween.module.js';
+import { PLYLoader } from 'three/addons/loaders/PLYLoader.js';
+import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 
 // Initialize Three.js scene
 let scene, camera, renderer, controls;
@@ -2445,79 +2447,104 @@ function applyMaterialToModel(modelIndex, materialType) {
     renderer.render(scene, camera);
 }
 
-export async function loadModel(modelPath, materialType = null) {
+export async function loadModel(url) {
     try {
         showLoadingIndicator();
-
+        
         // Check if model is already loaded
-        const existingModel = loadedModels.find(m => m.path === modelPath);
-        if (existingModel) {
-            selectModel(existingModel.index);
-            hideLoadingIndicator();
-            return existingModel;
+        if (scene.getObjectByName(getFileNameFromPath(url))) {
+            throw new Error('Model already loaded');
         }
 
-        // Determine material type if not provided
-        if (!materialType) {
-            materialType = 'phong'; // Default material type
-        }
-
-        // Get appropriate loader for the file path
-        const loader = getLoaderForPath(modelPath);
+        // Get file extension and select appropriate loader
+        const extension = url.split('.').pop().toLowerCase();
+        const loader = getLoaderForPath(url);
         if (!loader) {
-            throw new Error('Unsupported file format');
+            throw new Error(`Unsupported file format: ${extension}`);
         }
 
         // Load the model
-        const result = await new Promise((resolve, reject) => {
-            loader.load(
-                modelPath,
-                (object) => resolve(object),
-                null,
-                (error) => reject(error)
-            );
-        });
-
-        // Process the loaded model
-        let model = {
-            path: modelPath,
-            name: getFileNameFromPath(modelPath),
-            object: result,
-            index: loadedModels.length,
-            materialType: materialType
-        };
-
-        // Apply materials and add to scene
-        if (result.scene) {
-            result.scene.traverse((child) => {
-                if (child.isMesh) {
-                    applyMaterial(child, materialType);
-                    validateGeometry(child.geometry);
-                }
-            });
-            AddModelToScene(result.scene);
-            model.object = result.scene;
-        } else if (result.isMesh) {
-            applyMaterial(result, materialType);
-            validateGeometry(result.geometry);
-            AddModelToScene(result);
-            model.object = result;
+        const model = await loader.loadAsync(url);
+        
+        // Validate geometry
+        if (!validateGeometry(model)) {
+            fixGeometryBounds(model);
         }
 
-        // Store model information
-        loadedModels.push(model);
-        updateModelList();
+        // Apply material based on file type
+        applyMaterial(model, extension);
 
-        // Position and scale the model
-        positionAndScaleModel(model.object, model);
+        // Add to scene and position
+        AddModelToScene(model);
+        positionAndScaleModel(model);
 
         hideLoadingIndicator();
         return model;
     } catch (error) {
         hideLoadingIndicator();
         console.error('Error loading model:', error);
-        showError('Failed to load model: ' + error.message);
         throw error;
+    }
+}
+
+// Helper function to get loader based on file extension
+function getLoaderForPath(path) {
+    const extension = path.split('.').pop().toLowerCase();
+    switch (extension) {
+        case 'glb':
+        case 'gltf':
+            return new GLTFLoader();
+        case 'obj':
+            return new OBJLoader();
+        case 'stl':
+            return new STLLoader();
+        case 'ply':
+            return new PLYLoader();
+        case 'fbx':
+            return new FBXLoader();
+        default:
+            return null;
+    }
+}
+
+// Helper function to validate geometry
+function validateGeometry(model) {
+    if (model.geometry) {
+        return model.geometry.boundingBox && 
+               model.geometry.boundingBox.min && 
+               model.geometry.boundingBox.max;
+    }
+    return false;
+}
+
+// Helper function to fix geometry bounds
+function fixGeometryBounds(model) {
+    if (model.geometry) {
+        model.geometry.computeBoundingBox();
+        model.geometry.computeBoundingSphere();
+    }
+}
+
+// Helper function to position and scale model
+function positionAndScaleModel(model) {
+    const box = new THREE.Box3().setFromObject(model);
+    const center = box.getCenter(new THREE.Vector3());
+    const size = box.getSize(new THREE.Vector3());
+    
+    // Center the model
+    model.position.sub(center);
+    
+    // Scale to fit in view
+    const maxDim = Math.max(size.x, size.y, size.z);
+    const scale = 1 / maxDim;
+    model.scale.setScalar(scale);
+    
+    // Update camera to fit model
+    const camera = scene.getObjectByName('camera');
+    if (camera) {
+        const distance = maxDim * 2;
+        camera.position.set(0, 0, distance);
+        camera.lookAt(0, 0, 0);
     }
 }
 

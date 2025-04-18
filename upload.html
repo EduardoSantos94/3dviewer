@@ -357,11 +357,205 @@
             }
 
             updateAuthUI(session);
-            updateEmptyState();
+            loadUserFiles(session.user.id);
         } catch (err) {
             console.error('Auth check failed:', err);
             window.location.href = 'login.html';
         }
+    }
+
+    // Load user's files from storage
+    async function loadUserFiles(userId) {
+        try {
+            const { data: files, error } = await supabaseClient
+                .from('user_files')
+                .select('*')
+                .eq('user_id', userId)
+                .order('created_at', { ascending: false });
+
+            if (error) throw error;
+
+            const fileList = document.getElementById('file-list');
+            fileList.innerHTML = '';
+
+            if (files && files.length > 0) {
+                files.forEach(file => {
+                    const fileItem = createFileItem(file);
+                    fileList.appendChild(fileItem);
+                });
+            }
+
+            updateEmptyState();
+        } catch (err) {
+            console.error('Error loading files:', err);
+            showError('Failed to load your files');
+        }
+    }
+
+    // Create a file item element
+    function createFileItem(file) {
+        const fileItem = document.createElement('div');
+        fileItem.className = 'file-item';
+        fileItem.innerHTML = `
+            <div class="file-info">
+                <i class="fas fa-cube file-icon"></i>
+                <div class="file-details">
+                    <span class="file-name">${file.name}</span>
+                    <span class="file-size">${formatFileSize(file.size)}</span>
+                </div>
+            </div>
+            <div class="file-actions">
+                <button class="file-action-btn" onclick="viewModel('${file.id}')">
+                    <i class="fas fa-eye"></i>
+                    View
+                </button>
+                <button class="file-action-btn delete" onclick="deleteModel('${file.id}')">
+                    <i class="fas fa-trash-alt"></i>
+                    Delete
+                </button>
+            </div>
+        `;
+        return fileItem;
+    }
+
+    // Handle file upload
+    async function uploadFile(file) {
+        try {
+            const { data: { session } } = await supabaseClient.auth.getSession();
+            if (!session) throw new Error('Not authenticated');
+
+            // Generate a unique file path
+            const fileExt = file.name.split('.').pop();
+            const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+            const filePath = `${session.user.id}/${fileName}`;
+
+            // Upload file to storage
+            const { data: uploadData, error: uploadError } = await supabaseClient.storage
+                .from('models')
+                .upload(filePath, file);
+
+            if (uploadError) throw uploadError;
+
+            // Get public URL
+            const { data: { publicUrl } } = supabaseClient.storage
+                .from('models')
+                .getPublicUrl(filePath);
+
+            // Save file metadata to database
+            const { data: fileData, error: dbError } = await supabaseClient
+                .from('user_files')
+                .insert([
+                    {
+                        user_id: session.user.id,
+                        name: file.name,
+                        size: file.size,
+                        path: filePath,
+                        url: publicUrl,
+                        type: file.type
+                    }
+                ])
+                .select()
+                .single();
+
+            if (dbError) throw dbError;
+
+            // Add file to UI
+            const fileList = document.getElementById('file-list');
+            const fileItem = createFileItem(fileData);
+            fileList.appendChild(fileItem);
+            updateEmptyState();
+
+            showSuccess('File uploaded successfully');
+        } catch (err) {
+            console.error('Upload error:', err);
+            showError('Failed to upload file');
+        }
+    }
+
+    // Delete model
+    async function deleteModel(fileId) {
+        if (!confirm('Are you sure you want to delete this model?')) return;
+
+        try {
+            const { data: { session } } = await supabaseClient.auth.getSession();
+            if (!session) throw new Error('Not authenticated');
+
+            // Get file metadata
+            const { data: file, error: fetchError } = await supabaseClient
+                .from('user_files')
+                .select('*')
+                .eq('id', fileId)
+                .single();
+
+            if (fetchError) throw fetchError;
+
+            // Delete from storage
+            const { error: storageError } = await supabaseClient.storage
+                .from('models')
+                .remove([file.path]);
+
+            if (storageError) throw storageError;
+
+            // Delete from database
+            const { error: dbError } = await supabaseClient
+                .from('user_files')
+                .delete()
+                .eq('id', fileId);
+
+            if (dbError) throw dbError;
+
+            // Remove from UI
+            const fileItems = document.querySelectorAll('.file-item');
+            fileItems.forEach(item => {
+                if (item.querySelector('.file-name').textContent === file.name) {
+                    item.remove();
+                }
+            });
+            updateEmptyState();
+
+            showSuccess('File deleted successfully');
+        } catch (err) {
+            console.error('Delete error:', err);
+            showError('Failed to delete file');
+        }
+    }
+
+    // View model in the viewer
+    async function viewModel(fileId) {
+        try {
+            const { data: file, error } = await supabaseClient
+                .from('user_files')
+                .select('*')
+                .eq('id', fileId)
+                .single();
+
+            if (error) throw error;
+
+            // Store the file URL in localStorage to load it in the viewer
+            localStorage.setItem('modelToLoad', file.url);
+            window.location.href = 'index.html';
+        } catch (err) {
+            console.error('Error getting file:', err);
+            showError('Failed to load file');
+        }
+    }
+
+    // Show error message
+    function showError(message) {
+        const errorDiv = document.createElement('div');
+        errorDiv.className = 'error-message';
+        errorDiv.textContent = message;
+        document.querySelector('.upload-box').insertBefore(errorDiv, document.querySelector('.upload-header'));
+        setTimeout(() => errorDiv.remove(), 5000);
+    }
+
+    // Show success message
+    function showSuccess(message) {
+        const successDiv = document.createElement('div');
+        successDiv.className = 'success-message';
+        successDiv.textContent = message;
+        document.querySelector('.upload-box').insertBefore(successDiv, document.querySelector('.upload-header'));
+        setTimeout(() => successDiv.remove(), 5000);
     }
 
     // Handle logout
@@ -494,61 +688,12 @@
         document.getElementById('upload-area').style.display = 'none';
     }
 
-    async function uploadFile(file) {
-        // Here you would implement the file upload logic to your server or storage
-        const fileList = document.getElementById('file-list');
-        const fileItem = document.createElement('div');
-        fileItem.className = 'file-item';
-        fileItem.innerHTML = `
-            <div class="file-info">
-                <i class="fas fa-cube file-icon"></i>
-                <div class="file-details">
-                    <span class="file-name">${file.name}</span>
-                    <span class="file-size">${formatFileSize(file.size)}</span>
-                </div>
-            </div>
-            <div class="file-actions">
-                <button class="file-action-btn" onclick="viewModel('${file.name}')">
-                    <i class="fas fa-eye"></i>
-                    View
-                </button>
-                <button class="file-action-btn delete" onclick="deleteModel('${file.name}')">
-                    <i class="fas fa-trash-alt"></i>
-                    Delete
-                </button>
-            </div>
-        `;
-        fileList.appendChild(fileItem);
-        updateEmptyState();
-    }
-
     function formatFileSize(bytes) {
         if (bytes === 0) return '0 Bytes';
         const k = 1024;
         const sizes = ['Bytes', 'KB', 'MB', 'GB'];
         const i = Math.floor(Math.log(bytes) / Math.log(k));
         return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-    }
-
-    // View model in the viewer
-    function viewModel(filename) {
-        // Store the filename in localStorage to load it in the viewer
-        localStorage.setItem('modelToLoad', filename);
-        window.location.href = 'index.html';
-    }
-
-    // Delete model
-    function deleteModel(filename) {
-        if (confirm('Are you sure you want to delete this model?')) {
-            // Here you would implement the deletion logic
-            const fileItems = document.querySelectorAll('.file-item');
-            fileItems.forEach(item => {
-                if (item.querySelector('.file-name').textContent === filename) {
-                    item.remove();
-                }
-            });
-            updateEmptyState();
-        }
     }
 
     // Initialize
