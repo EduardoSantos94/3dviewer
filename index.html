@@ -217,6 +217,77 @@
     const supabaseUrl = 'https://lwmcnwwkgdauqgxukwhn.supabase.co';
     const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx3bWNud3drZ2RhdXFneHVrd2huIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQ5NzcwNzcsImV4cCI6MjA2MDU1MzA3N30._NfRA6_3PL9JLEG9-X9P3Tzg5E59NuXtcmQzOdkraNE';
     const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // Initialize viewer and handle model loading
+    async function initializeViewer() {
+        try {
+            // Check if we're coming from the upload page
+            const viewerState = localStorage.getItem('viewerState');
+            const urlParams = new URLSearchParams(window.location.search);
+            const modelPath = urlParams.get('model');
+            
+            if (viewerState === 'fromUpload' && modelPath) {
+                // Hide frontpage immediately
+                const frontpage = document.getElementById('frontpage');
+                if (frontpage) {
+                    frontpage.style.display = 'none';
+                }
+                
+                // Show container
+                const container = document.querySelector('.container');
+                if (container) {
+                    container.style.display = 'block';
+                }
+                
+                // Get model URL from localStorage
+                const modelUrl = localStorage.getItem('selectedModel');
+                if (modelUrl) {
+                    try {
+                        await loadModel(modelUrl);
+                    } catch (error) {
+                        console.error('Failed to load model:', error);
+                        alert('Failed to load model. Please try again.');
+                    }
+                }
+                
+                // Clear the viewer state
+                localStorage.removeItem('viewerState');
+            }
+        } catch (error) {
+            console.error('Error initializing viewer:', error);
+        }
+    }
+
+    // Check authentication status
+    async function checkAuth() {
+        try {
+            const { data: { user }, error } = await supabase.auth.getUser();
+            if (error) throw error;
+            
+            const userInfo = document.getElementById('user-info');
+            const loginInfo = document.getElementById('login-info');
+            const userEmail = document.getElementById('user-email');
+            
+            if (!userInfo || !loginInfo || !userEmail) {
+                console.error('Required DOM elements not found');
+                return;
+            }
+            
+            if (user) {
+                userInfo.style.display = 'flex';
+                loginInfo.style.display = 'none';
+                userEmail.textContent = user.email;
+                
+                // Initialize viewer after auth check
+                await initializeViewer();
+            } else {
+                userInfo.style.display = 'none';
+                loginInfo.style.display = 'flex';
+            }
+        } catch (error) {
+            console.error('Auth check failed:', error);
+        }
+    }
     
     // Handle file selection
     document.getElementById('file-input')?.addEventListener('change', async (e) => {
@@ -244,11 +315,9 @@
                     upsert: false
                 });
             
-            if (error) {
-                throw error;
-            }
+            if (error) throw error;
             
-            // Get public URL
+            // Get signed URL
             const { data: urlData } = await supabase.storage
                 .from('client-files')
                 .createSignedUrl(data.path, 60 * 60); // 1 hour expiry
@@ -273,52 +342,6 @@
         }
     });
     
-    // Check authentication status
-    async function checkAuth() {
-        try {
-            const { data: { user }, error } = await supabase.auth.getUser();
-            if (error) throw error;
-            
-            const userInfo = document.getElementById('user-info');
-            const loginInfo = document.getElementById('login-info');
-            const userEmail = document.getElementById('user-email');
-            
-            if (!userInfo || !loginInfo || !userEmail) {
-                console.error('Required DOM elements not found');
-                return;
-            }
-            
-            if (user) {
-                userInfo.style.display = 'flex';
-                loginInfo.style.display = 'none';
-                userEmail.textContent = user.email;
-                
-                // Check if there's a model to load
-                const modelUrl = localStorage.getItem('selectedModel');
-                if (modelUrl) {
-                    try {
-                        // Verify URL is still valid
-                        const response = await fetch(modelUrl, { method: 'HEAD' });
-                        if (!response.ok) {
-                            // URL expired, remove it
-                            localStorage.removeItem('selectedModel');
-                            return;
-                        }
-                        await loadModel(modelUrl);
-                    } catch (error) {
-                        console.error('Failed to load model:', error);
-                        localStorage.removeItem('selectedModel');
-                    }
-                }
-            } else {
-                userInfo.style.display = 'none';
-                loginInfo.style.display = 'flex';
-            }
-        } catch (error) {
-            console.error('Auth check failed:', error);
-        }
-    }
-    
     // Handle logout
     document.getElementById('logout-btn')?.addEventListener('click', async () => {
         try {
@@ -326,13 +349,14 @@
             if (error) throw error;
             
             localStorage.removeItem('selectedModel');
+            localStorage.removeItem('viewerState');
             location.reload();
         } catch (error) {
             console.error('Logout failed:', error);
         }
     });
     
-    // Check auth on page load
+    // Initialize on page load
     document.addEventListener('DOMContentLoaded', () => {
         checkAuth();
     });

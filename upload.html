@@ -323,16 +323,18 @@
     }
     </style>
 
-    <script>
+    <script type="module">
+    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.3/+esm';
+    
     // Initialize Supabase client
     const supabaseUrl = 'https://lwmcnwwkgdauqgxukwhn.supabase.co';
     const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx3bWNud3drZ2RhdXFneHVrd2huIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQ5NzcwNzcsImV4cCI6MjA2MDU1MzA3N30._NfRA6_3PL9JLEG9-X9P3Tzg5E59NuXtcmQzOdkraNE';
-    const supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
+    const supabase = createClient(supabaseUrl, supabaseKey);
 
     // Check auth status and redirect if not logged in
     async function checkAuth() {
         try {
-            const { data: { session }, error } = await supabaseClient.auth.getSession();
+            const { data: { session }, error } = await supabase.auth.getSession();
             
             // If no session or error, redirect to login
             if (!session || error) {
@@ -346,7 +348,7 @@
             
             if (tokenExpiry <= now) {
                 // Token is expired, try to refresh
-                const { data: refreshData, error: refreshError } = await supabaseClient.auth.refreshSession();
+                const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
                 
                 if (refreshError || !refreshData.session) {
                     // If refresh fails, redirect to login
@@ -367,7 +369,7 @@
     // Load user's files from storage
     async function loadUserFiles(userId) {
         try {
-            const { data: files, error } = await supabaseClient
+            const { data: files, error } = await supabase
                 .from('user_files')
                 .select('*')
                 .eq('user_id', userId)
@@ -405,7 +407,7 @@
                 </div>
             </div>
             <div class="file-actions">
-                <button class="file-action-btn" onclick="viewModel('${file.id}')">
+                <button class="file-action-btn view-btn" data-model-path="${file.path}">
                     <i class="fas fa-eye"></i>
                     View
                 </button>
@@ -421,7 +423,7 @@
     // Handle file upload
     async function uploadFile(file) {
         try {
-            const { data: { session } } = await supabaseClient.auth.getSession();
+            const { data: { session } } = await supabase.auth.getSession();
             if (!session) throw new Error('Not authenticated');
 
             // Generate a unique file path
@@ -430,7 +432,7 @@
             const filePath = `${session.user.id}/${fileName}`;
 
             // Upload file to storage
-            const { data: uploadData, error: uploadError } = await supabaseClient.storage
+            const { data: uploadData, error: uploadError } = await supabase.storage
                 .from('client-files')
                 .upload(filePath, file);
 
@@ -440,12 +442,12 @@
             }
 
             // Get public URL
-            const { data: { publicUrl } } = supabaseClient.storage
+            const { data: { publicUrl } } = supabase.storage
                 .from('client-files')
                 .getPublicUrl(filePath);
 
             // Save file metadata to database
-            const { data: fileData, error: dbError } = await supabaseClient
+            const { data: fileData, error: dbError } = await supabase
                 .from('user_files')
                 .insert([
                     {
@@ -480,11 +482,11 @@
         if (!confirm('Are you sure you want to delete this model?')) return;
 
         try {
-            const { data: { session } } = await supabaseClient.auth.getSession();
+            const { data: { session } } = await supabase.auth.getSession();
             if (!session) throw new Error('Not authenticated');
 
             // Get file metadata
-            const { data: file, error: fetchError } = await supabaseClient
+            const { data: file, error: fetchError } = await supabase
                 .from('user_files')
                 .select('*')
                 .eq('id', fileId)
@@ -493,14 +495,14 @@
             if (fetchError) throw fetchError;
 
             // Delete from storage
-            const { error: storageError } = await supabaseClient.storage
+            const { error: storageError } = await supabase.storage
                 .from('client-files')
                 .remove([file.path]);
 
             if (storageError) throw storageError;
 
             // Delete from database
-            const { error: dbError } = await supabaseClient
+            const { error: dbError } = await supabase
                 .from('user_files')
                 .delete()
                 .eq('id', fileId);
@@ -524,22 +526,24 @@
     }
 
     // View model in the viewer
-    async function viewModel(fileId) {
+    async function handleViewClick(modelPath) {
         try {
-            const { data: file, error } = await supabaseClient
-                .from('user_files')
-                .select('*')
-                .eq('id', fileId)
-                .single();
+            // Get signed URL for the model
+            const { data: urlData, error: urlError } = await supabase.storage
+                .from('client-files')
+                .createSignedUrl(modelPath, 60 * 60); // 1 hour expiry
 
-            if (error) throw error;
+            if (urlError) throw urlError;
 
-            // Store the file URL in localStorage to load it in the viewer
-            localStorage.setItem('modelToLoad', file.url);
-            window.location.href = 'index.html';
-        } catch (err) {
-            console.error('Error getting file:', err);
-            showError('Failed to load file');
+            // Store model URL and viewing state
+            localStorage.setItem('selectedModel', urlData.signedUrl);
+            localStorage.setItem('viewerState', 'fromUpload');
+            
+            // Redirect to viewer with model ID
+            window.location.href = `index.html?model=${encodeURIComponent(modelPath)}`;
+        } catch (error) {
+            console.error('Error getting model URL:', error);
+            alert('Failed to view model. Please try again.');
         }
     }
 
@@ -564,7 +568,7 @@
     // Handle logout
     async function handleLogout() {
         try {
-            const { error } = await supabaseClient.auth.signOut();
+            const { error } = await supabase.auth.signOut();
             if (error) {
                 console.error('Logout error:', error.message);
                 return;
@@ -592,7 +596,7 @@
     }
 
     // Listen for auth state changes
-    supabaseClient.auth.onAuthStateChange((event, session) => {
+    supabase.auth.onAuthStateChange((event, session) => {
         if (event === 'SIGNED_OUT' || event === 'USER_DELETED') {
             window.location.href = 'login.html';
         } else if (event === 'SIGNED_IN') {
@@ -698,6 +702,14 @@
         const i = Math.floor(Math.log(bytes) / Math.log(k));
         return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
     }
+
+    // Add click handlers to view buttons
+    document.querySelectorAll('.view-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const modelPath = e.target.closest('.file-item').dataset.modelPath;
+            handleViewClick(modelPath);
+        });
+    });
 
     // Initialize
     document.addEventListener('DOMContentLoaded', () => {
