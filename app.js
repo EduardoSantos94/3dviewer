@@ -2447,7 +2447,7 @@ function applyMaterialToModel(modelIndex, materialType) {
     renderer.render(scene, camera);
 }
 
-export async function loadModel(url) {
+export async function loadModel(url, materialType = null) {
     try {
         showLoadingIndicator();
         
@@ -2459,6 +2459,7 @@ export async function loadModel(url) {
         // Get file extension and select appropriate loader
         const extension = url.split('.').pop().toLowerCase();
         const loader = getLoaderForPath(url);
+        
         if (!loader) {
             throw new Error(`Unsupported file format: ${extension}`);
         }
@@ -2468,21 +2469,29 @@ export async function loadModel(url) {
         
         // Validate geometry
         if (!validateGeometry(model)) {
-            fixGeometryBounds(model);
+            throw new Error('Invalid model geometry');
         }
 
-        // Apply material based on file type
-        applyMaterial(model, extension);
+        // Fix geometry bounds if needed
+        fixGeometryBounds(model);
+
+        // Apply material
+        if (materialType) {
+            applyMaterial(model, materialType);
+        }
 
         // Add to scene and position
         AddModelToScene(model);
         positionAndScaleModel(model);
 
+        // Update UI
+        updateModelListInSidebar();
         hideLoadingIndicator();
+
         return model;
     } catch (error) {
         hideLoadingIndicator();
-        console.error('Error loading model:', error);
+        showErrorMessage(error.message);
         throw error;
     }
 }

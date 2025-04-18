@@ -249,9 +249,14 @@ async function checkAuth() {
 
 // Update auth UI
 function updateAuthUI(session) {
-    document.getElementById('user-email').textContent = session.user.email;
-    document.getElementById('user-info').style.display = 'block';
-    document.getElementById('login-info').style.display = 'none';
+    const userInfo = document.getElementById('user-info');
+    const loginInfo = document.getElementById('login-info');
+    
+    if (userInfo && loginInfo) {
+        document.getElementById('user-email').textContent = session.user.email;
+        userInfo.style.display = 'block';
+        loginInfo.style.display = 'none';
+    }
 }
 
 // Handle logout
