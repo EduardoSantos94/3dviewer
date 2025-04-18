@@ -113,10 +113,29 @@ async function initRhino3dm() {
         console.log('Initializing rhino3dm...');
         
         // Check if rhino3dm is loaded
-        if (!isRhino3dmLoaded()) {
+        if (typeof rhino3dm === 'undefined') {
             console.error('rhino3dm.js is not loaded');
-            alert('Error: rhino3dm.js library not loaded. Please refresh the page and try again.');
-            return false;
+            // Try to load it dynamically
+            const script = document.createElement('script');
+            script.src = 'https://cdn.jsdelivr.net/npm/rhino3dm@7.15.0/rhino3dm.min.js';
+            document.head.appendChild(script);
+            
+            // Wait for script to load
+            await new Promise((resolve, reject) => {
+                script.onload = resolve;
+                script.onerror = () => reject(new Error('Failed to load rhino3dm.js'));
+            });
+        }
+        
+        // Wait for rhino3dm to be available
+        let attempts = 0;
+        while (typeof rhino3dm === 'undefined' && attempts < 10) {
+            await new Promise(resolve => setTimeout(resolve, 500));
+            attempts++;
+        }
+        
+        if (typeof rhino3dm === 'undefined') {
+            throw new Error('rhino3dm failed to load after multiple attempts');
         }
         
         // Initialize rhino3dm
@@ -126,7 +145,7 @@ async function initRhino3dm() {
         return true;
     } catch (error) {
         console.error('Failed to initialize rhino3dm:', error);
-        alert('Failed to initialize rhino3dm. Please refresh the page and try again.');
+        showErrorMessage('Failed to initialize 3D model loader. Please refresh the page and try again.');
         return false;
     }
 }
@@ -2348,7 +2367,60 @@ export async function loadModel(modelPath, materialType = null) {
         // Clear any existing models
         ClearScene();
         
-        // Load the model
+        // Get the file extension
+        const extension = modelPath.split('.').pop().toLowerCase();
+        
+        // Special handling for 3DM files
+        if (extension === '3dm') {
+            // Initialize Rhino3dm if not already initialized
+            const initialized = await initRhino3dm();
+            if (!initialized) {
+                throw new Error('Failed to initialize Rhino3dm');
+            }
+            
+            // Create and configure the loader
+            const loader = new Rhino3dmLoader();
+            loader.setLibraryPath('https://cdn.jsdelivr.net/npm/rhino3dm@7.15.0/');
+            loader.setWorkerLimit(1);
+            
+            // Load the model
+            const model = await new Promise((resolve, reject) => {
+                loader.load(modelPath, 
+                    (object) => resolve(object),
+                    (progress) => {
+                        const percent = Math.round((progress.loaded / progress.total) * 100);
+                        console.log(`Loading progress: ${percent}%`);
+                        // Update progress bar if it exists
+                        const progressBar = document.getElementById('progress');
+                        if (progressBar) {
+                            progressBar.style.width = `${percent}%`;
+                        }
+                    },
+                    (error) => reject(error)
+                );
+            });
+            
+            // Add model to scene
+            AddModelToScene(model);
+            
+            // Apply material if specified
+            if (materialType) {
+                applyMaterial(model, materialType);
+            }
+            
+            // Update UI
+            updateModelListInSidebar();
+            
+            // Hide loading elements and show viewer
+            hideLoadingIndicator();
+            document.getElementById('frontpage').style.display = 'none';
+            document.getElementById('drop-zone').style.display = 'none';
+            document.querySelector('.container').style.display = 'block';
+            
+            return model;
+        }
+        
+        // For other file formats
         const loader = getLoaderForPath(modelPath);
         if (!loader) {
             throw new Error('Unsupported file format');
@@ -2356,38 +2428,29 @@ export async function loadModel(modelPath, materialType = null) {
         
         const model = await loader.loadAsync(modelPath);
         
-        // Validate geometry
-        if (!validateModelGeometry(model)) {
-            throw new Error('Invalid model geometry');
-        }
-        
-        // Fix bounds if needed
-        fixModelBounds(model);
+        // Add model to scene
+        AddModelToScene(model);
         
         // Apply material if specified
         if (materialType) {
             applyMaterial(model, materialType);
         }
         
-        // Add model to scene
-        AddModelToScene(model);
-        
-        // Position and scale the model
-        fitModelToView(model);
-        
         // Update UI
         updateModelListInSidebar();
         
-        // Hide loading indicator and show viewer
+        // Hide loading elements and show viewer
         hideLoadingIndicator();
         document.getElementById('frontpage').style.display = 'none';
         document.getElementById('drop-zone').style.display = 'none';
-        document.getElementById('container').style.display = 'block';
+        document.querySelector('.container').style.display = 'block';
         
+        return model;
     } catch (error) {
         console.error('Error loading model:', error);
         showErrorMessage(`Failed to load model: ${error.message}`);
         hideLoadingIndicator();
+        throw error;
     }
 }
 
