@@ -2379,7 +2379,7 @@ export async function loadModel(modelPath, materialType = null) {
         AddModelToScene(model);
 
         // Position and scale the model
-        positionAndScaleModel(model);
+        centerModel(model);
 
         // Update UI
         updateModelListInSidebar();
@@ -2412,7 +2412,30 @@ function fixModelBounds(model) {
 }
 
 // Helper function to position and scale model
-function positionAndScaleModel(model) {
+function centerModel(model) {
+    const box = new THREE.Box3().setFromObject(model);
+    const center = box.getCenter(new THREE.Vector3());
+    const size = box.getSize(new THREE.Vector3());
+    
+    // Center the model
+    model.position.sub(center);
+    
+    // Scale to fit in view
+    const maxDim = Math.max(size.x, size.y, size.z);
+    const scale = 1 / maxDim;
+    model.scale.setScalar(scale);
+    
+    // Update camera to fit model
+    const camera = scene.getObjectByName('camera');
+    if (camera) {
+        const distance = maxDim * 2;
+        camera.position.set(0, 0, distance);
+        camera.lookAt(0, 0, 0);
+    }
+}
+
+// ... existing code ...
+function centerModel(model) {
     const box = new THREE.Box3().setFromObject(model);
     const center = box.getCenter(new THREE.Vector3());
     const size = box.getSize(new THREE.Vector3());
