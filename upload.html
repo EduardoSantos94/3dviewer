@@ -431,14 +431,17 @@
 
             // Upload file to storage
             const { data: uploadData, error: uploadError } = await supabaseClient.storage
-                .from('models')
+                .from('client-files')
                 .upload(filePath, file);
 
-            if (uploadError) throw uploadError;
+            if (uploadError) {
+                console.error('Upload error:', uploadError);
+                throw new Error(`Failed to upload file: ${uploadError.message}`);
+            }
 
             // Get public URL
             const { data: { publicUrl } } = supabaseClient.storage
-                .from('models')
+                .from('client-files')
                 .getPublicUrl(filePath);
 
             // Save file metadata to database
@@ -491,7 +494,7 @@
 
             // Delete from storage
             const { error: storageError } = await supabaseClient.storage
-                .from('models')
+                .from('client-files')
                 .remove([file.path]);
 
             if (storageError) throw storageError;
