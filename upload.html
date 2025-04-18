@@ -38,7 +38,7 @@
 
             <header class="upload-header">
                 <h1>Your 3D Models</h1>
-                <button id="add-files-btn" class="add-files-btn">
+                <button id="add-files-btn" class="add-files-btn" onclick="showUploadArea()">
                     <i class="fas fa-plus"></i>
                     Add Files
                 </button>
@@ -49,7 +49,7 @@
                     <i class="fas fa-cloud-upload-alt"></i>
                     <h2>Drop your files here</h2>
                     <p>or</p>
-                    <button class="select-files-btn">
+                    <button class="select-files-btn" onclick="document.getElementById('file-input').click()">
                         <i class="fas fa-folder-open"></i>
                         Select Files
                     </button>
@@ -68,7 +68,7 @@
                 <div id="empty-state" class="empty-state">
                     <i class="fas fa-cube"></i>
                     <p>No files uploaded yet</p>
-                    <button class="add-files-btn-secondary" onclick="showUploadArea()">
+                    <button class="add-files-btn-secondary" onclick="showUploadArea(true)">
                         Add Your First Model
                     </button>
                 </div>
@@ -152,14 +152,23 @@
         color: white;
         border: none;
         padding: 0.75rem 1.5rem;
-        border-radius: 8px;
+        border-radius: 12px;
         font-size: 1rem;
         cursor: pointer;
         transition: all 0.2s ease;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
     }
 
     .add-files-btn-secondary:hover {
         background-color: #004499;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 8px rgba(0, 102, 204, 0.2);
+    }
+
+    .add-files-btn-secondary i {
+        font-size: 1.25rem;
     }
 
     .drop-zone {
@@ -185,38 +194,99 @@
     .file-item {
         display: flex;
         align-items: center;
-        padding: 1rem;
-        background-color: #f5f5f7;
+        padding: 1rem 1.5rem;
+        background-color: #f8f9fa;
         border-radius: 12px;
         margin-bottom: 0.75rem;
         transition: all 0.2s ease;
+        justify-content: space-between;
     }
 
     .file-item:hover {
-        background-color: #e5e5e7;
+        background-color: #f0f0f0;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
     }
 
-    .file-item i {
+    .file-info {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        flex: 1;
+    }
+
+    .file-icon {
         color: #06c;
-        font-size: 1.25rem;
-        margin-right: 1rem;
+        font-size: 1.5rem;
+    }
+
+    .file-details {
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+    }
+
+    .file-name {
+        color: #1d1d1f;
+        font-weight: 500;
+    }
+
+    .file-size {
+        color: #86868b;
+        font-size: 0.875rem;
+    }
+
+    .file-actions {
+        display: flex;
+        gap: 0.75rem;
+    }
+
+    .file-action-btn {
+        background: none;
+        border: none;
+        padding: 0.5rem;
+        border-radius: 8px;
+        color: #06c;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.875rem;
+    }
+
+    .file-action-btn:hover {
+        background-color: rgba(0, 102, 204, 0.1);
+        transform: translateY(-1px);
+    }
+
+    .file-action-btn.delete {
+        color: #ff3b30;
+    }
+
+    .file-action-btn.delete:hover {
+        background-color: rgba(255, 59, 48, 0.1);
     }
 
     .empty-state {
         text-align: center;
         padding: 4rem 2rem;
         color: #86868b;
+        background-color: #f5f5f7;
+        border-radius: 16px;
+        margin-top: 2rem;
     }
 
     .empty-state i {
-        font-size: 3rem;
-        margin-bottom: 1rem;
+        font-size: 3.5rem;
+        margin-bottom: 1.5rem;
         color: #06c;
     }
 
     .empty-state p {
-        margin-bottom: 1.5rem;
+        margin-bottom: 2rem;
         font-size: 1.1rem;
+        color: #1d1d1f;
     }
 
     .auth-status {
@@ -421,19 +491,32 @@
     function handleFiles(e) {
         const files = [...e.target.files];
         files.forEach(uploadFile);
-        toggleUploadArea(); // Hide upload area after files are selected
+        document.getElementById('upload-area').style.display = 'none';
     }
 
     async function uploadFile(file) {
         // Here you would implement the file upload logic to your server or storage
-        // For now, we'll just add it to the list
         const fileList = document.getElementById('file-list');
         const fileItem = document.createElement('div');
         fileItem.className = 'file-item';
         fileItem.innerHTML = `
-            <i class="fas fa-cube"></i>
-            <span>${file.name}</span>
-            <span class="file-size">${formatFileSize(file.size)}</span>
+            <div class="file-info">
+                <i class="fas fa-cube file-icon"></i>
+                <div class="file-details">
+                    <span class="file-name">${file.name}</span>
+                    <span class="file-size">${formatFileSize(file.size)}</span>
+                </div>
+            </div>
+            <div class="file-actions">
+                <button class="file-action-btn" onclick="viewModel('${file.name}')">
+                    <i class="fas fa-eye"></i>
+                    View
+                </button>
+                <button class="file-action-btn delete" onclick="deleteModel('${file.name}')">
+                    <i class="fas fa-trash-alt"></i>
+                    Delete
+                </button>
+            </div>
         `;
         fileList.appendChild(fileItem);
         updateEmptyState();
@@ -445,6 +528,27 @@
         const sizes = ['Bytes', 'KB', 'MB', 'GB'];
         const i = Math.floor(Math.log(bytes) / Math.log(k));
         return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+
+    // View model in the viewer
+    function viewModel(filename) {
+        // Store the filename in localStorage to load it in the viewer
+        localStorage.setItem('modelToLoad', filename);
+        window.location.href = 'index.html';
+    }
+
+    // Delete model
+    function deleteModel(filename) {
+        if (confirm('Are you sure you want to delete this model?')) {
+            // Here you would implement the deletion logic
+            const fileItems = document.querySelectorAll('.file-item');
+            fileItems.forEach(item => {
+                if (item.querySelector('.file-name').textContent === filename) {
+                    item.remove();
+                }
+            });
+            updateEmptyState();
+        }
     }
 
     // Initialize

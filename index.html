@@ -231,6 +231,20 @@ document.addEventListener('DOMContentLoaded', () => {
     checkAndUpdateAuthStatus();
     document.getElementById('logout-btn')?.addEventListener('click', handleLogout);
 });
+
+document.addEventListener('DOMContentLoaded', async () => {
+    // Check if there's a model to load from the upload page
+    const modelToLoad = localStorage.getItem('modelToLoad');
+    if (modelToLoad) {
+        // Clear the storage so it doesn't load again on refresh
+        localStorage.removeItem('modelToLoad');
+        // Hide the frontpage
+        document.querySelector('.frontpage').style.display = 'none';
+        document.querySelector('.container').style.display = 'block';
+        // Load the model
+        await loadModel(modelToLoad);
+    }
+});
 </script>
 </body>
 </html> 
