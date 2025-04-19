@@ -331,6 +331,12 @@
     const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx3bWNud3drZ2RhdXFneHVrd2huIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQ5NzcwNzcsImV4cCI6MjA2MDU1MzA3N30._NfRA6_3PL9JLEG9-X9P3Tzg5E59NuXtcmQzOdkraNE';
     const supabase = createClient(supabaseUrl, supabaseKey);
 
+    // Make supabase globally available
+    window.supabase = supabase;
+
+    // Store current session globally
+    let currentSession = null;
+
     // Check auth status and redirect if not logged in
     async function checkAuth() {
         try {
@@ -342,6 +348,9 @@
                 return;
             }
 
+            // Store session globally
+            currentSession = session;
+
             // Check if token is expired
             const tokenExpiry = new Date(session.expires_at * 1000);
             const now = new Date();
@@ -351,14 +360,14 @@
                 const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
                 
                 if (refreshError || !refreshData.session) {
-                    // If refresh fails, redirect to login
                     console.log('Session refresh failed:', refreshError?.message);
                     window.location.href = 'login.html';
                     return;
                 }
+                currentSession = refreshData.session;
             }
 
-            updateAuthUI(session);
+            updateAuthUI(currentSession);
             updateFileList();
         } catch (err) {
             console.error('Auth check failed:', err);
@@ -372,9 +381,13 @@
         const emptyState = document.getElementById('empty-state');
         
         try {
+            if (!currentSession?.user?.id) {
+                throw new Error('No active session');
+            }
+
             const { data: files, error } = await supabase.storage
                 .from('models')
-                .list(session.user.id + '/');
+                .list(currentSession.user.id + '/');
 
             if (error) throw error;
 
@@ -390,7 +403,7 @@
             fileList.innerHTML = files.map(file => {
                 // Extract original filename by removing timestamp-random prefix
                 const originalFilename = file.name.replace(/^\d+-[a-z0-9]+\./, '');
-                const fileUrl = supabase.storage.from('models').getPublicUrl(session.user.id + '/' + file.name).data.publicUrl;
+                const fileUrl = supabase.storage.from('models').getPublicUrl(currentSession.user.id + '/' + file.name).data.publicUrl;
                 
                 return `
                     <div class="file-item">
@@ -403,7 +416,7 @@
                                 <i class="fas fa-eye"></i>
                                 View
                             </button>
-                            <button onclick="deleteFile('${file.name}')" class="action-btn delete-btn">
+                            <button onclick="window.deleteFile('${file.name}')" class="action-btn delete-btn">
                                 <i class="fas fa-trash"></i>
                                 Delete
                             </button>
@@ -417,221 +430,8 @@
         }
     }
 
-    // Handle file upload
-    async function uploadFile(file) {
-        try {
-            const { data: { session } } = await supabase.auth.getSession();
-            if (!session) throw new Error('Not authenticated');
-
-            // Generate a unique file path
-            const fileExt = file.name.split('.').pop();
-            const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
-            const filePath = `${session.user.id}/${fileName}`;
-
-            // Show upload progress
-            const progressBar = document.querySelector('.upload-progress');
-            progressBar.style.display = 'block';
-
-            // Upload file to storage
-            const { data: uploadData, error: uploadError } = await supabase.storage
-                .from('client-files')
-                .upload(filePath, file);
-
-            if (uploadError) {
-                console.error('Upload error:', uploadError);
-                throw new Error(`Failed to upload file: ${uploadError.message}`);
-            }
-
-            // Get public URL
-            const { data: { publicUrl } } = supabase.storage
-                .from('client-files')
-                .getPublicUrl(filePath);
-
-            // Save file metadata to database
-            const { data: fileData, error: dbError } = await supabase
-                .from('user_files')
-                .insert([
-                    {
-                        user_id: session.user.id,
-                        name: file.name,
-                        size: file.size,
-                        path: filePath,
-                        url: publicUrl,
-                        type: file.type
-                    }
-                ])
-                .select()
-                .single();
-
-            if (dbError) throw dbError;
-
-            // Add file to UI
-            const fileList = document.getElementById('file-list');
-            const fileItem = createFileItem(fileData);
-            fileList.appendChild(fileItem);
-            updateEmptyState();
-
-            showSuccess('File uploaded successfully');
-        } catch (err) {
-            console.error('Upload error:', err);
-            showError('Failed to upload file');
-        }
-    }
-
-    // Delete model
-    async function deleteModel(fileId) {
-        if (!confirm('Are you sure you want to delete this model?')) return;
-
-        try {
-            const { data: { session } } = await supabase.auth.getSession();
-            if (!session) throw new Error('Not authenticated');
-
-            // Get file metadata
-            const { data: file, error: fetchError } = await supabase
-                .from('user_files')
-                .select('*')
-                .eq('id', fileId)
-                .single();
-
-            if (fetchError) throw fetchError;
-
-            // Delete from storage
-            const { error: storageError } = await supabase.storage
-                .from('client-files')
-                .remove([file.path]);
-
-            if (storageError) throw storageError;
-
-            // Delete from database
-            const { error: dbError } = await supabase
-                .from('user_files')
-                .delete()
-                .eq('id', fileId);
-
-            if (dbError) throw dbError;
-
-            // Remove from UI
-            const fileItems = document.querySelectorAll('.file-item');
-            fileItems.forEach(item => {
-                if (item.querySelector('.file-name').textContent === file.name) {
-                    item.remove();
-                }
-            });
-            updateEmptyState();
-
-            showSuccess('File deleted successfully');
-        } catch (err) {
-            console.error('Delete error:', err);
-            showError('Failed to delete file');
-        }
-    }
-
-    // View model in the viewer
-    async function handleViewClick(filePath, fileUrl) {
-        try {
-            // Show loading indicator
-            const loadingIndicator = document.getElementById('loading-indicator');
-            if (loadingIndicator) {
-                loadingIndicator.style.display = 'flex';
-            }
-
-            // Get fresh signed URL for the model
-            const { data: { signedUrl }, error: urlError } = await supabase.storage
-                .from('client-files')
-                .createSignedUrl(filePath, 3600); // 1 hour expiry
-
-            if (urlError) throw urlError;
-
-            // Store model URL and viewing state
-            localStorage.setItem('selectedModel', signedUrl);
-            localStorage.setItem('viewerState', 'fromUpload');
-            
-            // Redirect to viewer with model URL
-            window.location.href = `index.html?model=${encodeURIComponent(signedUrl)}`;
-        } catch (error) {
-            console.error('Error getting model URL:', error);
-            showError('Failed to view model. Please try again.');
-        } finally {
-            // Hide loading indicator
-            const loadingIndicator = document.getElementById('loading-indicator');
-            if (loadingIndicator) {
-                loadingIndicator.style.display = 'none';
-            }
-        }
-    }
-
-    // Show error message
-    function showError(message) {
-        const errorDiv = document.createElement('div');
-        errorDiv.className = 'error-message';
-        errorDiv.textContent = message;
-        document.querySelector('.upload-box').insertBefore(errorDiv, document.querySelector('.upload-header'));
-        setTimeout(() => errorDiv.remove(), 5000);
-    }
-
-    // Show success message
-    function showSuccess(message) {
-        const successDiv = document.createElement('div');
-        successDiv.className = 'success-message';
-        successDiv.textContent = message;
-        document.querySelector('.upload-box').insertBefore(successDiv, document.querySelector('.upload-header'));
-        setTimeout(() => successDiv.remove(), 5000);
-    }
-
-    // Handle logout
-    async function handleLogout() {
-        try {
-            const { error } = await supabase.auth.signOut();
-            if (error) {
-                console.error('Logout error:', error.message);
-                return;
-            }
-            window.location.href = 'login.html';
-        } catch (err) {
-            console.error('Logout failed:', err);
-        }
-    }
-
-    // Update auth UI
-    function updateAuthUI(session) {
-        const userInfo = document.getElementById('user-info');
-        const loginInfo = document.getElementById('login-info');
-        const userEmail = document.getElementById('user-email');
-
-        if (session?.user) {
-            userEmail.textContent = session.user.email;
-            userInfo.style.display = 'flex';
-            loginInfo.style.display = 'none';
-        } else {
-            userInfo.style.display = 'none';
-            loginInfo.style.display = 'flex';
-        }
-    }
-
-    // Listen for auth state changes
-    supabase.auth.onAuthStateChange((event, session) => {
-        if (event === 'SIGNED_OUT' || event === 'USER_DELETED') {
-            window.location.href = 'login.html';
-        } else if (event === 'SIGNED_IN') {
-            updateAuthUI(session);
-            updateEmptyState();
-        }
-    });
-
-    // Update empty state visibility
-    function updateEmptyState() {
-        const fileList = document.getElementById('file-list');
-        const emptyState = document.getElementById('empty-state');
-        
-        if (fileList.children.length === 0) {
-            emptyState.style.display = 'block';
-        } else {
-            emptyState.style.display = 'none';
-        }
-    }
-
-    // Show/hide upload area
-    function showUploadArea(forceShow = false) {
+    // Make functions globally available
+    window.showUploadArea = function(forceShow = false) {
         const uploadArea = document.getElementById('upload-area');
         if (forceShow || uploadArea.style.display === 'none') {
             uploadArea.style.display = 'block';
@@ -639,7 +439,59 @@
         } else {
             uploadArea.style.display = 'none';
         }
-    }
+    };
+
+    window.deleteFile = async function(fileName) {
+        if (!confirm('Are you sure you want to delete this file?')) return;
+        
+        try {
+            if (!currentSession?.user?.id) throw new Error('No active session');
+
+            const { error } = await supabase.storage
+                .from('models')
+                .remove([`${currentSession.user.id}/${fileName}`]);
+
+            if (error) throw error;
+
+            await updateFileList();
+            showSuccess('File deleted successfully');
+        } catch (err) {
+            console.error('Delete error:', err);
+            showError('Failed to delete file');
+        }
+    };
+
+    window.uploadFile = async function(file) {
+        try {
+            if (!currentSession?.user?.id) throw new Error('No active session');
+
+            // Generate a unique file path
+            const fileExt = file.name.split('.').pop();
+            const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+            const filePath = `${currentSession.user.id}/${fileName}`;
+
+            // Show upload progress
+            const progressBar = document.querySelector('.upload-progress');
+            progressBar.style.display = 'block';
+
+            // Upload file
+            const { error: uploadError } = await supabase.storage
+                .from('models')
+                .upload(filePath, file);
+
+            if (uploadError) throw uploadError;
+
+            await updateFileList();
+            showSuccess('File uploaded successfully');
+        } catch (err) {
+            console.error('Upload error:', err);
+            showError('Failed to upload file');
+        } finally {
+            // Hide progress bar
+            const progressBar = document.querySelector('.upload-progress');
+            progressBar.style.display = 'none';
+        }
+    };
 
     // Setup drop zone event handlers
     function setupDropZone() {
@@ -666,11 +518,11 @@
         
         // Handle file input change
         fileInput.addEventListener('change', (e) => {
-            handleFiles(e.target.files);
+            handleFiles(Array.from(e.target.files));
         });
     }
 
-    function preventDefaults (e) {
+    function preventDefaults(e) {
         e.preventDefault();
         e.stopPropagation();
     }
@@ -685,12 +537,12 @@
 
     function handleDrop(e) {
         const dt = e.dataTransfer;
-        const files = dt.files;
+        const files = Array.from(dt.files);
         handleFiles(files);
     }
 
     function handleFiles(files) {
-        files.forEach(uploadFile);
+        files.forEach(window.uploadFile);
         document.getElementById('upload-area').style.display = 'none';
     }
 
@@ -702,13 +554,70 @@
         return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
     }
 
+    function showError(message) {
+        const errorDiv = document.createElement('div');
+        errorDiv.className = 'error-message';
+        errorDiv.innerHTML = `
+            <div class="error-content">
+                <i class="fas fa-exclamation-circle"></i>
+                <h3>Error</h3>
+                <p>${message}</p>
+                <button onclick="this.closest('.error-message').remove()">Close</button>
+            </div>
+        `;
+        document.body.appendChild(errorDiv);
+    }
+
+    function showSuccess(message) {
+        const successDiv = document.createElement('div');
+        successDiv.className = 'success-message';
+        successDiv.textContent = message;
+        document.querySelector('.upload-box').insertBefore(successDiv, document.querySelector('.upload-header'));
+        setTimeout(() => successDiv.remove(), 5000);
+    }
+
+    // Update auth UI
+    function updateAuthUI(session) {
+        const userInfo = document.getElementById('user-info');
+        const loginInfo = document.getElementById('login-info');
+        const userEmail = document.getElementById('user-email');
+
+        if (session?.user) {
+            userEmail.textContent = session.user.email;
+            userInfo.style.display = 'flex';
+            loginInfo.style.display = 'none';
+        } else {
+            userInfo.style.display = 'none';
+            loginInfo.style.display = 'flex';
+        }
+    }
+
     // Initialize
     document.addEventListener('DOMContentLoaded', () => {
         checkAuth();
         setupDropZone();
-        document.getElementById('logout-btn')?.addEventListener('click', handleLogout);
+        document.getElementById('logout-btn')?.addEventListener('click', async () => {
+            try {
+                const { error } = await supabase.auth.signOut();
+                if (error) throw error;
+                window.location.href = 'login.html';
+            } catch (err) {
+                console.error('Logout failed:', err);
+                showError('Failed to logout');
+            }
+        });
+    });
+
+    // Listen for auth state changes
+    supabase.auth.onAuthStateChange((event, session) => {
+        currentSession = session;
+        if (event === 'SIGNED_OUT' || event === 'USER_DELETED') {
+            window.location.href = 'login.html';
+        } else if (event === 'SIGNED_IN') {
+            updateAuthUI(session);
+            updateFileList();
+        }
     });
     </script>
 </body>
-</html> 
 </html> 
