@@ -38,7 +38,7 @@
 
             <header class="upload-header">
                 <h1>Your 3D Models</h1>
-                <button id="add-files-btn" class="add-files-btn" onclick="showUploadArea()">
+                <button id="add-files-btn" class="add-files-btn">
                     <i class="fas fa-plus"></i>
                     Add Files
                 </button>
@@ -49,7 +49,7 @@
                     <i class="fas fa-cloud-upload-alt"></i>
                     <h2>Drop your files here</h2>
                     <p>or</p>
-                    <button class="select-files-btn" onclick="document.getElementById('file-input').click()">
+                    <button class="select-files-btn" id="select-files-btn">
                         <i class="fas fa-folder-open"></i>
                         Select Files
                     </button>
@@ -68,7 +68,7 @@
                 <div id="empty-state" class="empty-state">
                     <i class="fas fa-cube"></i>
                     <p>No files uploaded yet</p>
-                    <button class="add-files-btn-secondary" onclick="showUploadArea(true)">
+                    <button class="add-files-btn-secondary" id="add-first-model-btn">
                         Add Your First Model
                     </button>
                 </div>
@@ -337,42 +337,58 @@
     // Store current session globally
     let currentSession = null;
 
+    // Initialize the page
+    async function initializePage() {
+        await checkAuth();
+        setupEventListeners();
+        await updateFileList();
+    }
+
     // Check auth status and redirect if not logged in
     async function checkAuth() {
         try {
             const { data: { session }, error } = await supabase.auth.getSession();
             
-            // If no session or error, redirect to login
             if (!session || error) {
                 window.location.href = 'login.html';
                 return;
             }
 
-            // Store session globally
             currentSession = session;
-
-            // Check if token is expired
-            const tokenExpiry = new Date(session.expires_at * 1000);
-            const now = new Date();
-            
-            if (tokenExpiry <= now) {
-                // Token is expired, try to refresh
-                const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
-                
-                if (refreshError || !refreshData.session) {
-                    console.log('Session refresh failed:', refreshError?.message);
-                    window.location.href = 'login.html';
-                    return;
-                }
-                currentSession = refreshData.session;
-            }
-
-            updateAuthUI(currentSession);
-            updateFileList();
+            updateAuthUI(session);
         } catch (err) {
             console.error('Auth check failed:', err);
             window.location.href = 'login.html';
         }
+    }
+
+    // Setup all event listeners
+    function setupEventListeners() {
+        // Add Files button
+        document.getElementById('add-files-btn').addEventListener('click', () => {
+            const uploadArea = document.getElementById('upload-area');
+            uploadArea.style.display = uploadArea.style.display === 'none' ? 'block' : 'none';
+            setupDropZone();
+        });
+
+        // Add First Model button
+        document.getElementById('add-first-model-btn').addEventListener('click', () => {
+            document.getElementById('upload-area').style.display = 'block';
+            setupDropZone();
+        });
+
+        // Select Files button
+        document.getElementById('select-files-btn').addEventListener('click', () => {
+            document.getElementById('file-input').click();
+        });
+
+        // File Input change
+        document.getElementById('file-input').addEventListener('change', (e) => {
+            handleFiles(Array.from(e.target.files));
+        });
+
+        // Logout button
+        document.getElementById('logout-btn')?.addEventListener('click', handleLogout);
     }
 
     // Load user's files from storage
@@ -386,14 +402,14 @@
             }
 
             const { data: files, error } = await supabase.storage
-                .from('models')
+                .from('client-files')
                 .list(currentSession.user.id + '/');
 
             if (error) throw error;
 
             if (!files || files.length === 0) {
                 fileList.style.display = 'none';
-                emptyState.style.display = 'flex';
+                emptyState.style.display = 'block';
                 return;
             }
 
@@ -401,22 +417,26 @@
             emptyState.style.display = 'none';
             
             fileList.innerHTML = files.map(file => {
-                // Extract original filename by removing timestamp-random prefix
                 const originalFilename = file.name.replace(/^\d+-[a-z0-9]+\./, '');
-                const fileUrl = supabase.storage.from('models').getPublicUrl(currentSession.user.id + '/' + file.name).data.publicUrl;
+                const fileUrl = supabase.storage
+                    .from('client-files')
+                    .getPublicUrl(currentSession.user.id + '/' + file.name).data.publicUrl;
                 
                 return `
                     <div class="file-item">
                         <div class="file-info">
-                            <span class="file-name">${originalFilename}</span>
-                            <span class="file-size">${formatFileSize(file.metadata.size)}</span>
+                            <i class="fas fa-cube"></i>
+                            <div class="file-details">
+                                <span class="file-name">${originalFilename}</span>
+                                <span class="file-size">${formatFileSize(file.metadata.size)}</span>
+                            </div>
                         </div>
                         <div class="file-actions">
-                            <button onclick="window.location.href='index.html?model=${encodeURIComponent(fileUrl)}&filename=${encodeURIComponent(originalFilename)}'" class="action-btn view-btn">
+                            <button class="file-action-btn" onclick="window.location.href='index.html?model=${encodeURIComponent(fileUrl)}&filename=${encodeURIComponent(originalFilename)}'">
                                 <i class="fas fa-eye"></i>
                                 View
                             </button>
-                            <button onclick="window.deleteFile('${file.name}')" class="action-btn delete-btn">
+                            <button class="file-action-btn delete" data-filename="${file.name}">
                                 <i class="fas fa-trash"></i>
                                 Delete
                             </button>
@@ -424,48 +444,22 @@
                     </div>
                 `;
             }).join('');
+
+            // Add delete button event listeners
+            document.querySelectorAll('.delete').forEach(button => {
+                button.addEventListener('click', () => deleteFile(button.dataset.filename));
+            });
         } catch (error) {
             console.error('Error fetching files:', error);
             showError('Failed to load files');
         }
     }
 
-    // Make functions globally available
-    window.showUploadArea = function(forceShow = false) {
-        const uploadArea = document.getElementById('upload-area');
-        if (forceShow || uploadArea.style.display === 'none') {
-            uploadArea.style.display = 'block';
-            setupDropZone(); // Ensure drop zone is initialized
-        } else {
-            uploadArea.style.display = 'none';
-        }
-    };
-
-    window.deleteFile = async function(fileName) {
-        if (!confirm('Are you sure you want to delete this file?')) return;
-        
+    // Handle file upload
+    async function uploadFile(file) {
         try {
             if (!currentSession?.user?.id) throw new Error('No active session');
 
-            const { error } = await supabase.storage
-                .from('models')
-                .remove([`${currentSession.user.id}/${fileName}`]);
-
-            if (error) throw error;
-
-            await updateFileList();
-            showSuccess('File deleted successfully');
-        } catch (err) {
-            console.error('Delete error:', err);
-            showError('Failed to delete file');
-        }
-    };
-
-    window.uploadFile = async function(file) {
-        try {
-            if (!currentSession?.user?.id) throw new Error('No active session');
-
-            // Generate a unique file path
             const fileExt = file.name.split('.').pop();
             const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
             const filePath = `${currentSession.user.id}/${fileName}`;
@@ -474,9 +468,8 @@
             const progressBar = document.querySelector('.upload-progress');
             progressBar.style.display = 'block';
 
-            // Upload file
             const { error: uploadError } = await supabase.storage
-                .from('models')
+                .from('client-files')
                 .upload(filePath, file);
 
             if (uploadError) throw uploadError;
@@ -487,24 +480,53 @@
             console.error('Upload error:', err);
             showError('Failed to upload file');
         } finally {
-            // Hide progress bar
             const progressBar = document.querySelector('.upload-progress');
             progressBar.style.display = 'none';
         }
-    };
+    }
 
-    // Setup drop zone event handlers
+    // Delete file
+    async function deleteFile(fileName) {
+        if (!confirm('Are you sure you want to delete this file?')) return;
+        
+        try {
+            if (!currentSession?.user?.id) throw new Error('No active session');
+
+            const { error } = await supabase.storage
+                .from('client-files')
+                .remove([`${currentSession.user.id}/${fileName}`]);
+
+            if (error) throw error;
+
+            await updateFileList();
+            showSuccess('File deleted successfully');
+        } catch (err) {
+            console.error('Delete error:', err);
+            showError('Failed to delete file');
+        }
+    }
+
+    // Handle logout
+    async function handleLogout() {
+        try {
+            const { error } = await supabase.auth.signOut();
+            if (error) throw error;
+            window.location.href = 'login.html';
+        } catch (err) {
+            console.error('Logout failed:', err);
+            showError('Failed to logout');
+        }
+    }
+
+    // Setup drop zone
     function setupDropZone() {
         const dropZone = document.getElementById('upload-drop-zone');
-        const fileInput = document.getElementById('file-input');
 
-        // Prevent default drag behaviors
         ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
             dropZone.addEventListener(eventName, preventDefaults, false);
             document.body.addEventListener(eventName, preventDefaults, false);
         });
 
-        // Highlight drop zone when item is dragged over it
         ['dragenter', 'dragover'].forEach(eventName => {
             dropZone.addEventListener(eventName, highlight, false);
         });
@@ -513,13 +535,7 @@
             dropZone.addEventListener(eventName, unhighlight, false);
         });
 
-        // Handle dropped files
         dropZone.addEventListener('drop', handleDrop, false);
-        
-        // Handle file input change
-        fileInput.addEventListener('change', (e) => {
-            handleFiles(Array.from(e.target.files));
-        });
     }
 
     function preventDefaults(e) {
@@ -542,10 +558,27 @@
     }
 
     function handleFiles(files) {
-        files.forEach(window.uploadFile);
+        files.forEach(uploadFile);
         document.getElementById('upload-area').style.display = 'none';
     }
 
+    // Update auth UI
+    function updateAuthUI(session) {
+        const userInfo = document.getElementById('user-info');
+        const loginInfo = document.getElementById('login-info');
+        const userEmail = document.getElementById('user-email');
+
+        if (session?.user) {
+            userEmail.textContent = session.user.email;
+            userInfo.style.display = 'flex';
+            loginInfo.style.display = 'none';
+        } else {
+            userInfo.style.display = 'none';
+            loginInfo.style.display = 'flex';
+        }
+    }
+
+    // Utility functions
     function formatFileSize(bytes) {
         if (bytes === 0) return '0 Bytes';
         const k = 1024;
@@ -576,38 +609,6 @@
         setTimeout(() => successDiv.remove(), 5000);
     }
 
-    // Update auth UI
-    function updateAuthUI(session) {
-        const userInfo = document.getElementById('user-info');
-        const loginInfo = document.getElementById('login-info');
-        const userEmail = document.getElementById('user-email');
-
-        if (session?.user) {
-            userEmail.textContent = session.user.email;
-            userInfo.style.display = 'flex';
-            loginInfo.style.display = 'none';
-        } else {
-            userInfo.style.display = 'none';
-            loginInfo.style.display = 'flex';
-        }
-    }
-
-    // Initialize
-    document.addEventListener('DOMContentLoaded', () => {
-        checkAuth();
-        setupDropZone();
-        document.getElementById('logout-btn')?.addEventListener('click', async () => {
-            try {
-                const { error } = await supabase.auth.signOut();
-                if (error) throw error;
-                window.location.href = 'login.html';
-            } catch (err) {
-                console.error('Logout failed:', err);
-                showError('Failed to logout');
-            }
-        });
-    });
-
     // Listen for auth state changes
     supabase.auth.onAuthStateChange((event, session) => {
         currentSession = session;
@@ -618,6 +619,9 @@
             updateFileList();
         }
     });
+
+    // Initialize the page
+    initializePage();
     </script>
 </body>
 </html> 
