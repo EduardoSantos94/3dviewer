@@ -2456,6 +2456,8 @@ export async function loadModel(modelInfo, materialType = null) {
         // Get the file extension
         const extension = filename.split('.').pop().toLowerCase();
         
+        let loadedModel;
+        
         // Special handling for 3DM files
         if (extension === '3dm') {
             // Initialize Rhino3dm if not already initialized
@@ -2470,7 +2472,7 @@ export async function loadModel(modelInfo, materialType = null) {
             loader.setWorkerLimit(1);
             
             // Load the model
-            const model = await new Promise((resolve, reject) => {
+            loadedModel = await new Promise((resolve, reject) => {
                 loader.load(modelPath, 
                     (object) => resolve(object),
                     (progress) => {
@@ -2485,45 +2487,34 @@ export async function loadModel(modelInfo, materialType = null) {
                     (error) => reject(error)
                 );
             });
-            
-            // Add model to scene
-            AddModelToScene(model);
-            
-            // Apply material if specified
-            if (materialType) {
-                applyMaterial(model, materialType);
+        } else {
+            // For other file formats
+            const loader = getLoaderForFile(filename);
+            if (!loader) {
+                throw new Error(`Unsupported file format: ${extension}`);
             }
-            
-            // Update UI
-            updateModelListInSidebar();
-            
-            // Hide loading elements and show viewer
-            hideLoadingIndicator();
-            document.getElementById('frontpage').style.display = 'none';
-            document.getElementById('drop-zone').style.display = 'none';
-            document.querySelector('.container').style.display = 'block';
-            
-            return model;
+            loadedModel = await loader.loadAsync(modelPath);
         }
-        
-        // For other file formats
-        const loader = getLoaderForFile(filename);
-        if (!loader) {
-            throw new Error(`Unsupported file format: ${extension}`);
-        }
-        
-        const model = await loader.loadAsync(modelPath);
         
         // Add model to scene
-        AddModelToScene(model);
+        AddModelToScene(loadedModel);
         
         // Apply material if specified
         if (materialType) {
-            applyMaterial(model, materialType);
+            applyMaterial(loadedModel, materialType);
         }
         
+        // Add to models array
+        models.push({
+            name: filename,
+            object: loadedModel,
+            visible: true,
+            selected: true,
+            materialType: materialType || 'gold'
+        });
+        
         // Update UI
-        updateModelListInSidebar();
+        updateLoadedModelsUI();
         
         // Hide loading elements and show viewer
         hideLoadingIndicator();
@@ -2531,7 +2522,7 @@ export async function loadModel(modelInfo, materialType = null) {
         document.getElementById('drop-zone').style.display = 'none';
         document.querySelector('.container').style.display = 'block';
         
-        return model;
+        return loadedModel;
     } catch (error) {
         console.error('Error loading model:', error);
         showErrorMessage(`Failed to load model: ${error.message}`);
