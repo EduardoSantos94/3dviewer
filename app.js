@@ -2499,10 +2499,21 @@ export async function loadModel(modelInfo) {
     if (loadingContainer) loadingContainer.style.display = 'flex';
 
     try {
-        // Get filename and extension
-        const filename = modelInfo.filename || modelUrl.split('/').pop().split('?')[0];
-        const extension = filename.split('.').pop().toLowerCase();
+        // Get filename and ensure it has an extension
+        let filename = modelInfo.filename;
+        if (!filename || !filename.includes('.')) {
+            // Try to extract extension from URL
+            const urlExtension = modelUrl.split('.').pop().toLowerCase();
+            if (['3dm', 'obj', 'stl', 'glb', 'gltf'].includes(urlExtension)) {
+                filename = `model.${urlExtension}`;
+            } else {
+                throw new Error('Unable to determine file type - no valid extension found');
+            }
+        }
 
+        // Get the extension
+        const extension = filename.split('.').pop().toLowerCase();
+        
         console.log('Processing file:', { filename, extension });
 
         // Get the appropriate loader

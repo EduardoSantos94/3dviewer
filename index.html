@@ -314,7 +314,7 @@
     async function checkForModelUrl() {
         const urlParams = new URLSearchParams(window.location.search);
         const modelUrl = urlParams.get('model');
-        const filename = urlParams.get('filename');
+        let filename = urlParams.get('filename');
         
         if (modelUrl) {
             try {
@@ -339,13 +339,23 @@
                     Authorization: `Bearer ${session.access_token}`
                 };
 
-                // Extract file extension from filename
-                const fileExtension = filename.split('.').pop().toLowerCase();
+                // Ensure we have a valid filename with extension
+                if (!filename || !filename.includes('.')) {
+                    // Try to extract extension from URL
+                    const urlExtension = decodedUrl.split('.').pop().toLowerCase();
+                    if (['3dm', 'obj', 'stl', 'glb', 'gltf'].includes(urlExtension)) {
+                        filename = `model.${urlExtension}`;
+                    } else {
+                        filename = 'model.3dm'; // Default fallback
+                    }
+                }
+
+                console.log('Loading model with:', { url: decodedUrl, filename });
 
                 // Load the model with authentication and proper filename
                 await window.loadModel({ 
                     url: decodedUrl,
-                    filename: filename || 'model.' + fileExtension, // Use original filename or fallback with extension
+                    filename: filename,
                     headers: authHeaders
                 });
 
