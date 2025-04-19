@@ -235,6 +235,37 @@
         }
     }
 
+    // Check for model URL parameter
+    async function checkForModelUrl() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const modelUrl = urlParams.get('model');
+        
+        if (modelUrl) {
+            try {
+                // Hide frontpage and show loading indicator
+                const frontpage = document.getElementById('frontpage');
+                const loadingIndicator = document.getElementById('loading-indicator');
+                const container = document.querySelector('.container');
+                
+                if (frontpage) frontpage.style.display = 'none';
+                if (loadingIndicator) loadingIndicator.style.display = 'flex';
+                if (container) container.style.display = 'flex';
+
+                // Load the model
+                const decodedUrl = decodeURIComponent(modelUrl);
+                await window.loadModel({ url: decodedUrl });
+
+                // Hide loading indicator
+                if (loadingIndicator) loadingIndicator.style.display = 'none';
+            } catch (error) {
+                console.error('Error loading model:', error);
+                const loadingIndicator = document.getElementById('loading-indicator');
+                if (loadingIndicator) loadingIndicator.style.display = 'none';
+                showErrorMessage('Failed to load model. Please try again.');
+            }
+        }
+    }
+
     try {
         const supabase = createClient(supabaseUrl, supabaseKey);
 
@@ -255,6 +286,8 @@
         // Check initial session
         supabase.auth.getSession().then(({ data: { session } }) => {
             updateAuthUI(session);
+            // Check for model URL after auth is initialized
+            checkForModelUrl();
         });
     } catch (error) {
         console.error('Failed to initialize Supabase:', error);
