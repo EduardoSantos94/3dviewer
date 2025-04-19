@@ -776,28 +776,28 @@
     }
 
     // Update the viewFile function to use signed URLs
-    async function viewFile(fileName, originalFilename, signedUrl) {
+    async function viewFile(fileName, originalFilename) {
         try {
-            if (!currentSession?.user?.id) {
-                throw new Error('No active session');
+            if (!currentSession?.user?.id) throw new Error('No active session');
+
+            // Get the file extension
+            const fileType = originalFilename.split('.').pop().toLowerCase();
+            if (!['3dm', 'obj', 'stl', 'glb', 'gltf'].includes(fileType)) {
+                throw new Error(`Unsupported file type: ${fileType}`);
             }
 
-            console.log('View file request:', {
-                fileName,
-                originalFilename,
-                signedUrl
-            });
+            // Get public URL for the file
+            const { data: publicUrlData } = await supabase.storage
+                .from('client-files')
+                .getPublicUrl(`${currentSession.user.id}/${fileName}`);
 
-            // Create viewer URL with all necessary information
-            const viewerUrl = `index.html?model=${encodeURIComponent(signedUrl)}&filename=${encodeURIComponent(originalFilename)}`;
-            
-            console.log('Opening viewer with URL:', {
-                signedUrl,
-                filename: originalFilename
-            });
+            if (!publicUrlData?.publicUrl) {
+                throw new Error('Failed to get public URL for file');
+            }
 
-            // Open in new tab
-            window.open(viewerUrl, '_blank');
+            // Construct viewer URL with file type
+            const viewerUrl = `index.html?model=${encodeURIComponent(publicUrlData.publicUrl)}&filename=${encodeURIComponent(originalFilename)}&type=${encodeURIComponent(fileType)}`;
+            window.location.href = viewerUrl;
         } catch (error) {
             console.error('Error viewing file:', error);
             showErrorMessage('Failed to view file: ' + error.message);

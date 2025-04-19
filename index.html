@@ -376,6 +376,15 @@
             // Check for model URL after auth is initialized
             checkForModelUrl();
         });
+
+        // Make a test request to validate the token
+        const { error: testError } = await supabase.storage
+            .from('client-files')
+            .list(session.user.id + '/', { limit: 1 });
+
+        if (testError?.message?.includes('401')) {
+            throw new Error('Invalid session');
+        }
     } catch (error) {
         console.error('Failed to initialize Supabase:', error);
     }

@@ -540,7 +540,7 @@ function setupEventListeners() {
             if (files && files.length > 0) {
                 // Force hide dropzone here to ensure UI is consistent
                 const dropZone = document.getElementById('drop-zone');
-                if (dropZone) {
+    if (dropZone) {
                     dropZone.style.display = 'none';
                 }
                 
@@ -761,7 +761,7 @@ function getLoaderForPath(path) {
 // Update the processOtherFile function to fix Content Security Policy issues when loading OBJ files
 async function processOtherFile(file) {
     try {
-        const loader = getLoaderForFile(file.name);
+            const loader = getLoaderForFile(file.name);
         if (!loader) {
             throw new Error(`Unsupported file format: ${file.name.split('.').pop()}`);
         }
@@ -816,8 +816,8 @@ async function processOtherFile(file) {
                         console.error(`Error parsing OBJ content: ${error.message || 'Unknown error'}`);
                         reject(new Error(`Failed to parse ${file.name}: ${error.message || 'Unknown error'}`));
                     }
-                });
-            } catch (error) {
+                    });
+                } catch (error) {
                 console.error(`Error reading OBJ file: ${error.message || 'Unknown error'}`);
                 throw new Error(`Failed to read ${file.name}: ${error.message || 'Unknown error'}`);
             }
