@@ -671,11 +671,13 @@
 
             if (emptyState) emptyState.style.display = 'none';
             
-            // Process files
+            // Process files with improved filename handling
             const fileItems = await Promise.all(files.map(async file => {
                 try {
-                    // Get the original filename from metadata or fallback to stored name
-                    const originalFilename = file.metadata?.originalName || file.name.split('-').slice(1).join('-');
+                    // Get the original filename from metadata or parse from name
+                    const originalFilename = file.metadata?.originalName || 
+                        (file.name.includes('-') ? file.name.split('-').slice(1).join('-') : file.name);
+                    
                     const sizeInMB = (file.metadata?.size || file.size || 0) / (1024 * 1024);
                     const formattedSize = sizeInMB.toFixed(2);
                     
@@ -695,8 +697,6 @@
                         console.error('Error getting signed URL:', signedUrlError);
                         throw signedUrlError;
                     }
-
-                    const signedUrl = signedUrlData.signedUrl;
 
                     return `
                         <div class="file-item">
@@ -746,7 +746,7 @@
         }
     }
 
-    // Update the uploadFile function to properly handle filenames and errors
+    // Update the uploadFile function to properly handle filenames and metadata
     async function uploadFile(file) {
         const progressBar = document.querySelector('.upload-progress');
         const progressBarFill = progressBar?.querySelector('.progress-bar');
@@ -768,7 +768,7 @@
                 throw new Error(`Unsupported file type: ${fileExt}`);
             }
 
-            // Keep original filename but prefix with timestamp for uniqueness
+            // Generate timestamp for unique filename
             const timestamp = Date.now();
             const originalName = file.name;
             const fileName = `${timestamp}-${originalName}`;
@@ -788,16 +788,18 @@
             if (progressBarFill) progressBarFill.style.width = '0%';
             if (progressText) progressText.textContent = 'Preparing upload...';
 
-            // Upload options with metadata
+            // Upload options with improved metadata
             const options = {
                 cacheControl: '3600',
                 upsert: true,
-                contentType: file.type || 'application/octet-stream',
+                contentType: getMimeType(fileExt),
                 duplex: 'half',
                 metadata: {
                     originalName,
-                    fileType: fileExt.substring(1), // Store without the dot
-                    size: file.size
+                    fileType: fileExt.substring(1),
+                    size: file.size,
+                    uploadedBy: currentSession.user.id,
+                    uploadedAt: new Date().toISOString()
                 }
             };
 
@@ -830,6 +832,18 @@
         }
     }
 
+    // Helper function to get correct MIME type
+    function getMimeType(extension) {
+        const mimeTypes = {
+            '.3dm': 'application/x-3dm',
+            '.obj': 'model/obj',
+            '.stl': 'model/stl',
+            '.glb': 'model/gltf-binary',
+            '.gltf': 'model/gltf+json'
+        };
+        return mimeTypes[extension.toLowerCase()] || 'application/octet-stream';
+    }
+
     // Update the viewFile function to properly handle file viewing
     async function viewFile(fileName, originalFilename) {
         try {
@@ -841,17 +855,32 @@
                 throw new Error(`Unsupported file type: ${fileType}`);
             }
 
-            // Get a signed URL for the file
-            const { data: signedUrlData, error: signedUrlError } = await supabase.storage
-                .from('client-files')
-                .createSignedUrl(`${currentSession.user.id}/${fileName}`, 3600);
+            // First try to get a public URL (if bucket is public)
+            let modelUrl;
+            try {
+                const { data: publicUrlData } = await supabase.storage
+                    .from('client-files')
+                    .getPublicUrl(`${currentSession.user.id}/${fileName}`);
+                
+                modelUrl = publicUrlData.publicUrl;
+                console.log('Using public URL:', modelUrl);
+            } catch (publicUrlError) {
+                console.log('Public URL not available, trying signed URL');
+                // If public URL fails, try signed URL
+                const { data: signedUrlData, error: signedUrlError } = await supabase.storage
+                    .from('client-files')
+                    .createSignedUrl(`${currentSession.user.id}/${fileName}`, 3600);
 
-            if (signedUrlError) throw signedUrlError;
-            if (!signedUrlData?.signedUrl) throw new Error('Failed to get signed URL for file');
+                if (signedUrlError) throw signedUrlError;
+                if (!signedUrlData?.signedUrl) throw new Error('Failed to get signed URL for file');
+                
+                modelUrl = signedUrlData.signedUrl;
+                console.log('Using signed URL:', modelUrl);
+            }
 
             // Construct viewer URL with all necessary parameters
             const viewerUrl = new URL('index.html', window.location.origin);
-            viewerUrl.searchParams.set('model', signedUrlData.signedUrl);
+            viewerUrl.searchParams.set('model', modelUrl);
             viewerUrl.searchParams.set('filename', originalFilename);
             viewerUrl.searchParams.set('type', fileType);
 
@@ -860,7 +889,7 @@
                 filename: originalFilename,
                 type: fileType
             });
-            
+
             // Use replace instead of href to prevent back button issues
             window.location.replace(viewerUrl.toString());
         } catch (error) {
