@@ -5,12 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="Content-Security-Policy" content="
         default-src 'self';
-        script-src 'self' 'unsafe-eval' 'unsafe-inline' https://unpkg.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://files.mcneel.com blob:;
-        style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com;
+        script-src 'self' 'unsafe-eval' 'unsafe-inline' https://unpkg.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://www.googletagmanager.com https://www.google-analytics.com blob:;
+        style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com;
         font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com;
-        connect-src 'self' https://cdn.jsdelivr.net https://unpkg.com https://cdnjs.cloudflare.com https://files.mcneel.com https://*.supabase.co wss://*.supabase.co https://www.google-analytics.com data: blob:;
-        img-src 'self' data: blob: https://*.supabase.co;
+        connect-src 'self' https://*.supabase.co wss://*.supabase.co https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://www.google-analytics.com https://unpkg.com;
+        img-src 'self' data: blob: https://*.supabase.co https://www.google-analytics.com;
         worker-src 'self' blob:;
+        child-src 'self' blob:;
     ">
     <title>Upload Models - Jewelry Viewer</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -388,17 +389,34 @@
     let currentSession = null;
     let refreshTimer = null;
 
-    // Initialize the page with bucket creation
+    // Initialize the page with improved error handling
     async function initializePage() {
+        const loadingOverlay = document.getElementById('loading-overlay');
+        if (loadingOverlay) loadingOverlay.classList.add('active');
+        
         try {
-            await checkAuth();
+            // First check authentication
+            const isAuthenticated = await checkAuth();
+            if (!isAuthenticated) return;
+
+            // Then initialize storage
             await initializeStorage();
+            
+            // Setup event listeners
             setupEventListeners();
+            
+            // Load initial file list
             await updateFileList();
+            
+            // Setup session refresh
             setupSessionRefresh();
+            
+            console.log('Page initialized successfully');
         } catch (error) {
             console.error('Failed to initialize page:', error);
             showErrorMessage('Failed to initialize page: ' + error.message);
+        } finally {
+            if (loadingOverlay) loadingOverlay.classList.remove('active');
         }
     }
 
@@ -433,7 +451,8 @@
             if (error) throw error;
             
             if (!session) {
-                window.location.href = 'login.html';
+                console.log('No active session, redirecting to login');
+                window.location.replace('login.html');
                 return;
             }
 
@@ -445,18 +464,21 @@
                     .list(session.user.id + '/', { limit: 1 });
 
                 if (testError?.message?.includes('401')) {
-                    throw new Error('Invalid session');
+                    console.log('Session invalid, attempting refresh');
+                    const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+                    
+                    if (refreshError || !refreshData.session) {
+                        throw new Error('Session refresh failed');
+                    }
+                    
+                    currentSession = refreshData.session;
+                    console.log('Session refreshed successfully');
+                } else if (testError) {
+                    throw testError;
                 }
             } catch (validationError) {
                 console.error('Session validation failed:', validationError);
-                // Try to refresh the session
-                const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
-                
-                if (refreshError || !refreshData.session) {
-                    throw new Error('Session expired. Please login again.');
-                }
-                
-                currentSession = refreshData.session;
+                throw new Error('Session validation failed. Please login again.');
             }
 
             // If we get here, the session is valid
@@ -466,14 +488,16 @@
             // Broadcast session update to other tabs
             localStorage.setItem('lastSessionUpdate', Date.now().toString());
             
+            return true;
         } catch (err) {
             console.error('Auth check failed:', err);
             showErrorMessage(err.message);
-            window.location.href = 'login.html';
+            window.location.replace('login.html');
+            return false;
         }
     }
 
-    // Setup session refresh
+    // Setup session refresh with improved error handling
     function setupSessionRefresh() {
         // Clear any existing refresh timer
         if (refreshTimer) {
@@ -493,6 +517,7 @@
                     
                     // Refresh if token will expire in less than 15 minutes
                     if (timeUntilExpiry <= 15 * 60 * 1000) {
+                        console.log('Session nearing expiry, refreshing...');
                         const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
                         if (refreshError) throw refreshError;
                         
@@ -500,14 +525,17 @@
                             currentSession = refreshData.session;
                             updateAuthUI(currentSession);
                             localStorage.setItem('lastSessionUpdate', Date.now().toString());
+                            console.log('Session refreshed successfully');
                         }
                     }
+                } else {
+                    throw new Error('No active session');
                 }
             } catch (err) {
                 console.error('Session refresh failed:', err);
                 // Only redirect if the error is auth-related
                 if (err.message.includes('auth') || err.message.includes('session')) {
-                    window.location.href = 'login.html';
+                    window.location.replace('login.html');
                 }
             }
         }, 10 * 60 * 1000); // 10 minutes
@@ -597,17 +625,17 @@
                     sortBy: { column: 'name', order: 'desc' }
                 });
 
+            if (error) {
+                console.error('List error:', error);
+                throw error;
+            }
+
             console.log('Storage list response:', {
                 files,
                 error,
                 path: userPath,
                 bucket: 'client-files'
             });
-
-            if (error) {
-                console.error('List error:', error);
-                throw error;
-            }
 
             // Handle empty state
             if (!files || files.length === 0) {
@@ -635,7 +663,7 @@
                     });
 
                     // Get a signed URL for the file
-                    const { data: { signedUrl }, error: signedUrlError } = await supabase.storage
+                    const { data: signedUrlData, error: signedUrlError } = await supabase.storage
                         .from('client-files')
                         .createSignedUrl(`${userPath}${file.name}`, 3600); // 1 hour expiry
 
@@ -643,6 +671,8 @@
                         console.error('Error getting signed URL:', signedUrlError);
                         throw signedUrlError;
                     }
+
+                    const signedUrl = signedUrlData.signedUrl;
 
                     return `
                         <div class="file-item">
@@ -692,8 +722,12 @@
         }
     }
 
-    // Update the uploadFile function to properly handle filenames
+    // Update the uploadFile function to properly handle filenames and errors
     async function uploadFile(file) {
+        const progressBar = document.querySelector('.upload-progress');
+        const progressBarFill = progressBar?.querySelector('.progress-bar');
+        const progressText = progressBar?.querySelector('.progress-text');
+
         try {
             if (!currentSession?.user?.id) throw new Error('No active session');
 
@@ -726,9 +760,6 @@
             });
 
             // Show upload progress
-            const progressBar = document.querySelector('.upload-progress');
-            const progressBarFill = progressBar?.querySelector('.progress-bar');
-            const progressText = progressBar?.querySelector('.progress-text');
             if (progressBar) progressBar.style.display = 'block';
             if (progressBarFill) progressBarFill.style.width = '0%';
             if (progressText) progressText.textContent = 'Preparing upload...';
@@ -741,7 +772,8 @@
                 duplex: 'half',
                 metadata: {
                     originalName,
-                    fileType: fileExt.substring(1) // Store without the dot
+                    fileType: fileExt.substring(1), // Store without the dot
+                    size: file.size
                 }
             };
 
@@ -770,13 +802,12 @@
             console.error('Upload error:', err);
             showErrorMessage(err.message || 'Failed to upload file');
         } finally {
-            const progressBar = document.querySelector('.upload-progress');
             if (progressBar) progressBar.style.display = 'none';
         }
     }
 
-    // Update the viewFile function to use signed URLs
-    async function viewFile(fileName, originalFilename) {
+    // Update the viewFile function to properly handle file viewing
+    async function viewFile(fileName, originalFilename, signedUrl) {
         try {
             if (!currentSession?.user?.id) throw new Error('No active session');
 
@@ -786,25 +817,29 @@
                 throw new Error(`Unsupported file type: ${fileType}`);
             }
 
-            // Get public URL for the file
-            const { data: publicUrlData } = await supabase.storage
-                .from('client-files')
-                .getPublicUrl(`${currentSession.user.id}/${fileName}`);
+            // Use the signed URL if provided, otherwise get a new one
+            let fileUrl = signedUrl;
+            if (!fileUrl) {
+                const { data: urlData, error: urlError } = await supabase.storage
+                    .from('client-files')
+                    .createSignedUrl(`${currentSession.user.id}/${fileName}`, 3600);
 
-            if (!publicUrlData?.publicUrl) {
-                throw new Error('Failed to get public URL for file');
+                if (urlError) throw urlError;
+                fileUrl = urlData.signedUrl;
             }
 
-            // Construct viewer URL with file type
-            const viewerUrl = `index.html?model=${encodeURIComponent(publicUrlData.publicUrl)}&filename=${encodeURIComponent(originalFilename)}&type=${encodeURIComponent(fileType)}`;
-            window.location.href = viewerUrl;
+            // Construct viewer URL with all necessary parameters
+            const viewerUrl = `index.html?model=${encodeURIComponent(fileUrl)}&filename=${encodeURIComponent(originalFilename)}&type=${encodeURIComponent(fileType)}`;
+            
+            // Use replace instead of href to prevent back button issues
+            window.location.replace(viewerUrl);
         } catch (error) {
             console.error('Error viewing file:', error);
             showErrorMessage('Failed to view file: ' + error.message);
         }
     }
 
-    // Update the deleteFile function to use the correct bucket
+    // Update the deleteFile function to properly handle deletion and UI updates
     async function deleteFile(fileName) {
         try {
             if (!currentSession?.user?.id) {
@@ -817,7 +852,7 @@
 
             if (error) throw error;
 
-            showSuccessMessage('File deleted successfully');
+            showSuccess('File deleted successfully');
             await updateFileList();
         } catch (error) {
             console.error('Error deleting file:', error);
