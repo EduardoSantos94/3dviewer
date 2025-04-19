@@ -369,6 +369,12 @@
         border-radius: 8px;
         box-shadow: 0 2px 10px rgba(0,0,0,0.1);
     }
+
+    #upload-area {
+        opacity: 0;
+        transform: translateY(-10px);
+        transition: opacity 0.3s ease, transform 0.3s ease;
+    }
     </style>
 
     <script type="module">
@@ -548,14 +554,15 @@
         });
     }
 
-    // Setup all event listeners
+    // Setup all event listeners with improved handling
     function setupEventListeners() {
         // Add Files button
         const addFilesBtn = document.getElementById('add-files-btn');
         if (addFilesBtn) {
             addFilesBtn.addEventListener('click', () => {
                 const uploadArea = document.getElementById('upload-area');
-                toggleUploadArea(uploadArea.style.display === 'none');
+                const isShowing = uploadArea.style.display === 'block';
+                toggleUploadArea(!isShowing);
             });
         }
 
@@ -570,7 +577,9 @@
         // Select Files button
         const selectFilesBtn = document.getElementById('select-files-btn');
         if (selectFilesBtn) {
-            selectFilesBtn.addEventListener('click', () => {
+            selectFilesBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
                 document.getElementById('file-input').click();
             });
         }
@@ -583,6 +592,8 @@
                 if (files.length > 0) {
                     handleFiles(files);
                 }
+                // Reset the input to allow selecting the same file again
+                e.target.value = '';
             });
         }
 
@@ -594,6 +605,19 @@
 
         // Setup drop zone
         setupDropZone();
+
+        // Add click event for the entire document to handle closing upload area
+        document.addEventListener('click', (e) => {
+            const uploadArea = document.getElementById('upload-area');
+            const addFilesBtn = document.getElementById('add-files-btn');
+            
+            // If clicking outside upload area and not on add files button, close upload area
+            if (uploadArea && uploadArea.style.display === 'block' &&
+                !uploadArea.contains(e.target) && 
+                !addFilesBtn.contains(e.target)) {
+                toggleUploadArea(false);
+            }
+        });
     }
 
     // Load user's files from storage with loading state
@@ -651,7 +675,7 @@
             const fileItems = await Promise.all(files.map(async file => {
                 try {
                     // Get the original filename from metadata or fallback to stored name
-                    const originalFilename = file.metadata?.originalName || file.name.substring(file.name.indexOf('-') + 1);
+                    const originalFilename = file.metadata?.originalName || file.name.split('-').slice(1).join('-');
                     const sizeInMB = (file.metadata?.size || file.size || 0) / (1024 * 1024);
                     const formattedSize = sizeInMB.toFixed(2);
                     
@@ -684,7 +708,7 @@
                                 </div>
                             </div>
                             <div class="file-actions">
-                                <button onclick="viewFile('${file.name}', '${originalFilename}', '${signedUrl}')" class="file-action-btn view-btn">
+                                <button onclick="viewFile('${file.name}', '${originalFilename}')" class="file-action-btn view-btn">
                                     <i class="fas fa-eye"></i>
                                     View
                                 </button>
@@ -807,7 +831,7 @@
     }
 
     // Update the viewFile function to properly handle file viewing
-    async function viewFile(fileName, originalFilename, signedUrl) {
+    async function viewFile(fileName, originalFilename) {
         try {
             if (!currentSession?.user?.id) throw new Error('No active session');
 
@@ -817,22 +841,28 @@
                 throw new Error(`Unsupported file type: ${fileType}`);
             }
 
-            // Use the signed URL if provided, otherwise get a new one
-            let fileUrl = signedUrl;
-            if (!fileUrl) {
-                const { data: urlData, error: urlError } = await supabase.storage
-                    .from('client-files')
-                    .createSignedUrl(`${currentSession.user.id}/${fileName}`, 3600);
+            // Get a signed URL for the file
+            const { data: signedUrlData, error: signedUrlError } = await supabase.storage
+                .from('client-files')
+                .createSignedUrl(`${currentSession.user.id}/${fileName}`, 3600);
 
-                if (urlError) throw urlError;
-                fileUrl = urlData.signedUrl;
-            }
+            if (signedUrlError) throw signedUrlError;
+            if (!signedUrlData?.signedUrl) throw new Error('Failed to get signed URL for file');
 
             // Construct viewer URL with all necessary parameters
-            const viewerUrl = `index.html?model=${encodeURIComponent(fileUrl)}&filename=${encodeURIComponent(originalFilename)}&type=${encodeURIComponent(fileType)}`;
+            const viewerUrl = new URL('index.html', window.location.origin);
+            viewerUrl.searchParams.set('model', signedUrlData.signedUrl);
+            viewerUrl.searchParams.set('filename', originalFilename);
+            viewerUrl.searchParams.set('type', fileType);
+
+            console.log('Redirecting to viewer:', {
+                url: viewerUrl.toString(),
+                filename: originalFilename,
+                type: fileType
+            });
             
             // Use replace instead of href to prevent back button issues
-            window.location.replace(viewerUrl);
+            window.location.replace(viewerUrl.toString());
         } catch (error) {
             console.error('Error viewing file:', error);
             showErrorMessage('Failed to view file: ' + error.message);
@@ -883,7 +913,7 @@
         }
     }
 
-    // Improve Add Files button toggle
+    // Improve Add Files button toggle with animation
     function toggleUploadArea(show) {
         const uploadArea = document.getElementById('upload-area');
         const addFilesBtn = document.getElementById('add-files-btn');
@@ -893,10 +923,22 @@
         if (show) {
             uploadArea.style.display = 'block';
             addFilesBtn.innerHTML = '<i class="fas fa-times"></i> Cancel';
+            
+            // Force a reflow to trigger animation
+            uploadArea.offsetHeight;
+            uploadArea.style.opacity = '1';
+            uploadArea.style.transform = 'translateY(0)';
+            
             setupDropZone();
         } else {
-            uploadArea.style.display = 'none';
-            addFilesBtn.innerHTML = '<i class="fas fa-plus"></i> Add Files';
+            uploadArea.style.opacity = '0';
+            uploadArea.style.transform = 'translateY(-10px)';
+            
+            // Wait for animation to complete before hiding
+            setTimeout(() => {
+                uploadArea.style.display = 'none';
+                addFilesBtn.innerHTML = '<i class="fas fa-plus"></i> Add Files';
+            }, 300);
         }
     }
 
@@ -937,22 +979,32 @@
     function handleFiles(files) {
         if (!files.length) return;
 
-        // Show upload area
+        // Hide the upload area and empty state
         const uploadArea = document.getElementById('upload-area');
-        if (uploadArea) {
-            uploadArea.style.display = 'block';
-        }
+        const emptyState = document.getElementById('empty-state');
+        if (uploadArea) uploadArea.style.display = 'none';
+        if (emptyState) emptyState.style.display = 'none';
+
+        // Show loading overlay
+        const loadingOverlay = document.getElementById('loading-overlay');
+        if (loadingOverlay) loadingOverlay.classList.add('active');
 
         // Upload each file
-        files.forEach(file => {
-            uploadFile(file).catch(error => {
-                console.error('Error uploading file:', error);
-                showErrorMessage(`Failed to upload ${file.name}: ${error.message}`);
-            });
-        });
+        const uploadPromises = Array.from(files).map(file => uploadFile(file));
 
-        // Hide upload area after starting uploads
-        toggleUploadArea(false);
+        // Wait for all uploads to complete
+        Promise.all(uploadPromises)
+            .then(() => {
+                // Refresh the file list
+                updateFileList();
+            })
+            .catch(error => {
+                console.error('Error uploading files:', error);
+                showErrorMessage(`Failed to upload files: ${error.message}`);
+            })
+            .finally(() => {
+                if (loadingOverlay) loadingOverlay.classList.remove('active');
+            });
     }
 
     // Update auth UI
