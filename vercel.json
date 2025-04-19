@@ -5,7 +5,7 @@
       "headers": [
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline' https://unpkg.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://files.mcneel.com; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; connect-src 'self' https://cdn.jsdelivr.net https://unpkg.com https://cdnjs.cloudflare.com https://files.mcneel.com https://*.supabase.co wss://*.supabase.co https://www.google-analytics.com data: blob:; img-src 'self' data: blob:; worker-src 'self' blob:;"
+          "value": "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline' https://unpkg.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://files.mcneel.com https://www.googletagmanager.com https://www.google-analytics.com blob:; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; connect-src 'self' https://cdn.jsdelivr.net https://unpkg.com https://cdnjs.cloudflare.com https://files.mcneel.com https://*.supabase.co wss://*.supabase.co https://www.google-analytics.com data: blob:; img-src 'self' data: blob: https://*.supabase.co https://www.google-analytics.com; worker-src 'self' blob:; child-src 'self' blob:;"
         },
         {
           "key": "Access-Control-Allow-Origin",

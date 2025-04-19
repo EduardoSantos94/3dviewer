@@ -5,11 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="Content-Security-Policy" content="
         default-src 'self';
-        script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com blob:;
+        script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://www.googletagmanager.com https://www.google-analytics.com blob:;
         style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com;
         font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com;
-        connect-src 'self' https://*.supabase.co wss://*.supabase.co https://cdn.jsdelivr.net https://cdnjs.cloudflare.com;
-        img-src 'self' data: blob: https://*.supabase.co;
+        connect-src 'self' https://*.supabase.co wss://*.supabase.co https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://www.google-analytics.com;
+        img-src 'self' data: blob: https://*.supabase.co https://www.google-analytics.com;
         worker-src 'self' blob:;
         child-src 'self' blob:;
     ">
@@ -219,6 +219,22 @@
     const supabaseUrl = 'https://lwmcnwwkgdauqgxukwhn.supabase.co';
     const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx3bWNud3drZ2RhdXFneHVrd2huIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQ5NzcwNzcsImV4cCI6MjA2MDU1MzA3N30._NfRA6_3PL9JLEG9-X9P3Tzg5E59NuXtcmQzOdkraNE';
 
+    // Update auth UI function
+    function updateAuthUI(session) {
+        const userInfo = document.getElementById('user-info');
+        const loginInfo = document.getElementById('login-info');
+        const userEmail = document.getElementById('user-email');
+
+        if (session?.user) {
+            if (userEmail) userEmail.textContent = session.user.email;
+            if (userInfo) userInfo.style.display = 'flex';
+            if (loginInfo) loginInfo.style.display = 'none';
+        } else {
+            if (userInfo) userInfo.style.display = 'none';
+            if (loginInfo) loginInfo.style.display = 'flex';
+        }
+    }
+
     try {
         const supabase = createClient(supabaseUrl, supabaseKey);
 
@@ -234,6 +250,11 @@
                 console.log('User signed out');
                 updateAuthUI(null);
             }
+        });
+
+        // Check initial session
+        supabase.auth.getSession().then(({ data: { session } }) => {
+            updateAuthUI(session);
         });
     } catch (error) {
         console.error('Failed to initialize Supabase:', error);
