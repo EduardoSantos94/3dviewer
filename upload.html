@@ -572,28 +572,22 @@
                 throw new Error('No active session');
             }
 
-            // Show loading state
             loadingOverlay.classList.add('active');
-
-            // Log the user ID and path we're querying
             const userPath = currentSession.user.id + '/';
             console.log('Fetching files for path:', userPath);
 
-            // List files from the models bucket with the user's folder
             const { data: files, error } = await supabase.storage
                 .from('models')
                 .list(userPath, {
                     limit: 100,
                     offset: 0,
-                    sortBy: { column: 'name', order: 'asc' }
+                    sortBy: { column: 'name', order: 'desc' }
                 });
 
-            // Log the response
             console.log('Storage list response:', { files, error });
 
             if (error) throw error;
 
-            // Handle empty state
             if (!files || files.length === 0) {
                 console.log('No files found');
                 if (fileListContent) fileListContent.innerHTML = '';
@@ -603,26 +597,20 @@
 
             if (emptyState) emptyState.style.display = 'none';
             
-            // Create file items
             const fileItems = await Promise.all(files
-                .filter(file => !file.name.startsWith('.')) // Filter out hidden files
+                .filter(file => !file.name.startsWith('.'))
                 .map(async file => {
                     try {
-                        // Get the public URL for verification
-                        const { data: { publicUrl } } = supabase.storage
-                            .from('models')
-                            .getPublicUrl(userPath + file.name);
-
-                        // Extract original filename from the stored name
-                        const originalFilename = file.name.replace(/^\d+-[a-z0-9]+\./, '');
+                        // Extract original filename from stored name
+                        const originalFilename = file.name.substring(file.name.indexOf('-') + 1);
                         const sizeInMB = (file.metadata?.size || 0) / (1024 * 1024);
                         const formattedSize = sizeInMB.toFixed(2);
                         
                         console.log('Processing file:', {
-                            name: file.name,
+                            storedName: file.name,
                             originalFilename,
                             size: formattedSize,
-                            publicUrl
+                            metadata: file.metadata
                         });
 
                         return `
@@ -648,7 +636,7 @@
                         `;
                     } catch (err) {
                         console.error('Error processing file:', file.name, err);
-                        return ''; // Skip this file if there's an error
+                        return '';
                     }
                 }));
 
@@ -666,22 +654,20 @@
         } catch (error) {
             console.error('Error updating file list:', error);
             showErrorMessage('Failed to update file list: ' + error.message);
-            // Show empty state on error
             if (fileListContent) fileListContent.innerHTML = '';
             if (emptyState) emptyState.style.display = 'block';
         } finally {
-            // Hide loading state
             loadingOverlay.classList.remove('active');
         }
     }
 
-    // Update the uploadFile function to handle file list updates properly
+    // Update the uploadFile function to preserve original filename
     async function uploadFile(file) {
         try {
             if (!currentSession?.user?.id) throw new Error('No active session');
 
             // Validate file size (max 50MB)
-            const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
+            const MAX_FILE_SIZE = 50 * 1024 * 1024;
             if (file.size > MAX_FILE_SIZE) {
                 throw new Error(`File size exceeds 50MB limit: ${formatFileSize(file.size)}`);
             }
@@ -693,20 +679,22 @@
                 throw new Error(`Unsupported file type: ${fileExt}`);
             }
 
+            // Keep original filename but prefix with timestamp for uniqueness
             const timestamp = Date.now();
-            const randomString = Math.random().toString(36).substring(2);
             const originalName = file.name;
-            const fileName = `${timestamp}-${randomString}.${originalName}`;
+            // Store with original extension
+            const fileName = `${timestamp}-${originalName}`;
             const filePath = `${currentSession.user.id}/${fileName}`;
 
             console.log('Uploading file:', {
                 originalName,
                 fileName,
                 filePath,
+                extension: fileExt,
                 size: formatFileSize(file.size)
             });
 
-            // Show and reset upload progress
+            // Show upload progress
             const progressBar = document.querySelector('.upload-progress');
             const progressBarFill = progressBar?.querySelector('.progress-bar');
             const progressText = progressBar?.querySelector('.progress-text');
@@ -714,28 +702,32 @@
             if (progressBarFill) progressBarFill.style.width = '0%';
             if (progressText) progressText.textContent = 'Preparing upload...';
 
-            // Create upload options with progress tracking
+            // Upload options with metadata
             const options = {
                 cacheControl: '3600',
                 upsert: false,
                 contentType: file.type || 'application/octet-stream',
                 metadata: {
                     originalName,
+                    extension: fileExt,
                     size: file.size,
                     uploadedAt: new Date().toISOString()
                 }
             };
 
-            // Upload the file
             const { error: uploadError } = await supabase.storage
                 .from('models')
                 .upload(filePath, file, options);
 
             if (uploadError) throw uploadError;
 
-            console.log('File uploaded successfully:', fileName);
+            console.log('File uploaded successfully:', {
+                fileName,
+                originalName,
+                extension: fileExt
+            });
 
-            // Wait a short moment before updating the file list to allow for storage propagation
+            // Wait for storage to propagate
             await new Promise(resolve => setTimeout(resolve, 1000));
             await updateFileList();
             
@@ -952,19 +944,54 @@
         }
     });
 
-    // View file function
+    // Update the viewFile function to handle filenames correctly
     async function viewFile(fileName, originalFilename) {
         try {
             if (!currentSession?.user?.id) {
                 throw new Error('No active session');
             }
 
-            // Construct the storage URL directly
+            console.log('View file request:', {
+                fileName,
+                originalFilename
+            });
+
+            // Get file metadata to ensure we have the correct extension
+            const { data: fileList, error: listError } = await supabase.storage
+                .from('models')
+                .list(currentSession.user.id + '/', {
+                    search: fileName
+                });
+
+            if (listError) throw listError;
+
+            const fileInfo = fileList.find(f => f.name === fileName);
+            if (!fileInfo) {
+                throw new Error('File not found');
+            }
+
+            // Get the file extension from metadata or filename
+            const extension = fileInfo.metadata?.extension || 
+                            ('.' + fileName.split('.').pop().toLowerCase());
+
+            console.log('File info:', {
+                fileInfo,
+                extension,
+                metadata: fileInfo.metadata
+            });
+
+            // Construct the storage URL
             const storageUrl = `${supabase.storageUrl}/object/public/models/${currentSession.user.id}/${fileName}`;
             
-            // Create viewer URL with authentication token
-            const viewerUrl = `index.html?model=${encodeURIComponent(storageUrl)}&filename=${encodeURIComponent(originalFilename)}&token=${encodeURIComponent(currentSession.access_token)}`;
+            // Create viewer URL with all necessary information
+            const viewerUrl = `index.html?model=${encodeURIComponent(storageUrl)}&filename=${encodeURIComponent(originalFilename)}&extension=${encodeURIComponent(extension)}&token=${encodeURIComponent(currentSession.access_token)}`;
             
+            console.log('Opening viewer with URL:', {
+                storageUrl,
+                filename: originalFilename,
+                extension
+            });
+
             // Open in new tab
             window.open(viewerUrl, '_blank');
         } catch (error) {

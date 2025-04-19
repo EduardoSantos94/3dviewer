@@ -315,6 +315,7 @@
         const urlParams = new URLSearchParams(window.location.search);
         const modelUrl = urlParams.get('model');
         const filename = urlParams.get('filename');
+        const extension = urlParams.get('extension');
         const authToken = urlParams.get('token');
         
         if (modelUrl) {
@@ -347,26 +348,38 @@
                     Authorization: `Bearer ${token}`
                 };
 
-                // Ensure we have a valid filename with extension
-                const decodedFilename = filename ? decodeURIComponent(filename) : null;
-                let finalFilename = decodedFilename;
+                // Use provided filename and extension, or extract from URL
+                let finalFilename = filename ? decodeURIComponent(filename) : null;
+                let fileExtension = extension ? decodeURIComponent(extension) : null;
+
+                console.log('Model parameters:', {
+                    url: decodedUrl,
+                    filename: finalFilename,
+                    providedExtension: fileExtension
+                });
                 
-                if (!finalFilename || !finalFilename.includes('.')) {
-                    // Try to extract extension from URL
+                if (!finalFilename || !fileExtension) {
+                    // Try to extract extension from URL if not provided
                     const urlExtension = decodedUrl.split('.').pop().toLowerCase();
                     if (['3dm', 'obj', 'stl', 'glb', 'gltf'].includes(urlExtension)) {
-                        finalFilename = `model.${urlExtension}`;
+                        fileExtension = '.' + urlExtension;
+                        finalFilename = finalFilename || `model${fileExtension}`;
                     } else {
-                        finalFilename = 'model.3dm'; // Default fallback
+                        throw new Error('Could not determine file type. Please check the file extension.');
                     }
                 }
 
-                console.log('Loading model with:', { url: decodedUrl, filename: finalFilename });
+                console.log('Loading model with:', {
+                    url: decodedUrl,
+                    filename: finalFilename,
+                    extension: fileExtension
+                });
 
                 // Load the model with authentication and proper filename
                 await window.loadModel({ 
                     url: decodedUrl,
                     filename: finalFilename,
+                    extension: fileExtension,
                     headers: authHeaders
                 });
 
