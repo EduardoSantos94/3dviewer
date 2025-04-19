@@ -2360,15 +2360,19 @@ function applyMaterialToModel(modelIndex, materialType) {
 }
 
 // Export the loadModel function
-export async function loadModel(modelPath, materialType = null) {
+export async function loadModel(modelInfo, materialType = null) {
     try {
         showLoadingIndicator();
         
         // Clear any existing models
         ClearScene();
         
-        // Get the file extension
-        const extension = modelPath.split('.').pop().toLowerCase();
+        // Extract URL and filename from modelInfo
+        const modelPath = typeof modelInfo === 'object' ? modelInfo.url : modelInfo;
+        const filename = typeof modelInfo === 'object' ? modelInfo.filename : modelPath;
+        
+        // Get the file extension from the original filename
+        const extension = filename.split('.').pop().toLowerCase();
         
         // Special handling for 3DM files
         if (extension === '3dm') {
@@ -2421,9 +2425,9 @@ export async function loadModel(modelPath, materialType = null) {
         }
         
         // For other file formats
-        const loader = getLoaderForPath(modelPath);
+        const loader = getLoaderForFile(filename);
         if (!loader) {
-            throw new Error('Unsupported file format');
+            throw new Error(`Unsupported file format: ${extension}`);
         }
         
         const model = await loader.loadAsync(modelPath);

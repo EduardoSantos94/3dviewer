@@ -239,19 +239,27 @@
                     container.style.display = 'block';
                 }
                 
-                // Get model URL from localStorage
+                // Get model URL and original filename from localStorage
                 const modelUrl = localStorage.getItem('selectedModel');
-                if (modelUrl) {
+                const originalFilename = localStorage.getItem('originalFilename');
+                
+                if (modelUrl && originalFilename) {
                     try {
-                        await loadModel(modelUrl);
+                        // Create a proxy object that contains both the URL and filename
+                        const modelInfo = {
+                            url: modelUrl,
+                            filename: originalFilename
+                        };
+                        await loadModel(modelInfo);
                     } catch (error) {
                         console.error('Failed to load model:', error);
-                        alert('Failed to load model. Please try again.');
+                        showErrorMessage('Failed to load model. Please try again.');
                     }
                 }
                 
                 // Clear the viewer state
                 localStorage.removeItem('viewerState');
+                localStorage.removeItem('originalFilename');
             }
         } catch (error) {
             console.error('Error initializing viewer:', error);
@@ -328,7 +336,8 @@
             
             // Store URL and load model
             localStorage.setItem('selectedModel', urlData.signedUrl);
-            await loadModel(urlData.signedUrl);
+            localStorage.setItem('originalFilename', file.name);
+            await loadModel({ url: urlData.signedUrl, filename: file.name });
             
         } catch (error) {
             console.error('Upload failed:', error);
@@ -349,6 +358,7 @@
             if (error) throw error;
             
             localStorage.removeItem('selectedModel');
+            localStorage.removeItem('originalFilename');
             localStorage.removeItem('viewerState');
             location.reload();
         } catch (error) {
