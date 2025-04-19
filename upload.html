@@ -64,8 +64,8 @@
             </div>
 
             <div class="uploaded-files">
-                <div id="file-list"></div>
-                <div id="empty-state" class="empty-state">
+                <div id="file-list-content"></div>
+                <div id="empty-state" style="display: none;">
                     <i class="fas fa-cube"></i>
                     <p>No files uploaded yet</p>
                     <button class="add-files-btn-secondary" id="add-first-model-btn">
@@ -331,8 +331,11 @@
     const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx3bWNud3drZ2RhdXFneHVrd2huIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQ5NzcwNzcsImV4cCI6MjA2MDU1MzA3N30._NfRA6_3PL9JLEG9-X9P3Tzg5E59NuXtcmQzOdkraNE';
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Make supabase globally available
+    // Make functions globally available
     window.supabase = supabase;
+    window.deleteFile = deleteFile;
+    window.viewFile = viewFile;
+    window.showErrorMessage = showErrorMessage;
 
     // Store current session globally
     let currentSession = null;
@@ -393,28 +396,32 @@
 
     // Load user's files from storage
     async function updateFileList() {
+        const fileListContent = document.getElementById('file-list-content');
+        const emptyState = document.getElementById('empty-state');
+        
         try {
-            const { data: { session } } = await supabase.auth.getSession();
-            if (!session) {
-                console.error('No active session');
-                return;
+            if (!currentSession?.user?.id) {
+                throw new Error('No active session');
             }
 
             const { data: files, error } = await supabase.storage
                 .from('models')
-                .list(session.user.id + '/');
+                .list(currentSession.user.id + '/');
 
             if (error) {
                 console.error('Error fetching files:', error);
+                showErrorMessage('Failed to fetch files: ' + error.message);
                 return;
             }
 
-            const fileListContent = document.getElementById('file-list-content');
             if (!files || files.length === 0) {
-                fileListContent.innerHTML = '<div class="empty-model-list">No files uploaded yet</div>';
+                if (fileListContent) fileListContent.innerHTML = '';
+                if (emptyState) emptyState.style.display = 'block';
                 return;
             }
 
+            if (emptyState) emptyState.style.display = 'none';
+            
             const fileItems = files.map(file => {
                 // Extract original filename by removing timestamp-random prefix
                 const originalFilename = file.name.replace(/^\d+-[a-z0-9]+\./, '');
@@ -439,7 +446,9 @@
                 `;
             }).join('');
 
-            fileListContent.innerHTML = fileItems;
+            if (fileListContent) {
+                fileListContent.innerHTML = fileItems;
+            }
         } catch (error) {
             console.error('Error updating file list:', error);
             showErrorMessage('Failed to update file list: ' + error.message);
@@ -454,15 +463,15 @@
             const timestamp = Date.now();
             const randomString = Math.random().toString(36).substring(2);
             const originalName = file.name;
-            const fileName = `${timestamp}-${randomString}-${originalName}`;
+            const fileName = `${timestamp}-${randomString}.${originalName}`;
             const filePath = `${currentSession.user.id}/${fileName}`;
 
             // Show upload progress
             const progressBar = document.querySelector('.upload-progress');
-            progressBar.style.display = 'block';
+            if (progressBar) progressBar.style.display = 'block';
 
             const { error: uploadError } = await supabase.storage
-                .from('client-files')
+                .from('models')
                 .upload(filePath, file, {
                     metadata: {
                         originalName: originalName
@@ -475,10 +484,10 @@
             showSuccess('File uploaded successfully');
         } catch (err) {
             console.error('Upload error:', err);
-            showError('Failed to upload file');
+            showErrorMessage('Failed to upload file: ' + err.message);
         } finally {
             const progressBar = document.querySelector('.upload-progress');
-            progressBar.style.display = 'none';
+            if (progressBar) progressBar.style.display = 'none';
         }
     }
 
@@ -490,7 +499,7 @@
             if (!currentSession?.user?.id) throw new Error('No active session');
 
             const { error } = await supabase.storage
-                .from('client-files')
+                .from('models')
                 .remove([`${currentSession.user.id}/${fileName}`]);
 
             if (error) throw error;
@@ -499,7 +508,7 @@
             showSuccess('File deleted successfully');
         } catch (err) {
             console.error('Delete error:', err);
-            showError('Failed to delete file');
+            showErrorMessage('Failed to delete file');
         }
     }
 
@@ -511,7 +520,7 @@
             window.location.href = 'login.html';
         } catch (err) {
             console.error('Logout failed:', err);
-            showError('Failed to logout');
+            showErrorMessage('Failed to logout');
         }
     }
 
@@ -582,20 +591,6 @@
         const sizes = ['Bytes', 'KB', 'MB', 'GB'];
         const i = Math.floor(Math.log(bytes) / Math.log(k));
         return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-    }
-
-    function showError(message) {
-        const errorDiv = document.createElement('div');
-        errorDiv.className = 'error-message';
-        errorDiv.innerHTML = `
-            <div class="error-content">
-                <i class="fas fa-exclamation-circle"></i>
-                <h3>Error</h3>
-                <p>${message}</p>
-                <button onclick="this.closest('.error-message').remove()">Close</button>
-            </div>
-        `;
-        document.body.appendChild(errorDiv);
     }
 
     function showSuccess(message) {
