@@ -1412,4 +1412,219 @@ select:focus {
 #logout-btn:hover {
     background-color: #f8f9fa;
     color: #333;
+}
+
+/* Primary Button Style */
+.add-files-btn {
+    background-color: var(--apple-blue);
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.add-files-btn:hover {
+    background-color: #0056b3;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.add-files-btn i {
+    font-size: 18px;
+}
+
+/* Secondary Button Style */
+.add-files-btn-secondary {
+    background-color: white;
+    color: var(--apple-blue);
+    border: 2px solid var(--apple-blue);
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.add-files-btn-secondary:hover {
+    background-color: #f0f7ff;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Delete Button Style */
+.delete-btn {
+    background-color: #ff3b30;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.delete-btn:hover {
+    background-color: #dc3545;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Auth Button Style */
+.auth-btn {
+    background-color: var(--apple-gray-5);
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.auth-btn:hover {
+    background-color: var(--apple-gray-4);
+    transform: translateY(-1px);
+}
+
+/* Navigation Link Style */
+.nav-link {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    text-decoration: none;
+    color: var(--apple-gray-5);
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+
+.nav-link:hover {
+    color: var(--apple-blue);
+}
+
+/* Upload Area Styles */
+.upload-area {
+    margin: 24px 0;
+    padding: 32px;
+    background-color: #f8f9fa;
+    border-radius: 12px;
+    border: 2px dashed var(--apple-gray-3);
+    text-align: center;
+}
+
+.drop-zone {
+    padding: 48px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+}
+
+.drop-zone i {
+    font-size: 48px;
+    color: var(--apple-gray-4);
+}
+
+.drop-zone h2 {
+    font-size: 24px;
+    color: var(--apple-gray-5);
+    margin: 0;
+}
+
+.drop-zone p {
+    color: var(--apple-gray-4);
+    margin: 8px 0;
+}
+
+.supported-formats {
+    color: var(--apple-gray-4);
+    font-size: 14px;
+    margin-top: 16px;
+}
+
+/* Empty State Styles */
+#empty-state {
+    text-align: center;
+    padding: 48px;
+}
+
+#empty-state i {
+    font-size: 48px;
+    color: var(--apple-gray-3);
+    margin-bottom: 16px;
+}
+
+#empty-state p {
+    color: var(--apple-gray-4);
+    margin-bottom: 24px;
+}
+
+/* File List Styles */
+.uploaded-files {
+    margin-top: 24px;
+}
+
+.file-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px;
+    background-color: white;
+    border-radius: 8px;
+    margin-bottom: 12px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    transition: all 0.2s ease;
+}
+
+.file-item:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.file-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.file-info i {
+    font-size: 24px;
+    color: var(--apple-gray-4);
+}
+
+.file-details {
+    display: flex;
+    flex-direction: column;
+}
+
+.file-name {
+    font-weight: 500;
+    color: var(--apple-gray-5);
+}
+
+.file-size {
+    font-size: 14px;
+    color: var(--apple-gray-4);
+}
+
+.file-actions {
+    display: flex;
+    gap: 8px;
 } 
