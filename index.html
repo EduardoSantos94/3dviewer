@@ -328,7 +328,15 @@
 
                 // Load the model
                 const decodedUrl = decodeURIComponent(modelUrl);
-                await window.loadModel({ url: decodedUrl });
+                // Extract filename from URL for proper extension detection
+                const urlObj = new URL(decodedUrl);
+                const pathSegments = urlObj.pathname.split('/');
+                const filename = pathSegments[pathSegments.length - 1];
+                
+                await window.loadModel({ 
+                    url: decodedUrl,
+                    filename: filename
+                });
 
                 // Hide loading indicator
                 if (loadingIndicator) loadingIndicator.style.display = 'none';

@@ -2369,9 +2369,18 @@ export async function loadModel(modelInfo, materialType = null) {
         
         // Extract URL and filename from modelInfo
         const modelPath = typeof modelInfo === 'object' ? modelInfo.url : modelInfo;
-        const filename = typeof modelInfo === 'object' ? modelInfo.filename : modelPath;
+        let filename;
         
-        // Get the file extension from the original filename
+        if (typeof modelInfo === 'object' && modelInfo.filename) {
+            filename = modelInfo.filename;
+        } else {
+            // Extract filename from URL, handling query parameters
+            const urlObj = new URL(modelPath);
+            const pathSegments = urlObj.pathname.split('/');
+            filename = pathSegments[pathSegments.length - 1];
+        }
+        
+        // Get the file extension
         const extension = filename.split('.').pop().toLowerCase();
         
         // Special handling for 3DM files
