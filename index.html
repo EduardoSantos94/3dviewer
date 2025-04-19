@@ -314,6 +314,7 @@
     async function checkForModelUrl() {
         const urlParams = new URLSearchParams(window.location.search);
         const modelUrl = urlParams.get('model');
+        const filename = urlParams.get('filename');
         
         if (modelUrl) {
             try {
@@ -326,16 +327,23 @@
                 if (loadingIndicator) loadingIndicator.style.display = 'flex';
                 if (container) container.style.display = 'flex';
 
-                // Load the model
+                // Get current session for authentication
+                const { data: { session } } = await supabase.auth.getSession();
+                if (!session) {
+                    throw new Error('Authentication required to view models');
+                }
+
+                // Construct authenticated URL
                 const decodedUrl = decodeURIComponent(modelUrl);
-                // Extract filename from URL for proper extension detection
-                const urlObj = new URL(decodedUrl);
-                const pathSegments = urlObj.pathname.split('/');
-                const filename = pathSegments[pathSegments.length - 1];
-                
+                const authHeaders = {
+                    Authorization: `Bearer ${session.access_token}`
+                };
+
+                // Load the model with authentication
                 await window.loadModel({ 
                     url: decodedUrl,
-                    filename: filename
+                    filename: filename || 'model',
+                    headers: authHeaders
                 });
 
                 // Hide loading indicator
@@ -344,7 +352,7 @@
                 console.error('Error loading model:', error);
                 const loadingIndicator = document.getElementById('loading-indicator');
                 if (loadingIndicator) loadingIndicator.style.display = 'none';
-                showErrorMessage('Failed to load model. Please try again.');
+                showErrorMessage('Failed to load model: ' + error.message);
             }
         }
     }

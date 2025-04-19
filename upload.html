@@ -417,7 +417,8 @@
             emptyState.style.display = 'none';
             
             fileList.innerHTML = files.map(file => {
-                const originalFilename = file.name.replace(/^\d+-[a-z0-9]+\./, '');
+                // Get the original filename from metadata if available, otherwise extract from name
+                const originalFilename = file.metadata?.originalName || file.name.split('-').slice(2).join('-');
                 const fileUrl = supabase.storage
                     .from('client-files')
                     .getPublicUrl(currentSession.user.id + '/' + file.name).data.publicUrl;
@@ -460,8 +461,10 @@
         try {
             if (!currentSession?.user?.id) throw new Error('No active session');
 
-            const fileExt = file.name.split('.').pop();
-            const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+            const timestamp = Date.now();
+            const randomString = Math.random().toString(36).substring(2);
+            const originalName = file.name;
+            const fileName = `${timestamp}-${randomString}-${originalName}`;
             const filePath = `${currentSession.user.id}/${fileName}`;
 
             // Show upload progress
@@ -470,7 +473,11 @@
 
             const { error: uploadError } = await supabase.storage
                 .from('client-files')
-                .upload(filePath, file);
+                .upload(filePath, file, {
+                    metadata: {
+                        originalName: originalName
+                    }
+                });
 
             if (uploadError) throw uploadError;
 
