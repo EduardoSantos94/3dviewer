@@ -2483,8 +2483,31 @@ function applyMaterialToModel(modelIndex, materialType) {
     renderer.render(scene, camera);
 }
 
-// Export the loadModel function
-export async function loadModel(modelInfo) {
+// Add these functions before loadModel
+function showLoadingProgress() {
+    const container = document.getElementById('progress-container');
+    if (container) {
+        container.style.display = 'block';
+    }
+}
+
+function hideLoadingProgress() {
+    const container = document.getElementById('progress-container');
+    if (container) {
+        container.style.display = 'none';
+    }
+}
+
+function updateLoadingProgress(progress) {
+    const progressBar = document.getElementById('progress');
+    if (progressBar) {
+        progressBar.style.width = progress + '%';
+    }
+}
+
+// ... existing code ...
+
+async function loadModel(modelInfo) {
     if (!modelInfo || (!modelInfo.url && !modelInfo.file)) {
         console.error('No model URL or file provided');
         return;
@@ -2573,7 +2596,6 @@ export async function loadModel(modelInfo) {
         throw error;
     }
 }
-
 // ... existing code ...
 
 

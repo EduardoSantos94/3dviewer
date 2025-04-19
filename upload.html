@@ -393,51 +393,44 @@
 
     // Load user's files from storage
     async function updateFileList() {
-        const fileList = document.getElementById('file-list');
-        const emptyState = document.getElementById('empty-state');
-        
         try {
-            if (!currentSession?.user?.id) {
-                throw new Error('No active session');
-            }
-
-            const { data: files, error } = await supabase.storage
-                .from('client-files')
-                .list(currentSession.user.id + '/');
-
-            if (error) throw error;
-
-            if (!files || files.length === 0) {
-                fileList.style.display = 'none';
-                emptyState.style.display = 'block';
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) {
+                console.error('No active session');
                 return;
             }
 
-            fileList.style.display = 'block';
-            emptyState.style.display = 'none';
-            
-            fileList.innerHTML = files.map(file => {
-                // Extract original filename from the timestamped name
-                const originalFilename = file.name.split('-').slice(2).join('-');
-                const fileUrl = supabase.storage
-                    .from('client-files')
-                    .getPublicUrl(currentSession.user.id + '/' + file.name).data.publicUrl;
+            const { data: files, error } = await supabase.storage
+                .from('models')
+                .list(session.user.id + '/');
+
+            if (error) {
+                console.error('Error fetching files:', error);
+                return;
+            }
+
+            const fileListContent = document.getElementById('file-list-content');
+            if (!files || files.length === 0) {
+                fileListContent.innerHTML = '<div class="empty-model-list">No files uploaded yet</div>';
+                return;
+            }
+
+            const fileItems = files.map(file => {
+                // Extract original filename by removing timestamp-random prefix
+                const originalFilename = file.name.replace(/^\d+-[a-z0-9]+\./, '');
+                const sizeInMB = (file.metadata.size / (1024 * 1024)).toFixed(2);
                 
                 return `
                     <div class="file-item">
-                        <div class="file-info">
-                            <i class="fas fa-cube file-icon"></i>
-                            <div class="file-details">
-                                <span class="file-name">${originalFilename}</span>
-                                <span class="file-size">${formatFileSize(file.metadata.size)}</span>
-                            </div>
-                        </div>
+                        <i class="fas fa-cube"></i>
+                        <span>${originalFilename}</span>
+                        <span class="file-size">${sizeInMB} MB</span>
                         <div class="file-actions">
-                            <button class="file-action-btn" onclick="window.location.href='index.html?model=${encodeURIComponent(fileUrl)}&filename=${encodeURIComponent(originalFilename)}'" title="View model">
+                            <button onclick="viewFile('${file.name}', '${originalFilename}')" class="file-action-btn">
                                 <i class="fas fa-eye"></i>
                                 View
                             </button>
-                            <button class="file-action-btn delete" data-filename="${file.name}" title="Delete file">
+                            <button onclick="deleteFile('${file.name}')" class="file-action-btn delete">
                                 <i class="fas fa-trash"></i>
                                 Delete
                             </button>
@@ -446,13 +439,10 @@
                 `;
             }).join('');
 
-            // Add delete button event listeners
-            document.querySelectorAll('.delete').forEach(button => {
-                button.addEventListener('click', () => deleteFile(button.dataset.filename));
-            });
+            fileListContent.innerHTML = fileItems;
         } catch (error) {
-            console.error('Error fetching files:', error);
-            showError('Failed to load files');
+            console.error('Error updating file list:', error);
+            showErrorMessage('Failed to update file list: ' + error.message);
         }
     }
 
