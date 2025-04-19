@@ -2485,119 +2485,91 @@ function applyMaterialToModel(modelIndex, materialType) {
 
 // Export the loadModel function
 export async function loadModel(modelInfo) {
-    console.log('Loading model:', modelInfo);
-
-    // Check if we have a model URL or file
-    const modelUrl = modelInfo.url || modelInfo.file;
-    if (!modelUrl) {
-        throw new Error('No model URL or file provided');
+    if (!modelInfo || (!modelInfo.url && !modelInfo.file)) {
+        console.error('No model URL or file provided');
+        return;
     }
 
-    // Clear existing scene and show loading progress
+    // Clear scene and show loading progress
     clearScene();
-    const loadingContainer = document.getElementById('loadingProgressContainer');
-    if (loadingContainer) loadingContainer.style.display = 'flex';
+    showLoadingProgress();
 
     try {
-        // Get filename and ensure it has an extension
-        let filename = modelInfo.filename;
-        if (!filename || !filename.includes('.')) {
-            // Try to extract extension from URL
-            const urlExtension = modelUrl.split('.').pop().toLowerCase();
-            if (['3dm', 'obj', 'stl', 'glb', 'gltf'].includes(urlExtension)) {
-                filename = `model.${urlExtension}`;
-            } else {
-                throw new Error('Unable to determine file type - no valid extension found');
-            }
-        }
-
-        // Get the extension
+        const filename = modelInfo.filename || (modelInfo.file ? modelInfo.file.name : modelInfo.url.split('/').pop());
         const extension = filename.split('.').pop().toLowerCase();
-        
-        console.log('Processing file:', { filename, extension });
 
-        // Get the appropriate loader
-        const loader = getLoaderForFile(filename);
-        if (!loader) {
+        // Initialize loader based on file type
+        let loader;
+        if (extension === '3dm') {
+            await initRhino3dm();
+            loader = new Rhino3dmLoader();
+            loader.setLibraryPath('https://cdn.jsdelivr.net/npm/rhino3dm@7.15.0/');
+            if (modelInfo.headers) {
+                loader.setRequestHeader(modelInfo.headers);
+            }
+        } else if (extension === 'obj') {
+            loader = new OBJLoader();
+            if (modelInfo.headers) {
+                loader.setRequestHeader(modelInfo.headers);
+            }
+        } else if (extension === 'stl') {
+            loader = new STLLoader();
+            if (modelInfo.headers) {
+                loader.setRequestHeader(modelInfo.headers);
+            }
+        } else if (extension === 'glb' || extension === 'gltf') {
+            loader = new GLTFLoader();
+            if (modelInfo.headers) {
+                loader.setRequestHeader(modelInfo.headers);
+            }
+        } else {
             throw new Error(`Unsupported file type: ${extension}`);
         }
 
-        // Set authentication headers if provided
-        if (modelInfo.headers) {
-            loader.setRequestHeader(modelInfo.headers);
-        }
-
         // Load the model
-        const loadedModel = await new Promise((resolve, reject) => {
-            if (modelInfo.file) {
-                // Handle File object
-                const reader = new FileReader();
-                reader.onload = async (e) => {
-                    try {
-                        if (extension === '3dm') {
-                            const result = await process3DMFile(e.target.result);
-                            resolve(result);
-                        } else {
-                            loader.parse(e.target.result, '', (result) => resolve(result), reject);
-                        }
-                    } catch (error) {
-                        reject(error);
-                    }
-                };
-                reader.onerror = reject;
-                reader.readAsArrayBuffer(modelInfo.file);
-            } else {
-                // Handle URL
-                loader.load(
-                    modelUrl,
-                    (result) => resolve(result),
-                    (progress) => {
-                        const progressBar = document.getElementById('progress');
-                        if (progressBar && progress.lengthComputable) {
-                            const percent = (progress.loaded / progress.total) * 100;
-                            progressBar.style.width = percent + '%';
+        const model = await new Promise((resolve, reject) => {
+            const loadFn = modelInfo.file ? 
+                (callback) => loader.parse(modelInfo.file, '', callback) :
+                (callback) => loader.load(
+                    modelInfo.url,
+                    callback,
+                    (event) => {
+                        if (event.lengthComputable) {
+                            const progress = (event.loaded / event.total) * 100;
+                            updateLoadingProgress(progress);
                         }
                     },
                     reject
                 );
-            }
+
+            loadFn((result) => {
+                if (extension === 'glb' || extension === 'gltf') {
+                    resolve(result.scene);
+                } else {
+                    resolve(result);
+                }
+            });
         });
 
-        // Process the loaded model
-        if (loadedModel) {
-            // Add to scene
-            AddModelToScene(loadedModel);
-            
-            // Add to models array with original filename
-            models.push({
-                object: loadedModel,
-                filename: filename,
-                materialType: modelInfo.materialType || null
-            });
-            
-            // Apply material if specified
-            if (modelInfo.materialType) {
-                applyMaterial(loadedModel, modelInfo.materialType);
-            }
+        // Add model to scene
+        scene.add(model);
+        models.push({ object: model, filename: filename });
+        selectedObject = model;
 
-            // Update UI
-            updateModelListInSidebar();
-            
-            // Set as selected object for turntable
-            selectedObject = loadedModel;
-            
-            // Center and fit camera
-            centerSelectedModel();
-            zoomToFit([loadedModel]);
+        // Apply materials if specified
+        if (modelInfo.materials) {
+            applyMaterialToModel(model, modelInfo.materials);
         }
 
-        // Hide loading progress
-        if (loadingContainer) loadingContainer.style.display = 'none';
+        // Update camera and controls
+        fitCameraToObject(camera, model, controls);
+        hideLoadingProgress();
 
-        return loadedModel;
+        return model;
     } catch (error) {
         console.error('Error loading model:', error);
-        if (loadingContainer) loadingContainer.style.display = 'none';
+        hideLoadingProgress();
+        showErrorMessage(`Failed to load model: ${error.message}`);
         throw error;
     }
 }
