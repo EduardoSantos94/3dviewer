@@ -1872,37 +1872,110 @@ function validateMeshGeometry(geometry) {
 
 // Converts Rhino mesh to THREE.js BufferGeometry
 function rhinoMeshToThreeGeometry(rhinoMesh) {
-    if (!rhinoMesh) return null;
-    
     try {
-        // Extract vertices
-        const vertices = [];
-        const vertexCount = rhinoMesh.vertices().count;
-        
-        for (let i = 0; i < vertexCount; i++) {
-            const pt = rhinoMesh.vertices().get(i);
-            vertices.push(pt.x, pt.y, pt.z);
+        // Get the mesh attributes first
+        const attributes = rhinoMesh.attributes();
+        if (!attributes) {
+            console.warn('No attributes found for Rhino mesh');
         }
-        
-        // Extract faces
-        const indices = [];
-        const faceCount = rhinoMesh.faces().count;
-        
-        for (let i = 0; i < faceCount; i++) {
-            const face = rhinoMesh.faces().get(i);
-            indices.push(face.a, face.b, face.c);
-        }
-        
+
         // Create geometry
         const geometry = new THREE.BufferGeometry();
-        geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
-        geometry.setIndex(indices);
-        geometry.computeVertexNormals();
+        
+        // Get vertices
+        const vertices = rhinoMesh.vertices();
+        if (!vertices) {
+            throw new Error('No vertices found in Rhino mesh');
+        }
+        
+        // Get faces
+        const faces = rhinoMesh.faces();
+        if (!faces) {
+            throw new Error('No faces found in Rhino mesh');
+        }
+        
+        // Create position buffer
+        const positions = new Float32Array(faces.count * 3 * 3);
+        const normals = new Float32Array(faces.count * 3 * 3);
+        
+        // Process each face
+        for (let faceIndex = 0; faceIndex < faces.count; faceIndex++) {
+            const face = faces.get(faceIndex);
+            
+            // Get vertices for this face
+            for (let i = 0; i < 3; i++) {
+                const vertexIndex = face[i];
+                const vertex = vertices.get(vertexIndex);
+                
+                const posIndex = (faceIndex * 9) + (i * 3);
+                positions[posIndex] = vertex[0];
+                positions[posIndex + 1] = vertex[1];
+                positions[posIndex + 2] = vertex[2];
+            }
+            
+            // Calculate face normal
+            const v1 = new THREE.Vector3(positions[faceIndex * 9], positions[faceIndex * 9 + 1], positions[faceIndex * 9 + 2]);
+            const v2 = new THREE.Vector3(positions[faceIndex * 9 + 3], positions[faceIndex * 9 + 4], positions[faceIndex * 9 + 5]);
+            const v3 = new THREE.Vector3(positions[faceIndex * 9 + 6], positions[faceIndex * 9 + 7], positions[faceIndex * 9 + 8]);
+            
+            const normal = new THREE.Vector3()
+                .subVectors(v2, v1)
+                .cross(new THREE.Vector3().subVectors(v3, v1))
+                .normalize();
+            
+            // Set the same normal for all vertices of this face
+            for (let i = 0; i < 3; i++) {
+                const normalIndex = (faceIndex * 9) + (i * 3);
+                normals[normalIndex] = normal.x;
+                normals[normalIndex + 1] = normal.y;
+                normals[normalIndex + 2] = normal.z;
+            }
+        }
+        
+        // Set attributes
+        geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        geometry.setAttribute('normal', new THREE.BufferAttribute(normals, 3));
+        
+        // Handle texture coordinates if present
+        const textureCoordinates = rhinoMesh.textureCoordinates();
+        if (textureCoordinates && textureCoordinates.count > 0) {
+            const uvs = new Float32Array(faces.count * 2 * 3);
+            for (let faceIndex = 0; faceIndex < faces.count; faceIndex++) {
+                const face = faces.get(faceIndex);
+                for (let i = 0; i < 3; i++) {
+                    const vertexIndex = face[i];
+                    const uv = textureCoordinates.get(vertexIndex);
+                    const uvIndex = (faceIndex * 6) + (i * 2);
+                    uvs[uvIndex] = uv[0];
+                    uvs[uvIndex + 1] = uv[1];
+                }
+            }
+            geometry.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
+        }
+        
+        // Handle decals if present
+        if (attributes && attributes.decals) {
+            geometry.userData.decals = attributes.decals;
+        }
+        
+        // Store original Rhino attributes in userData
+        if (attributes) {
+            geometry.userData.rhinoAttributes = {
+                name: attributes.name || '',
+                layer: attributes.layer || '',
+                material: attributes.material || null,
+                userStrings: attributes.getUserStrings ? attributes.getUserStrings() : []
+            };
+        }
+        
+        // Compute bounds
+        geometry.computeBoundingSphere();
+        geometry.computeBoundingBox();
         
         return geometry;
     } catch (error) {
-        console.error('Error converting Rhino mesh to THREE geometry:', error);
-        return null;
+        console.error('Error converting Rhino mesh to Three.js geometry:', error);
+        throw error;
     }
 }
 
@@ -2393,7 +2466,7 @@ export async function loadModel(modelInfo, materialType = null) {
             
             // Create and configure the loader
             const loader = new Rhino3dmLoader();
-            loader.setLibraryPath('https://cdn.jsdelivr.net/npm/rhino3dm@7.15.0/');
+            loader.setLibraryPath('https://cdn.jsdelivr.net/npm/rhino3dm@8.4.0/');
             loader.setWorkerLimit(1);
             
             // Load the model
