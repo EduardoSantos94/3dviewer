@@ -405,35 +405,23 @@
     // Initialize storage bucket
     async function initializeStorage() {
         try {
-            // Try to create the bucket if it doesn't exist
-            const { data: bucketData, error: createError } = await supabase
-                .storage
-                .createBucket('models', {
-                    public: false,
-                    allowedMimeTypes: ['application/octet-stream', 'model/3dm', 'model/obj', 'model/stl', 'model/gltf+json', 'model/gltf-binary'],
-                    fileSizeLimit: 52428800 // 50MB in bytes
+            // First try to list files to check bucket access
+            const { data: files, error: listError } = await supabase.storage
+                .from('client-files')
+                .list('', {
+                    limit: 1
                 });
 
-            if (createError && !createError.message.includes('already exists')) {
-                throw createError;
+            if (listError) {
+                console.error('Storage access error:', listError);
+                throw new Error('Cannot access storage. Please check your permissions.');
             }
 
-            console.log('Storage bucket ready:', bucketData || 'already exists');
-
-            // Set up bucket policies
-            const { error: policyError } = await supabase
-                .storage
-                .from('models')
-                .createSignedUrl('test.txt', 1); // This is just to test bucket access
-
-            if (policyError && !policyError.message.includes('not found')) {
-                throw policyError;
-            }
-
+            console.log('Storage access verified');
             return true;
         } catch (error) {
             console.error('Storage initialization error:', error);
-            throw new Error('Failed to initialize storage: ' + error.message);
+            throw new Error('Failed to access storage: ' + error.message);
         }
     }
 
@@ -453,7 +441,7 @@
             try {
                 // Make a test request to validate the token
                 const { error: testError } = await supabase.storage
-                    .from('models')
+                    .from('client-files')
                     .list(session.user.id + '/', { limit: 1 });
 
                 if (testError?.message?.includes('401')) {
@@ -597,12 +585,12 @@
             console.log('Fetching files for path:', {
                 userPath,
                 userId: currentSession.user.id,
-                bucket: 'models'
+                bucket: 'client-files'
             });
 
             // List all files in the user's directory
             const { data: files, error } = await supabase.storage
-                .from('models')
+                .from('client-files')
                 .list(userPath, {
                     limit: 100,
                     offset: 0,
@@ -613,27 +601,12 @@
                 files,
                 error,
                 path: userPath,
-                bucket: 'models'
+                bucket: 'client-files'
             });
 
             if (error) {
-                // If bucket doesn't exist, try to create it
-                if (error.message.includes('bucket not found')) {
-                    await initializeStorage();
-                    // Retry listing files
-                    const { data: retryFiles, error: retryError } = await supabase.storage
-                        .from('models')
-                        .list(userPath, {
-                            limit: 100,
-                            offset: 0,
-                            sortBy: { column: 'name', order: 'desc' }
-                        });
-                    
-                    if (retryError) throw retryError;
-                    files = retryFiles;
-                } else {
-                    throw error;
-                }
+                console.error('List error:', error);
+                throw error;
             }
 
             // Handle empty state
@@ -647,47 +620,45 @@
             if (emptyState) emptyState.style.display = 'none';
             
             // Process files
-            const fileItems = await Promise.all(files
-                .filter(file => !file.name.startsWith('.'))
-                .map(async file => {
-                    try {
-                        const originalFilename = file.name.substring(file.name.indexOf('-') + 1);
-                        const sizeInMB = (file.metadata?.size || 0) / (1024 * 1024);
-                        const formattedSize = sizeInMB.toFixed(2);
-                        
-                        console.log('Processing file:', {
-                            storedName: file.name,
-                            originalFilename,
-                            size: formattedSize,
-                            metadata: file.metadata
-                        });
+            const fileItems = await Promise.all(files.map(async file => {
+                try {
+                    const originalFilename = file.name.substring(file.name.indexOf('-') + 1);
+                    const sizeInMB = (file.metadata?.size || 0) / (1024 * 1024);
+                    const formattedSize = sizeInMB.toFixed(2);
+                    
+                    console.log('Processing file:', {
+                        storedName: file.name,
+                        originalFilename,
+                        size: formattedSize,
+                        metadata: file.metadata
+                    });
 
-                        return `
-                            <div class="file-item">
-                                <div class="file-info">
-                                    <i class="fas fa-cube file-icon"></i>
-                                    <div class="file-details">
-                                        <span class="file-name">${originalFilename}</span>
-                                        <span class="file-size">${formattedSize} MB</span>
-                                    </div>
-                                </div>
-                                <div class="file-actions">
-                                    <button onclick="viewFile('${file.name}', '${originalFilename}')" class="file-action-btn view-btn">
-                                        <i class="fas fa-eye"></i>
-                                        View
-                                    </button>
-                                    <button onclick="deleteFile('${file.name}')" class="file-action-btn delete">
-                                        <i class="fas fa-trash"></i>
-                                        Delete
-                                    </button>
+                    return `
+                        <div class="file-item">
+                            <div class="file-info">
+                                <i class="fas fa-cube file-icon"></i>
+                                <div class="file-details">
+                                    <span class="file-name">${originalFilename}</span>
+                                    <span class="file-size">${formattedSize} MB</span>
                                 </div>
                             </div>
-                        `;
-                    } catch (err) {
-                        console.error('Error processing file:', file.name, err);
-                        return '';
-                    }
-                }));
+                            <div class="file-actions">
+                                <button onclick="viewFile('${file.name}', '${originalFilename}')" class="file-action-btn view-btn">
+                                    <i class="fas fa-eye"></i>
+                                    View
+                                </button>
+                                <button onclick="deleteFile('${file.name}')" class="file-action-btn delete">
+                                    <i class="fas fa-trash"></i>
+                                    Delete
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                } catch (err) {
+                    console.error('Error processing file:', file.name, err);
+                    return '';
+                }
+            }));
 
             const validFileItems = fileItems.filter(item => item !== '');
 
@@ -710,7 +681,7 @@
         }
     }
 
-    // Update the uploadFile function to handle bucket creation
+    // Update the uploadFile function to use the correct bucket
     async function uploadFile(file) {
         try {
             if (!currentSession?.user?.id) throw new Error('No active session');
@@ -740,7 +711,7 @@
                 filePath,
                 extension: fileExt,
                 size: formatFileSize(file.size),
-                bucket: 'models'
+                bucket: 'client-files'
             });
 
             // Show upload progress
@@ -751,27 +722,17 @@
             if (progressBarFill) progressBarFill.style.width = '0%';
             if (progressText) progressText.textContent = 'Preparing upload...';
 
-            // Ensure storage is initialized
-            await initializeStorage();
-
             // Upload options with metadata
             const options = {
                 cacheControl: '3600',
-                upsert: false,
+                upsert: true,
                 contentType: file.type || 'application/octet-stream',
-                duplex: 'half',
-                metadata: {
-                    originalName,
-                    extension: fileExt,
-                    size: file.size,
-                    uploadedAt: new Date().toISOString(),
-                    userId: currentSession.user.id
-                }
+                duplex: 'half'
             };
 
             // Perform the upload
             const { data: uploadData, error: uploadError } = await supabase.storage
-                .from('models')
+                .from('client-files')
                 .upload(filePath, file, options);
 
             if (uploadError) {
@@ -798,7 +759,38 @@
         }
     }
 
-    // Delete file
+    // Update the viewFile function to use the correct bucket
+    async function viewFile(fileName, originalFilename) {
+        try {
+            if (!currentSession?.user?.id) {
+                throw new Error('No active session');
+            }
+
+            console.log('View file request:', {
+                fileName,
+                originalFilename
+            });
+
+            // Construct the storage URL
+            const storageUrl = `${supabase.storageUrl}/object/public/client-files/${currentSession.user.id}/${fileName}`;
+            
+            // Create viewer URL with all necessary information
+            const viewerUrl = `index.html?model=${encodeURIComponent(storageUrl)}&filename=${encodeURIComponent(originalFilename)}&token=${encodeURIComponent(currentSession.access_token)}`;
+            
+            console.log('Opening viewer with URL:', {
+                storageUrl,
+                filename: originalFilename
+            });
+
+            // Open in new tab
+            window.open(viewerUrl, '_blank');
+        } catch (error) {
+            console.error('Error viewing file:', error);
+            showErrorMessage('Failed to view file: ' + error.message);
+        }
+    }
+
+    // Update the deleteFile function to use the correct bucket
     async function deleteFile(fileName) {
         try {
             if (!currentSession?.user?.id) {
@@ -806,7 +798,7 @@
             }
 
             const { error } = await supabase.storage
-                .from('models')
+                .from('client-files')
                 .remove([`${currentSession.user.id}/${fileName}`]);
 
             if (error) throw error;
@@ -1000,62 +992,6 @@
             updateFileList();
         }
     });
-
-    // Update the viewFile function to handle filenames correctly
-    async function viewFile(fileName, originalFilename) {
-        try {
-            if (!currentSession?.user?.id) {
-                throw new Error('No active session');
-            }
-
-            console.log('View file request:', {
-                fileName,
-                originalFilename
-            });
-
-            // Get file metadata to ensure we have the correct extension
-            const { data: fileList, error: listError } = await supabase.storage
-                .from('models')
-                .list(currentSession.user.id + '/', {
-                    search: fileName
-                });
-
-            if (listError) throw listError;
-
-            const fileInfo = fileList.find(f => f.name === fileName);
-            if (!fileInfo) {
-                throw new Error('File not found');
-            }
-
-            // Get the file extension from metadata or filename
-            const extension = fileInfo.metadata?.extension || 
-                            ('.' + fileName.split('.').pop().toLowerCase());
-
-            console.log('File info:', {
-                fileInfo,
-                extension,
-                metadata: fileInfo.metadata
-            });
-
-            // Construct the storage URL
-            const storageUrl = `${supabase.storageUrl}/object/public/models/${currentSession.user.id}/${fileName}`;
-            
-            // Create viewer URL with all necessary information
-            const viewerUrl = `index.html?model=${encodeURIComponent(storageUrl)}&filename=${encodeURIComponent(originalFilename)}&extension=${encodeURIComponent(extension)}&token=${encodeURIComponent(currentSession.access_token)}`;
-            
-            console.log('Opening viewer with URL:', {
-                storageUrl,
-                filename: originalFilename,
-                extension
-            });
-
-            // Open in new tab
-            window.open(viewerUrl, '_blank');
-        } catch (error) {
-            console.error('Error viewing file:', error);
-            showErrorMessage('Failed to view file: ' + error.message);
-        }
-    }
 
     // Initialize the page
     initializePage();
