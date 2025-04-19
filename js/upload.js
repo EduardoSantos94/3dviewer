@@ -172,13 +172,21 @@ async function viewFile(fileName, originalFilename) {
         if (error) throw error;
         if (!data?.signedUrl) throw new Error('Failed to get file URL');
 
-        // Open viewer in new tab
-        const viewerUrl = new URL('index.html', window.location.origin);
-        viewerUrl.searchParams.set('model', data.signedUrl);
-        viewerUrl.searchParams.set('filename', originalFilename);
-        viewerUrl.searchParams.set('type', fileType);
+        // Log URL for debugging
+        console.log('Generated URL:', {
+            fileName,
+            originalFilename,
+            signedUrl: data.signedUrl
+        });
 
-        window.open(viewerUrl.toString(), '_blank');
+        // Construct absolute viewer URL
+        const baseUrl = window.location.href.split('/').slice(0, -1).join('/');
+        const viewerUrl = `${baseUrl}/index.html?model=${encodeURIComponent(data.signedUrl)}&filename=${encodeURIComponent(originalFilename)}&type=${encodeURIComponent(fileType)}`;
+
+        console.log('Redirecting to:', viewerUrl);
+
+        // Open in new tab
+        window.open(viewerUrl, '_blank');
     } catch (error) {
         console.error('Error viewing file:', error);
         showErrorMessage('Failed to view file: ' + error.message);
@@ -212,6 +220,35 @@ document.addEventListener('DOMContentLoaded', () => {
     const addFilesBtn = document.getElementById('add-files-btn');
     if (addFilesBtn) {
         addFilesBtn.addEventListener('click', () => {
+            const uploadArea = document.getElementById('upload-area');
+            if (uploadArea) {
+                uploadArea.style.display = uploadArea.style.display === 'none' ? 'block' : 'none';
+                addFilesBtn.innerHTML = uploadArea.style.display === 'none' ? 
+                    '<i class="fas fa-plus"></i> Add Files' : 
+                    '<i class="fas fa-times"></i> Cancel';
+            }
+        });
+    }
+
+    // Add First Model button
+    const addFirstModelBtn = document.getElementById('add-first-model-btn');
+    if (addFirstModelBtn) {
+        addFirstModelBtn.addEventListener('click', () => {
+            const uploadArea = document.getElementById('upload-area');
+            if (uploadArea) {
+                uploadArea.style.display = 'block';
+                const addFilesBtn = document.getElementById('add-files-btn');
+                if (addFilesBtn) {
+                    addFilesBtn.innerHTML = '<i class="fas fa-times"></i> Cancel';
+                }
+            }
+        });
+    }
+
+    // Select Files button
+    const selectFilesBtn = document.getElementById('select-files-btn');
+    if (selectFilesBtn) {
+        selectFilesBtn.addEventListener('click', () => {
             document.getElementById('file-input').click();
         });
     }
@@ -222,9 +259,40 @@ document.addEventListener('DOMContentLoaded', () => {
         fileInput.addEventListener('change', (e) => {
             const files = Array.from(e.target.files);
             if (files.length > 0) {
+                const uploadArea = document.getElementById('upload-area');
+                if (uploadArea) {
+                    uploadArea.style.display = 'none';
+                }
+                const addFilesBtn = document.getElementById('add-files-btn');
+                if (addFilesBtn) {
+                    addFilesBtn.innerHTML = '<i class="fas fa-plus"></i> Add Files';
+                }
                 files.forEach(file => uploadFile(file));
             }
             e.target.value = ''; // Reset input
+        });
+    }
+
+    // Login button
+    const loginBtn = document.getElementById('login-btn');
+    if (loginBtn) {
+        loginBtn.addEventListener('click', () => {
+            window.location.href = 'login.html';
+        });
+    }
+
+    // Logout button
+    const logoutBtn = document.getElementById('logout-btn');
+    if (logoutBtn) {
+        logoutBtn.addEventListener('click', async () => {
+            try {
+                const { error } = await supabase.auth.signOut();
+                if (error) throw error;
+                window.location.href = 'login.html';
+            } catch (error) {
+                console.error('Logout error:', error);
+                showErrorMessage('Failed to logout: ' + error.message);
+            }
         });
     }
 
