@@ -339,10 +339,13 @@
                     Authorization: `Bearer ${session.access_token}`
                 };
 
-                // Load the model with authentication
+                // Extract file extension from filename
+                const fileExtension = filename.split('.').pop().toLowerCase();
+
+                // Load the model with authentication and proper filename
                 await window.loadModel({ 
                     url: decodedUrl,
-                    filename: filename || 'model',
+                    filename: filename || 'model.' + fileExtension, // Use original filename or fallback with extension
                     headers: authHeaders
                 });
 

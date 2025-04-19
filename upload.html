@@ -417,8 +417,8 @@
             emptyState.style.display = 'none';
             
             fileList.innerHTML = files.map(file => {
-                // Get the original filename from metadata if available, otherwise extract from name
-                const originalFilename = file.metadata?.originalName || file.name.split('-').slice(2).join('-');
+                // Extract original filename from the timestamped name
+                const originalFilename = file.name.split('-').slice(2).join('-');
                 const fileUrl = supabase.storage
                     .from('client-files')
                     .getPublicUrl(currentSession.user.id + '/' + file.name).data.publicUrl;
@@ -426,18 +426,18 @@
                 return `
                     <div class="file-item">
                         <div class="file-info">
-                            <i class="fas fa-cube"></i>
+                            <i class="fas fa-cube file-icon"></i>
                             <div class="file-details">
                                 <span class="file-name">${originalFilename}</span>
                                 <span class="file-size">${formatFileSize(file.metadata.size)}</span>
                             </div>
                         </div>
                         <div class="file-actions">
-                            <button class="file-action-btn" onclick="window.location.href='index.html?model=${encodeURIComponent(fileUrl)}&filename=${encodeURIComponent(originalFilename)}'">
+                            <button class="file-action-btn" onclick="window.location.href='index.html?model=${encodeURIComponent(fileUrl)}&filename=${encodeURIComponent(originalFilename)}'" title="View model">
                                 <i class="fas fa-eye"></i>
                                 View
                             </button>
-                            <button class="file-action-btn delete" data-filename="${file.name}">
+                            <button class="file-action-btn delete" data-filename="${file.name}" title="Delete file">
                                 <i class="fas fa-trash"></i>
                                 Delete
                             </button>

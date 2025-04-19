@@ -2499,14 +2499,11 @@ export async function loadModel(modelInfo) {
     if (loadingContainer) loadingContainer.style.display = 'flex';
 
     try {
-        // Get filename from modelInfo or extract from URL, removing any Supabase prefix
-        let filename = modelInfo.filename;
-        if (!filename) {
-            filename = modelUrl.split('/').pop().split('?')[0];
-            // Remove any timestamp-random prefix (e.g., "1234567890-abc123.3dm")
-            filename = filename.replace(/^\d+-[a-z0-9]+\./, '');
-        }
+        // Get filename and extension
+        const filename = modelInfo.filename || modelUrl.split('/').pop().split('?')[0];
         const extension = filename.split('.').pop().toLowerCase();
+
+        console.log('Processing file:', { filename, extension });
 
         // Get the appropriate loader
         const loader = getLoaderForFile(filename);
@@ -2584,14 +2581,12 @@ export async function loadModel(modelInfo) {
         }
 
         // Hide loading progress
-        const progressContainer = document.getElementById('loadingProgressContainer');
-        if (progressContainer) progressContainer.style.display = 'none';
+        if (loadingContainer) loadingContainer.style.display = 'none';
 
         return loadedModel;
     } catch (error) {
         console.error('Error loading model:', error);
-        const progressContainer = document.getElementById('loadingProgressContainer');
-        if (progressContainer) progressContainer.style.display = 'none';
+        if (loadingContainer) loadingContainer.style.display = 'none';
         throw error;
     }
 }
