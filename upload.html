@@ -388,15 +388,37 @@
     let currentSession = null;
     let refreshTimer = null;
 
-    // Initialize the page
+    // Initialize the page with retry logic
     async function initializePage() {
-        await checkAuth();
-        setupEventListeners();
-        await updateFileList();
-        setupSessionRefresh();
+        try {
+            await checkAuth();
+            setupEventListeners();
+            
+            // Try to update file list multiple times with increasing delays
+            const delays = [0, 1000, 3000]; // Try immediately, after 1s, and after 3s
+            for (let i = 0; i < delays.length; i++) {
+                await new Promise(resolve => setTimeout(resolve, delays[i]));
+                try {
+                    await updateFileList();
+                    // If successful, break the retry loop
+                    break;
+                } catch (err) {
+                    console.warn(`Attempt ${i + 1} to update file list failed:`, err);
+                    // Only show error on last attempt
+                    if (i === delays.length - 1) {
+                        showErrorMessage('Failed to load files. Please refresh the page.');
+                    }
+                }
+            }
+            
+            setupSessionRefresh();
+        } catch (error) {
+            console.error('Failed to initialize page:', error);
+            showErrorMessage('Failed to initialize page: ' + error.message);
+        }
     }
 
-    // Check auth status and redirect if not logged in
+    // Check auth status with improved session validation
     async function checkAuth() {
         try {
             const { data: { session }, error } = await supabase.auth.getSession();
@@ -408,13 +430,19 @@
                 return;
             }
 
-            // Check if token is expired or will expire soon
-            const tokenExpiry = new Date(session.expires_at * 1000);
-            const now = new Date();
-            const timeUntilExpiry = tokenExpiry.getTime() - now.getTime();
-            
-            if (timeUntilExpiry <= 0) {
-                // Token is expired, try to refresh
+            // Validate session token
+            try {
+                // Make a test request to validate the token
+                const { error: testError } = await supabase.storage
+                    .from('models')
+                    .list(session.user.id + '/', { limit: 1 });
+
+                if (testError?.message?.includes('401')) {
+                    throw new Error('Invalid session');
+                }
+            } catch (validationError) {
+                console.error('Session validation failed:', validationError);
+                // Try to refresh the session
                 const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
                 
                 if (refreshError || !refreshData.session) {
@@ -422,10 +450,10 @@
                 }
                 
                 currentSession = refreshData.session;
-            } else {
-                currentSession = session;
             }
 
+            // If we get here, the session is valid
+            currentSession = session;
             updateAuthUI(currentSession);
             
             // Broadcast session update to other tabs
@@ -547,15 +575,27 @@
             // Show loading state
             loadingOverlay.classList.add('active');
 
+            // Log the user ID and path we're querying
+            const userPath = currentSession.user.id + '/';
+            console.log('Fetching files for path:', userPath);
+
             // List files from the models bucket with the user's folder
             const { data: files, error } = await supabase.storage
                 .from('models')
-                .list(currentSession.user.id + '/');
+                .list(userPath, {
+                    limit: 100,
+                    offset: 0,
+                    sortBy: { column: 'name', order: 'asc' }
+                });
+
+            // Log the response
+            console.log('Storage list response:', { files, error });
 
             if (error) throw error;
 
             // Handle empty state
             if (!files || files.length === 0) {
+                console.log('No files found');
                 if (fileListContent) fileListContent.innerHTML = '';
                 if (emptyState) emptyState.style.display = 'block';
                 return;
@@ -564,49 +604,78 @@
             if (emptyState) emptyState.style.display = 'none';
             
             // Create file items
-            const fileItems = files
+            const fileItems = await Promise.all(files
                 .filter(file => !file.name.startsWith('.')) // Filter out hidden files
-                .map(file => {
-                    // Extract original filename from the stored name
-                    const originalFilename = file.name.replace(/^\d+-[a-z0-9]+\./, '');
-                    const sizeInMB = (file.metadata.size / (1024 * 1024)).toFixed(2);
-                    
-                    return `
-                        <div class="file-item">
-                            <div class="file-info">
-                                <i class="fas fa-cube file-icon"></i>
-                                <div class="file-details">
-                                    <span class="file-name">${originalFilename}</span>
-                                    <span class="file-size">${sizeInMB} MB</span>
+                .map(async file => {
+                    try {
+                        // Get the public URL for verification
+                        const { data: { publicUrl } } = supabase.storage
+                            .from('models')
+                            .getPublicUrl(userPath + file.name);
+
+                        // Extract original filename from the stored name
+                        const originalFilename = file.name.replace(/^\d+-[a-z0-9]+\./, '');
+                        const sizeInMB = (file.metadata?.size || 0) / (1024 * 1024);
+                        const formattedSize = sizeInMB.toFixed(2);
+                        
+                        console.log('Processing file:', {
+                            name: file.name,
+                            originalFilename,
+                            size: formattedSize,
+                            publicUrl
+                        });
+
+                        return `
+                            <div class="file-item">
+                                <div class="file-info">
+                                    <i class="fas fa-cube file-icon"></i>
+                                    <div class="file-details">
+                                        <span class="file-name">${originalFilename}</span>
+                                        <span class="file-size">${formattedSize} MB</span>
+                                    </div>
+                                </div>
+                                <div class="file-actions">
+                                    <button onclick="viewFile('${file.name}', '${originalFilename}')" class="file-action-btn view-btn">
+                                        <i class="fas fa-eye"></i>
+                                        View
+                                    </button>
+                                    <button onclick="deleteFile('${file.name}')" class="file-action-btn delete">
+                                        <i class="fas fa-trash"></i>
+                                        Delete
+                                    </button>
                                 </div>
                             </div>
-                            <div class="file-actions">
-                                <button onclick="viewFile('${file.name}', '${originalFilename}')" class="file-action-btn view-btn">
-                                    <i class="fas fa-eye"></i>
-                                    View
-                                </button>
-                                <button onclick="deleteFile('${file.name}')" class="file-action-btn delete">
-                                    <i class="fas fa-trash"></i>
-                                    Delete
-                                </button>
-                            </div>
-                        </div>
-                    `;
-                }).join('');
+                        `;
+                    } catch (err) {
+                        console.error('Error processing file:', file.name, err);
+                        return ''; // Skip this file if there's an error
+                    }
+                }));
+
+            const validFileItems = fileItems.filter(item => item !== '');
 
             if (fileListContent) {
-                fileListContent.innerHTML = fileItems;
+                if (validFileItems.length > 0) {
+                    fileListContent.innerHTML = validFileItems.join('');
+                    if (emptyState) emptyState.style.display = 'none';
+                } else {
+                    fileListContent.innerHTML = '';
+                    if (emptyState) emptyState.style.display = 'block';
+                }
             }
         } catch (error) {
             console.error('Error updating file list:', error);
             showErrorMessage('Failed to update file list: ' + error.message);
+            // Show empty state on error
+            if (fileListContent) fileListContent.innerHTML = '';
+            if (emptyState) emptyState.style.display = 'block';
         } finally {
             // Hide loading state
             loadingOverlay.classList.remove('active');
         }
     }
 
-    // Handle file upload
+    // Update the uploadFile function to handle file list updates properly
     async function uploadFile(file) {
         try {
             if (!currentSession?.user?.id) throw new Error('No active session');
@@ -630,6 +699,13 @@
             const fileName = `${timestamp}-${randomString}.${originalName}`;
             const filePath = `${currentSession.user.id}/${fileName}`;
 
+            console.log('Uploading file:', {
+                originalName,
+                fileName,
+                filePath,
+                size: formatFileSize(file.size)
+            });
+
             // Show and reset upload progress
             const progressBar = document.querySelector('.upload-progress');
             const progressBarFill = progressBar?.querySelector('.progress-bar');
@@ -640,21 +716,29 @@
 
             // Create upload options with progress tracking
             const options = {
-                metadata: { originalName },
-                onUploadProgress: (progress) => {
-                    const percent = Math.round((progress.loaded / progress.total) * 100);
-                    if (progressBarFill) progressBarFill.style.width = `${percent}%`;
-                    if (progressText) progressText.textContent = `Uploading... ${percent}%`;
+                cacheControl: '3600',
+                upsert: false,
+                contentType: file.type || 'application/octet-stream',
+                metadata: {
+                    originalName,
+                    size: file.size,
+                    uploadedAt: new Date().toISOString()
                 }
             };
 
+            // Upload the file
             const { error: uploadError } = await supabase.storage
                 .from('models')
                 .upload(filePath, file, options);
 
             if (uploadError) throw uploadError;
 
+            console.log('File uploaded successfully:', fileName);
+
+            // Wait a short moment before updating the file list to allow for storage propagation
+            await new Promise(resolve => setTimeout(resolve, 1000));
             await updateFileList();
+            
             showSuccess('File uploaded successfully');
         } catch (err) {
             console.error('Upload error:', err);
