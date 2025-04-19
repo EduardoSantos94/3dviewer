@@ -388,33 +388,52 @@
     let currentSession = null;
     let refreshTimer = null;
 
-    // Initialize the page with retry logic
+    // Initialize the page with bucket creation
     async function initializePage() {
         try {
             await checkAuth();
+            await initializeStorage();
             setupEventListeners();
-            
-            // Try to update file list multiple times with increasing delays
-            const delays = [0, 1000, 3000]; // Try immediately, after 1s, and after 3s
-            for (let i = 0; i < delays.length; i++) {
-                await new Promise(resolve => setTimeout(resolve, delays[i]));
-                try {
-                    await updateFileList();
-                    // If successful, break the retry loop
-                    break;
-                } catch (err) {
-                    console.warn(`Attempt ${i + 1} to update file list failed:`, err);
-                    // Only show error on last attempt
-                    if (i === delays.length - 1) {
-                        showErrorMessage('Failed to load files. Please refresh the page.');
-                    }
-                }
-            }
-            
+            await updateFileList();
             setupSessionRefresh();
         } catch (error) {
             console.error('Failed to initialize page:', error);
             showErrorMessage('Failed to initialize page: ' + error.message);
+        }
+    }
+
+    // Initialize storage bucket
+    async function initializeStorage() {
+        try {
+            // Try to create the bucket if it doesn't exist
+            const { data: bucketData, error: createError } = await supabase
+                .storage
+                .createBucket('models', {
+                    public: false,
+                    allowedMimeTypes: ['application/octet-stream', 'model/3dm', 'model/obj', 'model/stl', 'model/gltf+json', 'model/gltf-binary'],
+                    fileSizeLimit: 52428800 // 50MB in bytes
+                });
+
+            if (createError && !createError.message.includes('already exists')) {
+                throw createError;
+            }
+
+            console.log('Storage bucket ready:', bucketData || 'already exists');
+
+            // Set up bucket policies
+            const { error: policyError } = await supabase
+                .storage
+                .from('models')
+                .createSignedUrl('test.txt', 1); // This is just to test bucket access
+
+            if (policyError && !policyError.message.includes('not found')) {
+                throw policyError;
+            }
+
+            return true;
+        } catch (error) {
+            console.error('Storage initialization error:', error);
+            throw new Error('Failed to initialize storage: ' + error.message);
         }
     }
 
@@ -575,16 +594,6 @@
             loadingOverlay.classList.add('active');
             const userPath = currentSession.user.id + '/';
             
-            console.log('Checking storage bucket access...');
-            const { data: bucketData, error: bucketError } = await supabase
-                .storage
-                .getBucket('models');
-
-            if (bucketError) {
-                console.error('Bucket access error:', bucketError);
-                throw new Error('Cannot access storage bucket');
-            }
-
             console.log('Fetching files for path:', {
                 userPath,
                 userId: currentSession.user.id,
@@ -608,8 +617,23 @@
             });
 
             if (error) {
-                console.error('List error:', error);
-                throw error;
+                // If bucket doesn't exist, try to create it
+                if (error.message.includes('bucket not found')) {
+                    await initializeStorage();
+                    // Retry listing files
+                    const { data: retryFiles, error: retryError } = await supabase.storage
+                        .from('models')
+                        .list(userPath, {
+                            limit: 100,
+                            offset: 0,
+                            sortBy: { column: 'name', order: 'desc' }
+                        });
+                    
+                    if (retryError) throw retryError;
+                    files = retryFiles;
+                } else {
+                    throw error;
+                }
             }
 
             // Handle empty state
@@ -627,11 +651,6 @@
                 .filter(file => !file.name.startsWith('.'))
                 .map(async file => {
                     try {
-                        // Get file URL to verify accessibility
-                        const { data: urlData } = await supabase.storage
-                            .from('models')
-                            .createSignedUrl(userPath + file.name, 60);
-
                         const originalFilename = file.name.substring(file.name.indexOf('-') + 1);
                         const sizeInMB = (file.metadata?.size || 0) / (1024 * 1024);
                         const formattedSize = sizeInMB.toFixed(2);
@@ -640,8 +659,7 @@
                             storedName: file.name,
                             originalFilename,
                             size: formattedSize,
-                            metadata: file.metadata,
-                            url: urlData?.signedUrl
+                            metadata: file.metadata
                         });
 
                         return `
@@ -692,16 +710,10 @@
         }
     }
 
-    // Update the uploadFile function to verify uploads
+    // Update the uploadFile function to handle bucket creation
     async function uploadFile(file) {
         try {
             if (!currentSession?.user?.id) throw new Error('No active session');
-
-            // Log the current session and user info
-            console.log('Current session:', {
-                userId: currentSession.user.id,
-                email: currentSession.user.email
-            });
 
             // Validate file size (max 50MB)
             const MAX_FILE_SIZE = 50 * 1024 * 1024;
@@ -739,17 +751,8 @@
             if (progressBarFill) progressBarFill.style.width = '0%';
             if (progressText) progressText.textContent = 'Preparing upload...';
 
-            // First verify bucket exists and is accessible
-            const { data: bucketData, error: bucketError } = await supabase
-                .storage
-                .getBucket('models');
-
-            if (bucketError) {
-                console.error('Bucket error:', bucketError);
-                throw new Error('Storage bucket not accessible');
-            }
-
-            console.log('Bucket verified:', bucketData);
+            // Ensure storage is initialized
+            await initializeStorage();
 
             // Upload options with metadata
             const options = {
@@ -779,32 +782,6 @@
             console.log('Upload successful:', {
                 data: uploadData,
                 path: filePath
-            });
-
-            // Verify the file was uploaded by trying to get its URL
-            const { data: urlData, error: urlError } = await supabase.storage
-                .from('models')
-                .createSignedUrl(filePath, 60);
-
-            if (urlError) {
-                console.error('URL verification error:', urlError);
-                throw new Error('Failed to verify upload');
-            }
-
-            console.log('File URL verified:', urlData);
-
-            // List files to verify it appears in the list
-            const { data: listData, error: listError } = await supabase.storage
-                .from('models')
-                .list(currentSession.user.id + '/', {
-                    limit: 100,
-                    offset: 0,
-                    sortBy: { column: 'name', order: 'desc' }
-                });
-
-            console.log('Storage list after upload:', {
-                files: listData,
-                error: listError
             });
 
             // Wait for storage to propagate
