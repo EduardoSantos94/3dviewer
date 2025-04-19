@@ -34,6 +34,117 @@
     
     <!-- App script loads last -->
     <script type="module" src="app.js"></script>
+
+    <style>
+        /* Error Message Styles */
+        .error-message {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .error-content {
+            background-color: white;
+            padding: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            max-width: 400px;
+            text-align: center;
+        }
+
+        .error-content i {
+            color: #dc3545;
+            font-size: 2rem;
+            margin-bottom: 1rem;
+        }
+
+        .error-content h3 {
+            color: #333;
+            margin: 0.5rem 0;
+        }
+
+        .error-content p {
+            color: #666;
+            margin: 1rem 0;
+        }
+
+        .error-content button {
+            background-color: #dc3545;
+            color: white;
+            border: none;
+            padding: 0.5rem 1.5rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: background-color 0.2s;
+        }
+
+        .error-content button:hover {
+            background-color: #c82333;
+        }
+
+        /* Auth Styles */
+        .auth-status {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1001;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background-color: rgba(255, 255, 255, 0.9);
+            padding: 8px 12px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .auth-btn {
+            background-color: #007AFF;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .auth-btn:hover {
+            background-color: #0056b3;
+        }
+
+        #user-email {
+            color: #333;
+            font-size: 14px;
+            margin-right: 10px;
+        }
+
+        #upload-btn {
+            background-color: #28a745;
+        }
+
+        #upload-btn:hover {
+            background-color: #218838;
+        }
+
+        #logout-btn {
+            background-color: #dc3545;
+        }
+
+        #logout-btn:hover {
+            background-color: #c82333;
+        }
+    </style>
 </head>
 <body>
     <!-- Auth Status -->
@@ -156,64 +267,28 @@
         </div>
     </div>
 
-<style>
-.auth-status {
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    z-index: 1001;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    background-color: rgba(255, 255, 255, 0.9);
-    padding: 8px 12px;
-    border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-
-.auth-btn {
-    background-color: #007AFF;
-    color: white;
-    border: none;
-    padding: 8px 16px;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 14px;
-    transition: all 0.2s ease;
-    display: flex;
-    align-items: center;
-    gap: 5px;
-}
-
-.auth-btn:hover {
-    background-color: #0056b3;
-}
-
-#user-email {
-    color: #333;
-    font-size: 14px;
-    margin-right: 10px;
-}
-
-#upload-btn {
-    background-color: #28a745;
-}
-
-#upload-btn:hover {
-    background-color: #218838;
-}
-
-#logout-btn {
-    background-color: #dc3545;
-}
-
-#logout-btn:hover {
-    background-color: #c82333;
-}
-</style>
-
 <script type="module">
     import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.3/+esm';
+    import { loadModel } from './app.js';
+
+    // Make loadModel globally available
+    window.loadModel = loadModel;
+
+    // Add showErrorMessage function
+    window.showErrorMessage = function(message) {
+        const errorDiv = document.createElement('div');
+        errorDiv.className = 'error-message';
+        const errorContent = document.createElement('div');
+        errorContent.className = 'error-content';
+        errorContent.innerHTML = `
+            <i class="fas fa-exclamation-circle"></i>
+            <h3>Error</h3>
+            <p>${message}</p>
+            <button onclick="this.closest('.error-message').remove()">Close</button>
+        `;
+        errorDiv.appendChild(errorContent);
+        document.body.appendChild(errorDiv);
+    };
 
     // Initialize Supabase client with error handling
     const supabaseUrl = 'https://lwmcnwwkgdauqgxukwhn.supabase.co';
