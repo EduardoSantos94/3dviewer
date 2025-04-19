@@ -932,18 +932,27 @@ function updateTurntable() {
 
 // Toggle turntable animation with improved handling
 function toggleTurntable() {
-    isTurntableActive = !isTurntableActive;
-    console.log('Turntable:', isTurntableActive ? 'ON' : 'OFF');
-    
-    // Update button state
-    const turntableButton = document.getElementById('toggle-turntable');
-    if (turntableButton) {
-        turntableButton.classList.toggle('active', isTurntableActive);
+    if (!selectedObject) {
+        console.warn('No object selected for turntable animation');
+        return;
     }
     
-    // Disable/enable orbit controls when turntable is active
-    if (controls) {
-        controls.enabled = !isTurntableActive;
+    isTurntableActive = !isTurntableActive;
+    console.log("Turntable active:", isTurntableActive);
+    
+    const toggleTurntableBtn = document.getElementById('toggle-turntable');
+    if (toggleTurntableBtn) {
+        toggleTurntableBtn.classList.toggle('active', isTurntableActive);
+    }
+    
+    if (isTurntableActive) {
+        console.log('Starting turntable animation');
+        controls.enableRotate = false; // Disable manual rotation during turntable
+        turntableClock.start();
+    } else {
+        console.log('Stopping turntable animation');
+        controls.enableRotate = true; // Re-enable manual rotation
+        turntableClock.stop();
     }
 }
 
@@ -2115,9 +2124,11 @@ function animate() {
     
     // Update turntable if active
     if (isTurntableActive && selectedObject) {
+        if (!turntableClock.running) {
+            turntableClock.start();
+        }
         const delta = turntableClock.getDelta();
-        const rotationSpeed = turntableSpeed * delta;
-        selectedObject.rotation.y += rotationSpeed;
+        selectedObject.rotation.y += turntableSpeed * delta;
     }
     
     // Render the scene with composer for post-processing effects
@@ -2445,12 +2456,15 @@ export async function loadModel(modelInfo, materialType = null) {
         let filename;
         
         if (typeof modelInfo === 'object' && modelInfo.filename) {
+            // Use the original filename from the upload
             filename = modelInfo.filename;
         } else {
             // Extract filename from URL, handling query parameters
             const urlObj = new URL(modelPath);
             const pathSegments = urlObj.pathname.split('/');
-            filename = pathSegments[pathSegments.length - 1];
+            const rawFilename = pathSegments[pathSegments.length - 1];
+            // Remove any Supabase-specific prefix (timestamp-random)
+            filename = rawFilename.replace(/^\d+-[a-z0-9]+\./, '');
         }
         
         // Get the file extension
@@ -2504,7 +2518,7 @@ export async function loadModel(modelInfo, materialType = null) {
             applyMaterial(loadedModel, materialType);
         }
         
-        // Add to models array
+        // Add to models array with the original filename
         models.push({
             name: filename,
             object: loadedModel,
@@ -2512,6 +2526,9 @@ export async function loadModel(modelInfo, materialType = null) {
             selected: true,
             materialType: materialType || 'gold'
         });
+        
+        // Set as selected object for turntable
+        selectedObject = loadedModel;
         
         // Update UI
         updateLoadedModelsUI();
