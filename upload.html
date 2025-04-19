@@ -574,8 +574,24 @@
 
             loadingOverlay.classList.add('active');
             const userPath = currentSession.user.id + '/';
-            console.log('Fetching files for path:', userPath);
+            
+            console.log('Checking storage bucket access...');
+            const { data: bucketData, error: bucketError } = await supabase
+                .storage
+                .getBucket('models');
 
+            if (bucketError) {
+                console.error('Bucket access error:', bucketError);
+                throw new Error('Cannot access storage bucket');
+            }
+
+            console.log('Fetching files for path:', {
+                userPath,
+                userId: currentSession.user.id,
+                bucket: 'models'
+            });
+
+            // List all files in the user's directory
             const { data: files, error } = await supabase.storage
                 .from('models')
                 .list(userPath, {
@@ -584,12 +600,21 @@
                     sortBy: { column: 'name', order: 'desc' }
                 });
 
-            console.log('Storage list response:', { files, error });
+            console.log('Storage list response:', {
+                files,
+                error,
+                path: userPath,
+                bucket: 'models'
+            });
 
-            if (error) throw error;
+            if (error) {
+                console.error('List error:', error);
+                throw error;
+            }
 
+            // Handle empty state
             if (!files || files.length === 0) {
-                console.log('No files found');
+                console.log('No files found in path:', userPath);
                 if (fileListContent) fileListContent.innerHTML = '';
                 if (emptyState) emptyState.style.display = 'block';
                 return;
@@ -597,11 +622,16 @@
 
             if (emptyState) emptyState.style.display = 'none';
             
+            // Process files
             const fileItems = await Promise.all(files
                 .filter(file => !file.name.startsWith('.'))
                 .map(async file => {
                     try {
-                        // Extract original filename from stored name
+                        // Get file URL to verify accessibility
+                        const { data: urlData } = await supabase.storage
+                            .from('models')
+                            .createSignedUrl(userPath + file.name, 60);
+
                         const originalFilename = file.name.substring(file.name.indexOf('-') + 1);
                         const sizeInMB = (file.metadata?.size || 0) / (1024 * 1024);
                         const formattedSize = sizeInMB.toFixed(2);
@@ -610,7 +640,8 @@
                             storedName: file.name,
                             originalFilename,
                             size: formattedSize,
-                            metadata: file.metadata
+                            metadata: file.metadata,
+                            url: urlData?.signedUrl
                         });
 
                         return `
@@ -661,10 +692,16 @@
         }
     }
 
-    // Update the uploadFile function to preserve original filename
+    // Update the uploadFile function to verify uploads
     async function uploadFile(file) {
         try {
             if (!currentSession?.user?.id) throw new Error('No active session');
+
+            // Log the current session and user info
+            console.log('Current session:', {
+                userId: currentSession.user.id,
+                email: currentSession.user.email
+            });
 
             // Validate file size (max 50MB)
             const MAX_FILE_SIZE = 50 * 1024 * 1024;
@@ -682,16 +719,16 @@
             // Keep original filename but prefix with timestamp for uniqueness
             const timestamp = Date.now();
             const originalName = file.name;
-            // Store with original extension
             const fileName = `${timestamp}-${originalName}`;
             const filePath = `${currentSession.user.id}/${fileName}`;
 
-            console.log('Uploading file:', {
+            console.log('Preparing upload:', {
                 originalName,
                 fileName,
                 filePath,
                 extension: fileExt,
-                size: formatFileSize(file.size)
+                size: formatFileSize(file.size),
+                bucket: 'models'
             });
 
             // Show upload progress
@@ -702,29 +739,72 @@
             if (progressBarFill) progressBarFill.style.width = '0%';
             if (progressText) progressText.textContent = 'Preparing upload...';
 
+            // First verify bucket exists and is accessible
+            const { data: bucketData, error: bucketError } = await supabase
+                .storage
+                .getBucket('models');
+
+            if (bucketError) {
+                console.error('Bucket error:', bucketError);
+                throw new Error('Storage bucket not accessible');
+            }
+
+            console.log('Bucket verified:', bucketData);
+
             // Upload options with metadata
             const options = {
                 cacheControl: '3600',
                 upsert: false,
                 contentType: file.type || 'application/octet-stream',
+                duplex: 'half',
                 metadata: {
                     originalName,
                     extension: fileExt,
                     size: file.size,
-                    uploadedAt: new Date().toISOString()
+                    uploadedAt: new Date().toISOString(),
+                    userId: currentSession.user.id
                 }
             };
 
-            const { error: uploadError } = await supabase.storage
+            // Perform the upload
+            const { data: uploadData, error: uploadError } = await supabase.storage
                 .from('models')
                 .upload(filePath, file, options);
 
-            if (uploadError) throw uploadError;
+            if (uploadError) {
+                console.error('Upload error:', uploadError);
+                throw uploadError;
+            }
 
-            console.log('File uploaded successfully:', {
-                fileName,
-                originalName,
-                extension: fileExt
+            console.log('Upload successful:', {
+                data: uploadData,
+                path: filePath
+            });
+
+            // Verify the file was uploaded by trying to get its URL
+            const { data: urlData, error: urlError } = await supabase.storage
+                .from('models')
+                .createSignedUrl(filePath, 60);
+
+            if (urlError) {
+                console.error('URL verification error:', urlError);
+                throw new Error('Failed to verify upload');
+            }
+
+            console.log('File URL verified:', urlData);
+
+            // List files to verify it appears in the list
+            const { data: listData, error: listError } = await supabase.storage
+                .from('models')
+                .list(currentSession.user.id + '/', {
+                    limit: 100,
+                    offset: 0,
+                    sortBy: { column: 'name', order: 'desc' }
+                });
+
+            console.log('Storage list after upload:', {
+                files: listData,
+                error: listError
             });
 
             // Wait for storage to propagate
