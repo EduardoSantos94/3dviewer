@@ -314,7 +314,8 @@
     async function checkForModelUrl() {
         const urlParams = new URLSearchParams(window.location.search);
         const modelUrl = urlParams.get('model');
-        let filename = urlParams.get('filename');
+        const filename = urlParams.get('filename');
+        const authToken = urlParams.get('token');
         
         if (modelUrl) {
             try {

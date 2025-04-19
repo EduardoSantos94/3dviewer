@@ -8,7 +8,7 @@
         script-src 'self' 'unsafe-eval' 'unsafe-inline' https://unpkg.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://files.mcneel.com blob:;
         style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com;
         font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com;
-        connect-src 'self' https://cdn.jsdelivr.net https://unpkg.com https://cdnjs.cloudflare.com https://files.mcneel.com https://*.supabase.co https://www.google-analytics.com data: blob:;
+        connect-src 'self' https://cdn.jsdelivr.net https://unpkg.com https://cdnjs.cloudflare.com https://files.mcneel.com https://*.supabase.co wss://*.supabase.co https://www.google-analytics.com data: blob:;
         img-src 'self' data: blob: https://*.supabase.co;
         worker-src 'self' blob:;
     ">
@@ -73,6 +73,13 @@
                     </button>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <div class="loading-overlay" id="loading-overlay">
+        <div class="loading-content">
+            <div class="loading-spinner"></div>
+            <p>Loading...</p>
         </div>
     </div>
 
@@ -321,6 +328,46 @@
     #logout-btn:hover {
         background-color: #d63029;
     }
+
+    .loading-spinner {
+        display: inline-block;
+        width: 20px;
+        height: 20px;
+        border: 2px solid rgba(255,255,255,0.3);
+        border-radius: 50%;
+        border-top-color: #fff;
+        animation: spin 1s ease-in-out infinite;
+        margin-right: 8px;
+    }
+
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+
+    .loading-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(255, 255, 255, 0.8);
+        display: none;
+        justify-content: center;
+        align-items: center;
+        z-index: 1000;
+    }
+
+    .loading-overlay.active {
+        display: flex;
+    }
+
+    .loading-content {
+        text-align: center;
+        background: white;
+        padding: 2rem;
+        border-radius: 8px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
     </style>
 
     <script type="module">
@@ -339,12 +386,14 @@
 
     // Store current session globally
     let currentSession = null;
+    let refreshTimer = null;
 
     // Initialize the page
     async function initializePage() {
         await checkAuth();
         setupEventListeners();
         await updateFileList();
+        setupSessionRefresh();
     }
 
     // Check auth status and redirect if not logged in
@@ -352,17 +401,88 @@
         try {
             const { data: { session }, error } = await supabase.auth.getSession();
             
-            if (!session || error) {
+            if (error) throw error;
+            
+            if (!session) {
                 window.location.href = 'login.html';
                 return;
             }
 
-            currentSession = session;
-            updateAuthUI(session);
+            // Check if token is expired or will expire soon
+            const tokenExpiry = new Date(session.expires_at * 1000);
+            const now = new Date();
+            const timeUntilExpiry = tokenExpiry.getTime() - now.getTime();
+            
+            if (timeUntilExpiry <= 0) {
+                // Token is expired, try to refresh
+                const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+                
+                if (refreshError || !refreshData.session) {
+                    throw new Error('Session expired. Please login again.');
+                }
+                
+                currentSession = refreshData.session;
+            } else {
+                currentSession = session;
+            }
+
+            updateAuthUI(currentSession);
+            
+            // Broadcast session update to other tabs
+            localStorage.setItem('lastSessionUpdate', Date.now().toString());
+            
         } catch (err) {
             console.error('Auth check failed:', err);
+            showErrorMessage(err.message);
             window.location.href = 'login.html';
         }
+    }
+
+    // Setup session refresh
+    function setupSessionRefresh() {
+        // Clear any existing refresh timer
+        if (refreshTimer) {
+            clearInterval(refreshTimer);
+        }
+
+        // Set up periodic session refresh (every 10 minutes)
+        refreshTimer = setInterval(async () => {
+            try {
+                const { data: { session }, error } = await supabase.auth.getSession();
+                if (error) throw error;
+                
+                if (session) {
+                    const tokenExpiry = new Date(session.expires_at * 1000);
+                    const now = new Date();
+                    const timeUntilExpiry = tokenExpiry.getTime() - now.getTime();
+                    
+                    // Refresh if token will expire in less than 15 minutes
+                    if (timeUntilExpiry <= 15 * 60 * 1000) {
+                        const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+                        if (refreshError) throw refreshError;
+                        
+                        if (refreshData.session) {
+                            currentSession = refreshData.session;
+                            updateAuthUI(currentSession);
+                            localStorage.setItem('lastSessionUpdate', Date.now().toString());
+                        }
+                    }
+                }
+            } catch (err) {
+                console.error('Session refresh failed:', err);
+                // Only redirect if the error is auth-related
+                if (err.message.includes('auth') || err.message.includes('session')) {
+                    window.location.href = 'login.html';
+                }
+            }
+        }, 10 * 60 * 1000); // 10 minutes
+
+        // Listen for session updates from other tabs
+        window.addEventListener('storage', (event) => {
+            if (event.key === 'lastSessionUpdate') {
+                checkAuth();
+            }
+        });
     }
 
     // Setup all event listeners
@@ -370,14 +490,12 @@
         // Add Files button
         document.getElementById('add-files-btn').addEventListener('click', () => {
             const uploadArea = document.getElementById('upload-area');
-            uploadArea.style.display = uploadArea.style.display === 'none' ? 'block' : 'none';
-            setupDropZone();
+            toggleUploadArea(uploadArea.style.display === 'none');
         });
 
         // Add First Model button
         document.getElementById('add-first-model-btn').addEventListener('click', () => {
-            document.getElementById('upload-area').style.display = 'block';
-            setupDropZone();
+            toggleUploadArea(true);
         });
 
         // Select Files button
@@ -387,32 +505,48 @@
 
         // File Input change
         document.getElementById('file-input').addEventListener('change', (e) => {
-            handleFiles(Array.from(e.target.files));
+            const files = Array.from(e.target.files);
+            if (files.length > 0) {
+                handleFiles(files);
+                toggleUploadArea(false);
+            }
         });
 
         // Logout button
         document.getElementById('logout-btn')?.addEventListener('click', handleLogout);
+
+        // Handle drag and drop events globally
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            document.body.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                if (eventName === 'dragenter' || eventName === 'dragover') {
+                    toggleUploadArea(true);
+                }
+            });
+        });
     }
 
-    // Load user's files from storage
+    // Load user's files from storage with loading state
     async function updateFileList() {
         const fileListContent = document.getElementById('file-list-content');
         const emptyState = document.getElementById('empty-state');
+        const loadingOverlay = document.getElementById('loading-overlay');
         
         try {
             if (!currentSession?.user?.id) {
                 throw new Error('No active session');
             }
 
+            // Show loading state
+            loadingOverlay.classList.add('active');
+
             const { data: files, error } = await supabase.storage
                 .from('models')
                 .list(currentSession.user.id + '/');
 
-            if (error) {
-                console.error('Error fetching files:', error);
-                showErrorMessage('Failed to fetch files: ' + error.message);
-                return;
-            }
+            if (error) throw error;
 
             if (!files || files.length === 0) {
                 if (fileListContent) fileListContent.innerHTML = '';
@@ -423,21 +557,24 @@
             if (emptyState) emptyState.style.display = 'none';
             
             const fileItems = files.map(file => {
-                // Extract original filename by removing timestamp-random prefix
                 const originalFilename = file.name.replace(/^\d+-[a-z0-9]+\./, '');
                 const sizeInMB = (file.metadata.size / (1024 * 1024)).toFixed(2);
                 
                 return `
                     <div class="file-item">
-                        <i class="fas fa-cube"></i>
-                        <span>${originalFilename}</span>
-                        <span class="file-size">${sizeInMB} MB</span>
+                        <div class="file-info">
+                            <i class="fas fa-cube"></i>
+                            <div class="file-details">
+                                <span class="file-name">${originalFilename}</span>
+                                <span class="file-size">${sizeInMB} MB</span>
+                            </div>
+                        </div>
                         <div class="file-actions">
-                            <button onclick="viewFile('${file.name}', '${originalFilename}')" class="file-action-btn">
+                            <button onclick="viewFile('${file.name}', '${originalFilename}')" class="file-action-btn view-btn">
                                 <i class="fas fa-eye"></i>
                                 View
                             </button>
-                            <button onclick="deleteFile('${file.name}')" class="file-action-btn delete">
+                            <button onclick="deleteFile('${file.name}')" class="file-action-btn delete-btn">
                                 <i class="fas fa-trash"></i>
                                 Delete
                             </button>
@@ -452,6 +589,9 @@
         } catch (error) {
             console.error('Error updating file list:', error);
             showErrorMessage('Failed to update file list: ' + error.message);
+        } finally {
+            // Hide loading state
+            loadingOverlay.classList.remove('active');
         }
     }
 
@@ -460,23 +600,46 @@
         try {
             if (!currentSession?.user?.id) throw new Error('No active session');
 
+            // Validate file size (max 50MB)
+            const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
+            if (file.size > MAX_FILE_SIZE) {
+                throw new Error(`File size exceeds 50MB limit: ${formatFileSize(file.size)}`);
+            }
+
+            // Validate file type
+            const allowedTypes = ['.3dm', '.obj', '.stl', '.glb', '.gltf'];
+            const fileExt = '.' + file.name.split('.').pop().toLowerCase();
+            if (!allowedTypes.includes(fileExt)) {
+                throw new Error(`Unsupported file type: ${fileExt}`);
+            }
+
             const timestamp = Date.now();
             const randomString = Math.random().toString(36).substring(2);
             const originalName = file.name;
             const fileName = `${timestamp}-${randomString}.${originalName}`;
             const filePath = `${currentSession.user.id}/${fileName}`;
 
-            // Show upload progress
+            // Show and reset upload progress
             const progressBar = document.querySelector('.upload-progress');
+            const progressBarFill = progressBar?.querySelector('.progress-bar');
+            const progressText = progressBar?.querySelector('.progress-text');
             if (progressBar) progressBar.style.display = 'block';
+            if (progressBarFill) progressBarFill.style.width = '0%';
+            if (progressText) progressText.textContent = 'Preparing upload...';
+
+            // Create upload options with progress tracking
+            const options = {
+                metadata: { originalName },
+                onUploadProgress: (progress) => {
+                    const percent = Math.round((progress.loaded / progress.total) * 100);
+                    if (progressBarFill) progressBarFill.style.width = `${percent}%`;
+                    if (progressText) progressText.textContent = `Uploading... ${percent}%`;
+                }
+            };
 
             const { error: uploadError } = await supabase.storage
                 .from('models')
-                .upload(filePath, file, {
-                    metadata: {
-                        originalName: originalName
-                    }
-                });
+                .upload(filePath, file, options);
 
             if (uploadError) throw uploadError;
 
@@ -484,7 +647,7 @@
             showSuccess('File uploaded successfully');
         } catch (err) {
             console.error('Upload error:', err);
-            showErrorMessage('Failed to upload file: ' + err.message);
+            showErrorMessage(err.message || 'Failed to upload file');
         } finally {
             const progressBar = document.querySelector('.upload-progress');
             if (progressBar) progressBar.style.display = 'none';
@@ -512,15 +675,41 @@
         }
     }
 
-    // Handle logout
+    // Handle logout with proper cleanup
     async function handleLogout() {
         try {
+            // Clear the refresh timer
+            if (refreshTimer) {
+                clearInterval(refreshTimer);
+                refreshTimer = null;
+            }
+
             const { error } = await supabase.auth.signOut();
             if (error) throw error;
+
+            // Clear any stored session data
+            currentSession = null;
+            localStorage.removeItem('lastSessionUpdate');
+
             window.location.href = 'login.html';
         } catch (err) {
             console.error('Logout failed:', err);
-            showErrorMessage('Failed to logout');
+            showErrorMessage('Failed to logout: ' + err.message);
+        }
+    }
+
+    // Improve Add Files button toggle
+    function toggleUploadArea(show) {
+        const uploadArea = document.getElementById('upload-area');
+        const addFilesBtn = document.getElementById('add-files-btn');
+        
+        if (show) {
+            uploadArea.style.display = 'block';
+            addFilesBtn.innerHTML = '<i class="fas fa-times"></i>Cancel';
+            setupDropZone();
+        } else {
+            uploadArea.style.display = 'none';
+            addFilesBtn.innerHTML = '<i class="fas fa-plus"></i>Add Files';
         }
     }
 
@@ -596,9 +785,52 @@
     function showSuccess(message) {
         const successDiv = document.createElement('div');
         successDiv.className = 'success-message';
-        successDiv.textContent = message;
+        const successContent = document.createElement('div');
+        successContent.className = 'success-content';
+        
+        const icon = document.createElement('i');
+        icon.className = 'fas fa-check-circle';
+        
+        const title = document.createElement('h3');
+        title.textContent = 'Success';
+        
+        const text = document.createElement('p');
+        text.textContent = message;
+        
+        const button = document.createElement('button');
+        button.textContent = 'Close';
+        button.onclick = () => successDiv.remove();
+        
+        successContent.append(icon, title, text, button);
+        successDiv.appendChild(successContent);
         document.querySelector('.upload-box').insertBefore(successDiv, document.querySelector('.upload-header'));
+        
         setTimeout(() => successDiv.remove(), 5000);
+    }
+
+    // Show error message function with proper escaping
+    function showErrorMessage(message) {
+        const errorDiv = document.createElement('div');
+        errorDiv.className = 'error-message';
+        const errorContent = document.createElement('div');
+        errorContent.className = 'error-content';
+        
+        const icon = document.createElement('i');
+        icon.className = 'fas fa-exclamation-circle';
+        
+        const title = document.createElement('h3');
+        title.textContent = 'Error';
+        
+        const text = document.createElement('p');
+        text.textContent = message; // Safe from XSS
+        
+        const button = document.createElement('button');
+        button.textContent = 'Close';
+        button.onclick = () => errorDiv.remove();
+        
+        errorContent.append(icon, title, text, button);
+        errorDiv.appendChild(errorContent);
+        document.body.appendChild(errorDiv);
     }
 
     // Listen for auth state changes
@@ -611,6 +843,23 @@
             updateFileList();
         }
     });
+
+    // View file function
+    async function viewFile(fileName, originalFilename) {
+        try {
+            if (!currentSession?.user?.id) throw new Error('No active session');
+
+            // Instead of getting public URL, construct the storage URL directly
+            const storageUrl = `${supabase.storageUrl}/object/public/models/${currentSession.user.id}/${fileName}`;
+
+            // Construct the viewer URL with model URL, filename, and auth token
+            const viewerUrl = `index.html?model=${encodeURIComponent(storageUrl)}&filename=${encodeURIComponent(originalFilename)}&token=${encodeURIComponent(currentSession.access_token)}`;
+            window.location.href = viewerUrl;
+        } catch (err) {
+            console.error('Error viewing file:', err);
+            showErrorMessage('Failed to view file: ' + err.message);
+        }
+    }
 
     // Initialize the page
     initializePage();
