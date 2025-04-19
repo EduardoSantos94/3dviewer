@@ -622,8 +622,9 @@
             // Process files
             const fileItems = await Promise.all(files.map(async file => {
                 try {
-                    const originalFilename = file.name.substring(file.name.indexOf('-') + 1);
-                    const sizeInMB = (file.metadata?.size || 0) / (1024 * 1024);
+                    // Get the original filename from metadata or fallback to stored name
+                    const originalFilename = file.metadata?.originalName || file.name.substring(file.name.indexOf('-') + 1);
+                    const sizeInMB = (file.metadata?.size || file.size || 0) / (1024 * 1024);
                     const formattedSize = sizeInMB.toFixed(2);
                     
                     console.log('Processing file:', {
@@ -632,6 +633,16 @@
                         size: formattedSize,
                         metadata: file.metadata
                     });
+
+                    // Get a signed URL for the file
+                    const { data: { signedUrl }, error: signedUrlError } = await supabase.storage
+                        .from('client-files')
+                        .createSignedUrl(`${userPath}${file.name}`, 3600); // 1 hour expiry
+
+                    if (signedUrlError) {
+                        console.error('Error getting signed URL:', signedUrlError);
+                        throw signedUrlError;
+                    }
 
                     return `
                         <div class="file-item">
@@ -643,7 +654,7 @@
                                 </div>
                             </div>
                             <div class="file-actions">
-                                <button onclick="viewFile('${file.name}', '${originalFilename}')" class="file-action-btn view-btn">
+                                <button onclick="viewFile('${file.name}', '${originalFilename}', '${signedUrl}')" class="file-action-btn view-btn">
                                     <i class="fas fa-eye"></i>
                                     View
                                 </button>
@@ -681,7 +692,7 @@
         }
     }
 
-    // Update the uploadFile function to use the correct bucket
+    // Update the uploadFile function to properly handle filenames
     async function uploadFile(file) {
         try {
             if (!currentSession?.user?.id) throw new Error('No active session');
@@ -727,7 +738,11 @@
                 cacheControl: '3600',
                 upsert: true,
                 contentType: file.type || 'application/octet-stream',
-                duplex: 'half'
+                duplex: 'half',
+                metadata: {
+                    originalName,
+                    fileType: fileExt.substring(1) // Store without the dot
+                }
             };
 
             // Perform the upload
@@ -742,7 +757,8 @@
 
             console.log('Upload successful:', {
                 data: uploadData,
-                path: filePath
+                path: filePath,
+                originalName
             });
 
             // Wait for storage to propagate
@@ -759,8 +775,8 @@
         }
     }
 
-    // Update the viewFile function to use the correct bucket
-    async function viewFile(fileName, originalFilename) {
+    // Update the viewFile function to use signed URLs
+    async function viewFile(fileName, originalFilename, signedUrl) {
         try {
             if (!currentSession?.user?.id) {
                 throw new Error('No active session');
@@ -768,17 +784,15 @@
 
             console.log('View file request:', {
                 fileName,
-                originalFilename
+                originalFilename,
+                signedUrl
             });
 
-            // Construct the storage URL
-            const storageUrl = `${supabase.storageUrl}/object/public/client-files/${currentSession.user.id}/${fileName}`;
-            
             // Create viewer URL with all necessary information
-            const viewerUrl = `index.html?model=${encodeURIComponent(storageUrl)}&filename=${encodeURIComponent(originalFilename)}&token=${encodeURIComponent(currentSession.access_token)}`;
+            const viewerUrl = `index.html?model=${encodeURIComponent(signedUrl)}&filename=${encodeURIComponent(originalFilename)}`;
             
             console.log('Opening viewer with URL:', {
-                storageUrl,
+                signedUrl,
                 filename: originalFilename
             });
 

@@ -315,8 +315,6 @@
         const urlParams = new URLSearchParams(window.location.search);
         const modelUrl = urlParams.get('model');
         const filename = urlParams.get('filename');
-        const extension = urlParams.get('extension');
-        const authToken = urlParams.get('token');
         
         if (modelUrl) {
             try {
@@ -329,58 +327,19 @@
                 if (loadingIndicator) loadingIndicator.style.display = 'flex';
                 if (container) container.style.display = 'flex';
 
-                // Get authentication token - use URL token if available, otherwise get from session
-                let token;
-                if (authToken) {
-                    token = decodeURIComponent(authToken);
-                } else {
-                    // Get current session for authentication
-                    const { data: { session } } = await supabase.auth.getSession();
-                    if (!session) {
-                        throw new Error('Authentication required to view models');
-                    }
-                    token = session.access_token;
-                }
-
-                // Construct authenticated URL
-                const decodedUrl = decodeURIComponent(modelUrl);
-                const authHeaders = {
-                    Authorization: `Bearer ${token}`
-                };
-
-                // Use provided filename and extension, or extract from URL
-                let finalFilename = filename ? decodeURIComponent(filename) : null;
-                let fileExtension = extension ? decodeURIComponent(extension) : null;
-
-                console.log('Model parameters:', {
-                    url: decodedUrl,
-                    filename: finalFilename,
-                    providedExtension: fileExtension
-                });
+                // Get file extension from filename
+                const fileExt = filename ? ('.' + filename.split('.').pop().toLowerCase()) : null;
                 
-                if (!finalFilename || !fileExtension) {
-                    // Try to extract extension from URL if not provided
-                    const urlExtension = decodedUrl.split('.').pop().toLowerCase();
-                    if (['3dm', 'obj', 'stl', 'glb', 'gltf'].includes(urlExtension)) {
-                        fileExtension = '.' + urlExtension;
-                        finalFilename = finalFilename || `model${fileExtension}`;
-                    } else {
-                        throw new Error('Could not determine file type. Please check the file extension.');
-                    }
-                }
-
                 console.log('Loading model with:', {
-                    url: decodedUrl,
-                    filename: finalFilename,
-                    extension: fileExtension
+                    url: modelUrl,
+                    filename: filename,
+                    extension: fileExt
                 });
 
-                // Load the model with authentication and proper filename
+                // Load the model with the signed URL
                 await window.loadModel({ 
-                    url: decodedUrl,
-                    filename: finalFilename,
-                    extension: fileExtension,
-                    headers: authHeaders
+                    url: decodeURIComponent(modelUrl),
+                    filename: filename ? decodeURIComponent(filename) : 'model' + (fileExt || '.3dm')
                 });
 
                 // Hide loading indicator
