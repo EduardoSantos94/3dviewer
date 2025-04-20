@@ -2033,38 +2033,29 @@ async function process3DMFile(file) {
     try {
         showLoadingIndicator();
         
-        // Check if rhino3dm is loaded and initialize it if needed
+        // Initialize rhino3dm
         if (!window.rhino3dm) {
             throw new Error('rhino3dm library not loaded');
         }
         
-        // Initialize rhino3dm
         const rhino = await window.rhino3dm();
         if (!rhino) {
             throw new Error('Failed to initialize rhino3dm');
         }
-        
-        // Verify file is a valid Blob
-        if (!(file instanceof Blob)) {
-            throw new Error('Invalid file object - not a Blob');
-        }
 
         console.log('Processing 3DM file:', file.name);
 
-        // Load and parse the 3DM file
-        const arrayBuffer = await readFileAsArrayBuffer(file);
-        console.log('File loaded as ArrayBuffer, size:', arrayBuffer.byteLength);
+        // Read file as ArrayBuffer
+        const buffer = await readFileAsArrayBuffer(file);
+        console.log('File loaded as ArrayBuffer, size:', buffer.byteLength);
 
-        const rhinoDoc = await rhino.File3dm.fromByteArray(arrayBuffer);
-        if (!rhinoDoc) {
-            throw new Error('Failed to decode 3DM file');
+        // Create File3dm from buffer
+        const doc = await rhino.File3dm.fromByteArray(buffer);
+        if (!doc) {
+            throw new Error('Failed to parse 3DM file');
         }
 
-        // Process objects in the document
-        const objects = rhinoDoc.objects();
-        console.log('Found', objects.count, 'objects in 3DM file');
-
-        // Create model info
+        // Create model container
         const modelInfo = {
             path: file.name,
             name: file.name.split('/').pop().split('.')[0],
@@ -2077,93 +2068,124 @@ async function process3DMFile(file) {
             material: currentMaterial || 'gold'
         };
 
-        // Process all objects in the document
+        // Get all objects from the document
+        const objects = doc.objects();
+        const objectCount = objects.count;
+        console.log(`Found ${objectCount} objects in file`);
+
         let processedCount = 0;
         let errorCount = 0;
 
-        for (let i = 0; i < objects.count; i++) {
-            const rhinoObject = objects.get(i);
-            
+        // Process each object
+        for (let i = 0; i < objectCount; i++) {
             try {
-                // Get geometry and attributes
+                const rhinoObject = objects.get(i);
+                if (!rhinoObject) continue;
+
                 const geometry = rhinoObject.geometry();
-                const attributes = rhinoObject.attributes();
-                
                 if (!geometry) {
-                    console.warn(`Object ${i} has no geometry, skipping`);
+                    console.log(`Object ${i}: No geometry`);
                     continue;
                 }
 
                 console.log(`Processing object ${i}, type:`, geometry.objectType);
 
+                let mesh = null;
+
+                // Handle different geometry types
                 if (geometry.objectType === rhino.ObjectType.Mesh) {
-                    // Convert Rhino mesh to Three.js mesh
-                    const mesh = await convertRhinoMeshToThree(geometry, rhino);
-                    if (mesh) {
-                        // Apply attributes if available
-                        if (attributes) {
-                            applyRhinoAttributes(mesh, attributes);
-                        }
-                        modelInfo.object.add(mesh);
-                        processedCount++;
-                    }
+                    // Direct mesh conversion
+                    mesh = await convertRhinoMeshToThree(geometry, rhino);
                 } else if (geometry.objectType === rhino.ObjectType.Brep) {
-                    // Convert Brep to mesh first
+                    // Convert Brep to mesh
                     const meshes = await convertBrepToMeshes(geometry, rhino);
-                    for (const mesh of meshes) {
-                        if (mesh) {
-                            // Apply attributes if available
-                            if (attributes) {
-                                applyRhinoAttributes(mesh, attributes);
-                            }
-                            modelInfo.object.add(mesh);
-                            processedCount++;
-                        }
+                    if (meshes && meshes.length > 0) {
+                        const group = new THREE.Group();
+                        meshes.forEach(m => {
+                            if (m) group.add(m);
+                        });
+                        mesh = group;
+                    }
+                } else if (geometry.objectType === rhino.ObjectType.SubD) {
+                    // Convert SubD to mesh
+                    const meshGeometry = geometry.toMesh();
+                    if (meshGeometry) {
+                        mesh = await convertRhinoMeshToThree(meshGeometry, rhino);
+                        meshGeometry.delete();
                     }
                 }
-                
-                // Clean up Rhino objects
+
+                if (mesh) {
+                    // Apply any attributes (layer, material, etc)
+                    const attributes = rhinoObject.attributes();
+                    if (attributes) {
+                        // Store attributes in userData
+                        mesh.userData.attributes = {
+                            name: attributes.name || '',
+                            layerIndex: attributes.layerIndex,
+                            materialIndex: attributes.materialIndex,
+                            materialSource: attributes.materialSource
+                        };
+
+                        // Handle user strings if available
+                        if (typeof attributes.getUserStrings === 'function') {
+                            try {
+                                const userStrings = attributes.getUserStrings();
+                                if (userStrings && userStrings.length > 0) {
+                                    mesh.userData.userStrings = userStrings;
+                                }
+                            } catch (e) {
+                                console.warn('Error getting user strings:', e);
+                            }
+                        }
+
+                        attributes.delete();
+                    }
+
+                    modelInfo.object.add(mesh);
+                    processedCount++;
+                }
+
+                // Clean up
                 if (geometry) geometry.delete();
-                if (attributes) attributes.delete();
                 rhinoObject.delete();
-                
+
             } catch (error) {
                 console.error(`Error processing object ${i}:`, error);
                 errorCount++;
             }
         }
 
-        console.log(`Processed ${processedCount} objects successfully, ${errorCount} errors`);
+        // Clean up document
+        doc.delete();
 
-        // Clean up Rhino document
-        rhinoDoc.delete();
-        
-        // Add the model to the scene if it has any children
-        if (modelInfo.object.children.length > 0) {
-            console.log('Adding model to scene with', modelInfo.object.children.length, 'children');
-            scene.add(modelInfo.object);
-            
-            // Apply material
-            applyMaterial(modelInfo.object, modelInfo.material);
-            
-            // Calculate bounding box
-            modelInfo.boundingBox = new THREE.Box3().setFromObject(modelInfo.object);
-            
-            // Add to models array
-            models.push(modelInfo);
-            
-            // Update UI
-            updateLoadedModelsUI();
-            
-            // Center and fit the camera
-            zoomToFit([modelInfo]);
-        } else {
-            console.warn('No valid geometry found in the 3DM file');
-            throw new Error('No valid geometry found in the file');
+        console.log(`Processed ${processedCount} objects, ${errorCount} errors`);
+
+        if (processedCount === 0) {
+            throw new Error('No valid geometry found in file');
         }
-        
+
+        // Add to scene
+        scene.add(modelInfo.object);
+
+        // Apply material
+        applyMaterial(modelInfo.object, modelInfo.material);
+
+        // Calculate bounding box
+        modelInfo.boundingBox = new THREE.Box3().setFromObject(modelInfo.object);
+
+        // Add to models array
+        models.push(modelInfo);
+
+        // Update UI
+        updateLoadedModelsUI();
+
+        // Center and fit camera
+        zoomToFit([modelInfo]);
+
         hideLoadingIndicator();
         return modelInfo;
+
     } catch (error) {
         console.error('Error processing 3DM file:', error);
         hideLoadingIndicator();
@@ -2175,39 +2197,71 @@ async function process3DMFile(file) {
 // Helper function to convert Rhino mesh to Three.js mesh
 async function convertRhinoMeshToThree(rhinoMesh, rhino) {
     try {
-        const meshData = rhinoMesh.toThreejsJSON();
-        if (!meshData) return null;
+        // First check if we have a valid mesh
+        if (!rhinoMesh || !rhino) {
+            console.warn('Invalid rhinoMesh or rhino instance');
+            return null;
+        }
 
+        // Get the mesh vertices
+        const vertices = rhinoMesh.vertices();
+        if (!vertices || vertices.count < 3) {
+            console.warn('Mesh has insufficient vertices');
+            return null;
+        }
+
+        // Get the mesh faces
+        const faces = rhinoMesh.faces();
+        if (!faces || faces.count < 1) {
+            console.warn('Mesh has no faces');
+            return null;
+        }
+
+        // Create geometry
         const geometry = new THREE.BufferGeometry();
         
-        // Add vertices
-        if (meshData.data.attributes.position) {
-            geometry.setAttribute('position', 
-                new THREE.Float32BufferAttribute(meshData.data.attributes.position.array, 3));
+        // Create arrays for vertices and faces
+        const positions = new Float32Array(faces.count * 3 * 3); // 3 vertices per face, 3 components per vertex
+        const indices = new Uint32Array(faces.count * 3);
+        
+        // Process faces and vertices
+        for (let faceIndex = 0; faceIndex < faces.count; faceIndex++) {
+            const face = faces.get(faceIndex);
+            
+            // Get vertices for this face
+            for (let i = 0; i < 3; i++) {
+                const vertexIndex = face[i];
+                const vertex = vertices.get(vertexIndex);
+                
+                const posIndex = (faceIndex * 9) + (i * 3);
+                positions[posIndex] = vertex[0];
+                positions[posIndex + 1] = vertex[1];
+                positions[posIndex + 2] = vertex[2];
+                
+                indices[faceIndex * 3 + i] = faceIndex * 3 + i;
+            }
         }
         
-        // Add normals if available
-        if (meshData.data.attributes.normal) {
-            geometry.setAttribute('normal',
-                new THREE.Float32BufferAttribute(meshData.data.attributes.normal.array, 3));
-        } else {
-            geometry.computeVertexNormals();
-        }
+        // Set geometry attributes
+        geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        geometry.setIndex(new THREE.BufferAttribute(indices, 1));
         
-        // Add UVs if available
-        if (meshData.data.attributes.uv) {
-            geometry.setAttribute('uv',
-                new THREE.Float32BufferAttribute(meshData.data.attributes.uv.array, 2));
-        }
-        
-        // Add indices if available
-        if (meshData.data.index) {
-            geometry.setIndex(new THREE.Uint32BufferAttribute(meshData.data.index.array, 1));
-        }
+        // Compute vertex normals
+        geometry.computeVertexNormals();
         
         // Create mesh with standard material
-        const material = new THREE.MeshStandardMaterial();
+        const material = new THREE.MeshStandardMaterial({
+            color: 0xffd700,
+            metalness: 0.8,
+            roughness: 0.2,
+            side: THREE.DoubleSide
+        });
+        
         const mesh = new THREE.Mesh(geometry, material);
+        
+        // Clean up rhino objects
+        vertices.delete();
+        faces.delete();
         
         return mesh;
     } catch (error) {
