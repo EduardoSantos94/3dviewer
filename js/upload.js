@@ -241,20 +241,22 @@ async function uploadFile(file) {
             throw new Error(`Unsupported file type: ${ext}`);
         }
 
-        // Create safe filename with timestamp
+        // Create safe filename with timestamp and user ID
         const timestamp = Date.now();
-        const safeFileName = `${timestamp}-${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
+        const safeFileName = `${currentSession.user.id}/${timestamp}-${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
         const filePath = `${currentSession.user.id}/${safeFileName}`;
 
-        // Upload with progress
-        const { error: uploadError } = await supabase.storage
+        // Upload with progress tracking
+        const { data, error } = await supabase.storage
             .from('client-files')
             .upload(filePath, file, {
                 cacheControl: '3600',
                 upsert: false,
-                metadata: {
-                    originalName: file.name,
-                    uploadedAt: new Date().toISOString()
+                contentType: file.type,
+                duplex: 'half',
+                headers: {
+                    'x-upsert': 'true',
+                    'Cache-Control': 'max-age=3600'
                 },
                 onUploadProgress: (progress) => {
                     const percentage = Math.round((progress.loaded / progress.total) * 100);
@@ -263,7 +265,7 @@ async function uploadFile(file) {
                 }
             });
 
-        if (uploadError) throw uploadError;
+        if (error) throw error;
 
         // Update grid and show success
         await updateModelsGrid();
@@ -274,12 +276,12 @@ async function uploadFile(file) {
             progressBar.style.display = 'none';
         }, 2000);
 
-        // Close modal
-        toggleUploadModal(false);
+        return data;
     } catch (error) {
         console.error('Upload error:', error);
         showErrorMessage(error.message || 'Failed to upload file');
         progressBar.style.display = 'none';
+        throw error;
     }
 }
 
@@ -295,29 +297,29 @@ async function viewFile(fileName, originalFilename) {
             throw new Error(`Unsupported file type: ${fileType}`);
         }
 
-        // Get a signed URL
+        // Get a signed URL with the correct port configuration
         const { data, error } = await supabase.storage
             .from('client-files')
-            .createSignedUrl(`${currentSession.user.id}/${fileName}`, 3600);
+            .createSignedUrl(`${currentSession.user.id}/${fileName}`, 3600, {
+                transform: {
+                    width: 800,
+                    height: 600,
+                    quality: 80
+                }
+            });
 
         if (error) throw error;
         if (!data?.signedUrl) throw new Error('Failed to get file URL');
 
-        // Log URL for debugging
-        console.log('Generated URL:', {
-            fileName,
-            originalFilename,
-            signedUrl: data.signedUrl
-        });
-
-        // Construct absolute viewer URL
-        const baseUrl = window.location.href.split('/').slice(0, -1).join('/');
-        const viewerUrl = `${baseUrl}/index.html?model=${encodeURIComponent(data.signedUrl)}&filename=${encodeURIComponent(originalFilename)}&type=${encodeURIComponent(fileType)}`;
-
-        console.log('Redirecting to:', viewerUrl);
+        // Construct absolute viewer URL without port number
+        const baseUrl = window.location.origin;
+        const viewerUrl = new URL(`${baseUrl}/index.html`);
+        viewerUrl.searchParams.set('model', encodeURIComponent(data.signedUrl));
+        viewerUrl.searchParams.set('filename', encodeURIComponent(originalFilename));
+        viewerUrl.searchParams.set('type', encodeURIComponent(fileType));
 
         // Open in new tab
-        window.open(viewerUrl, '_blank');
+        window.open(viewerUrl.toString(), '_blank');
     } catch (error) {
         console.error('Error viewing file:', error);
         showErrorMessage('Failed to view file: ' + error.message);
@@ -495,4 +497,16 @@ function updateAuthUI(session) {
         if (userInfo) userInfo.style.display = 'none';
         if (loginInfo) loginInfo.style.display = 'flex';
     }
-} 
+}
+
+// Add environment configuration
+const STORAGE_CONFIG = {
+    maxFileSize: 50 * 1024 * 1024, // 50MB
+    allowedTypes: ['.3dm', '.obj', '.stl', '.glb', '.gltf', '.fbx'],
+    uploadPath: 'client-files',
+    defaultTransform: {
+        width: 800,
+        height: 600,
+        quality: 80
+    }
+}; 
