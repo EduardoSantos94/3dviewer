@@ -2145,7 +2145,7 @@ function validateMeshGeometry(geometry) {
 
 
 // Helper function to convert Brep to meshes
-async function convertBrepToMeshes(brep, rhino) {
+async function convertBrepToMeshes(brep, rhino, parentAttributes = null) { // Accept parent attributes
     const meshes = [];
     try {
         // Create meshing parameters
@@ -2162,7 +2162,8 @@ async function convertBrepToMeshes(brep, rhino) {
             const mesh = face.getMesh(rhino.MeshType.Any);
             
             if (mesh) {
-                const threeMesh = await convertRhinoMeshToThree(mesh, rhino); // Call the renamed function
+                // Pass parentAttributes down
+                const threeMesh = await convertRhinoMeshToThree(mesh, rhino, parentAttributes);
                 if (threeMesh) {
                     meshes.push(threeMesh);
                 }
@@ -2180,7 +2181,7 @@ async function convertBrepToMeshes(brep, rhino) {
 
 // ADDED: Define the missing conversion function
 // Helper function to convert Rhino Mesh to Three.js Mesh
-async function convertRhinoMeshToThree(rhinoMesh, rhino) {
+async function convertRhinoMeshToThree(rhinoMesh, rhino, attributes = null) { // Add optional attributes parameter
     try {
         const geometry = new THREE.BufferGeometry();
         const vertices = rhinoMesh.vertices();
@@ -2245,10 +2246,19 @@ async function convertRhinoMeshToThree(rhinoMesh, rhino) {
             geometry.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
         }
         
-        // Store original Rhino attributes if available
-        const attributes = rhinoMesh.getUserData('attributes'); // Example, adjust if needed
-        if (attributes) {
-            geometry.userData.rhinoAttributes = attributes;
+        // Store original Rhino attributes if available FROM THE PASSED attributes object
+        if (attributes) { // Check if attributes were passed
+            // geometry.userData.rhinoAttributes = attributes; // Storing the whole object might be too much
+            geometry.userData.rhinoName = attributes.name || '';
+            if (typeof attributes.getUserStrings === 'function') {
+                 try { geometry.userData.userStrings = attributes.getUserStrings(); } catch(e) { /* ignore */ }
+            }
+             if (attributes.layerIndex !== undefined) {
+                 geometry.userData.layerIndex = attributes.layerIndex;
+             }
+             if (attributes.materialIndex !== undefined) {
+                 geometry.userData.materialIndex = attributes.materialIndex;
+             }
         }
 
         geometry.computeBoundingSphere();
@@ -2363,9 +2373,9 @@ async function process3DMFile(file) {
 
                 // Handle different geometry types
                 if (geometry.objectType === rhino.ObjectType.Mesh) {
-                    threeMesh = await convertRhinoMeshToThree(geometry, rhino);
+                    threeMesh = await convertRhinoMeshToThree(geometry, rhino, attributes); // Pass attributes
                 } else if (geometry.objectType === rhino.ObjectType.Brep) {
-                    const meshes = await convertBrepToMeshes(geometry, rhino);
+                    const meshes = await convertBrepToMeshes(geometry, rhino, attributes); // Pass attributes
                     if (meshes && meshes.length > 0) {
                         if (meshes.length === 1) {
                             threeMesh = meshes[0];
@@ -2378,7 +2388,7 @@ async function process3DMFile(file) {
                 } else if (geometry.objectType === rhino.ObjectType.SubD) {
                     const meshGeometry = geometry.toMesh();
                     if (meshGeometry) {
-                        threeMesh = await convertRhinoMeshToThree(meshGeometry, rhino);
+                        threeMesh = await convertRhinoMeshToThree(meshGeometry, rhino, attributes); // Pass attributes
                         meshGeometry.delete();
                     }
                 }
@@ -2475,6 +2485,8 @@ async function process3DMFile(file) {
 // Helper function to convert Rhino Material to Three.js Material
 function convertRhinoMaterialToThree(rhinoMaterial) {
     if (!rhinoMaterial) return null;
+    const defaultFallbackMaterial = materialPresets['gold'] ? materialPresets['gold'].clone() : new THREE.MeshStandardMaterial({ color: 0xcccccc, side: THREE.DoubleSide });
+    if (defaultEnvMap) defaultFallbackMaterial.envMap = defaultEnvMap;
 
     try {
         const pbrMaterial = rhinoMaterial.physicallyBased();
@@ -2483,64 +2495,80 @@ function convertRhinoMaterialToThree(rhinoMaterial) {
             const diffuse = rhinoMaterial.diffuseColor;
             const color = new THREE.Color(diffuse.r / 255, diffuse.g / 255, diffuse.b / 255);
             const basicMat = new THREE.MeshStandardMaterial({ color: color, side: THREE.DoubleSide });
+            if (defaultEnvMap) basicMat.envMap = defaultEnvMap;
             console.log('Converted basic Rhino material');
             return basicMat;
         }
 
-        // PBR Conversion
-        let color;
+        // PBR Conversion - wrap property access in try...catch
+        let color, metalness, roughness, ior, transmission, thickness, clearcoat, clearcoatRoughness, sheen, sheenRoughness, emission;
         try {
             const baseColor = pbrMaterial.baseColor;
             color = new THREE.Color(baseColor.r / 255, baseColor.g / 255, baseColor.b / 255);
-        } catch (colorError) {
-            console.warn('Error getting baseColor from PBR material, using default:', colorError);
-            color = new THREE.Color(0xcccccc); // Default gray
+        } catch (e) {
+            console.warn('Error getting baseColor from PBR material, using fallback color:', e);
+            color = defaultFallbackMaterial.color; // Use fallback color
         }
-
-        // Helper to safely get PBR properties with defaults
+        
         const safeGet = (prop, defaultValue) => {
             try {
                 const value = pbrMaterial[prop];
-                // Check for null/undefined, potentially NaN if numeric
                 if (value === null || typeof value === 'undefined') return defaultValue;
                 if (typeof defaultValue === 'number' && isNaN(value)) return defaultValue;
                 return value;
             } catch (e) {
                 console.warn(`Error getting PBR property '${prop}', using default ${defaultValue}:`, e);
-                return defaultValue;
+                // If ANY property fails, maybe we should just use the fallback?
+                // For now, just use the default for the specific property.
+                 return defaultValue;
             }
         };
 
+        metalness = safeGet('metallic', defaultFallbackMaterial.metalness);
+        roughness = safeGet('roughness', defaultFallbackMaterial.roughness);
+        ior = safeGet('ior', defaultFallbackMaterial.ior || 1.5);
+        transmission = 1.0 - safeGet('opacity', 1.0); // Invert opacity for transmission
+        thickness = safeGet('opacityThickness', 0.0);
+        clearcoat = safeGet('clearcoat', defaultFallbackMaterial.clearcoat || 0.0);
+        clearcoatRoughness = safeGet('clearcoatRoughness', defaultFallbackMaterial.clearcoatRoughness || 0.0);
+        sheen = safeGet('sheen', defaultFallbackMaterial.sheen || 0.0);
+        sheenRoughness = safeGet('sheenRoughness', defaultFallbackMaterial.sheenRoughness || 0.0);
+        
+        try {
+             const emissionColor = safeGet('emission', { r: 0, g: 0, b: 0 });
+             emission = new THREE.Color(emissionColor.r / 255, emissionColor.g / 255, emissionColor.b / 255);
+        } catch (e) {
+             console.warn('Error getting emission color, using black:', e);
+             emission = new THREE.Color(0x000000);
+        }
+
+
         const threeMaterial = new THREE.MeshPhysicalMaterial({
             color: color,
-            metalness: safeGet('metallic', 0.5), // Default to semi-metallic
-            roughness: safeGet('roughness', 0.5), // Default to semi-rough
-            ior: safeGet('ior', 1.5), // Default IOR
-            transmission: 1.0 - safeGet('opacity', 1.0), // Default to opaque
-            thickness: safeGet('opacityThickness', 0.0), // Default thickness
-            clearcoat: safeGet('clearcoat', 0.0),
-            clearcoatRoughness: safeGet('clearcoatRoughness', 0.0),
-            sheen: safeGet('sheen', 0.0),
-            sheenRoughness: safeGet('sheenRoughness', 0.0),
-            emissive: new THREE.Color(safeGet('emission', { r: 0, g: 0, b: 0 }).r / 255, 
-                                        safeGet('emission', { r: 0, g: 0, b: 0 }).g / 255, 
-                                        safeGet('emission', { r: 0, g: 0, b: 0 }).b / 255),
+            metalness: metalness,
+            roughness: roughness,
+            ior: ior,
+            transmission: transmission,
+            thickness: thickness,
+            clearcoat: clearcoat,
+            clearcoatRoughness: clearcoatRoughness,
+            sheen: sheen,
+            sheenRoughness: sheenRoughness,
+            emissive: emission,
             emissiveIntensity: 1.0, 
             side: THREE.DoubleSide
         });
 
-        // Apply base color texture if available
-        // const baseColorTexture = rhinoMaterial.getTexture(Rhino.TextureType.PhysicallyBased_BaseColor);
-        // if (baseColorTexture) { /* TODO: Texture loading logic */ }
+        if (defaultEnvMap) threeMaterial.envMap = defaultEnvMap;
 
         pbrMaterial.delete(); // Clean up PBR material object
-        console.log('Converted PBR Rhino material');
+        console.log('Converted PBR Rhino material (with potential fallbacks)');
         return threeMaterial;
 
     } catch (error) {
-        console.warn('Error converting Rhino material:', error);
-        // Fallback to a default material
-        return new THREE.MeshStandardMaterial({ color: 0xcccccc, side: THREE.DoubleSide });
+        console.warn('Error converting Rhino material, returning default gold fallback:', error);
+        // Fallback to a default gold material preset if major error occurs
+        return defaultFallbackMaterial;
     }
 }
 
