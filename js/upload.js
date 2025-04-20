@@ -124,11 +124,11 @@ async function viewModel(storedName, originalName) {
         if (urlError) throw urlError;
         if (!urlData?.signedUrl) throw new Error('Failed to get file URL');
 
-        // Construct viewer URL
-        const viewerUrl = new URL(`${window.location.origin}/index.html`);
+        // Construct viewer URL - using viewer.html instead of index.html
+        const viewerUrl = new URL(`${window.location.origin}/viewer.html`);
         viewerUrl.searchParams.set('model', urlData.signedUrl);
         viewerUrl.searchParams.set('filename', mapping.original_name || originalName);
-        viewerUrl.searchParams.set('type', mapping.original_name.split('.').pop().toLowerCase());
+        viewerUrl.searchParams.set('type', (mapping.original_name || originalName).split('.').pop().toLowerCase());
 
         // Open in new tab
         window.open(viewerUrl.toString(), '_blank');
