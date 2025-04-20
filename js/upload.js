@@ -165,26 +165,49 @@ async function updateFileList() {
             throw new Error('No active session');
         }
 
-        loadingOverlay.classList.add('active');
-        const userPath = currentSession.user.id + '/';
+        loadingOverlay.style.display = 'flex';
+        const userId = currentSession.user.id;
 
-        console.log('Fetching files from:', userPath);
+        console.log('Fetching files for user:', userId);
 
+        // List files from the bucket
         const { data: files, error } = await supabase.storage
             .from('client-files')
-            .list(userPath);
+            .list(userId);
 
-        if (error) throw error;
+        if (error) {
+            console.error('Storage list error:', error);
+            throw error;
+        }
+
+        console.log('Files retrieved:', files);
 
         if (!files || files.length === 0) {
+            console.log('No files found for user');
             fileListContent.innerHTML = '';
             emptyState.style.display = 'block';
             return;
         }
 
+        // Get file mappings from the database
+        const { data: mappings, error: mappingError } = await supabase
+            .from(FILE_TABLE)
+            .select('*')
+            .eq('user_id', userId);
+
+        if (mappingError) {
+            console.error('File mapping error:', mappingError);
+            throw mappingError;
+        }
+
+        console.log('File mappings:', mappings);
+
+        // Create a map of stored names to original names
+        const nameMap = new Map(mappings.map(m => [m.stored_name, m.original_name]));
+
         const fileItems = files.map(file => {
-            const originalName = getOriginalFilename(file.name);
-            const size = (file.metadata?.size || file.size || 0) / (1024 * 1024);
+            const originalName = nameMap.get(file.name) || getOriginalFilename(file.name);
+            const size = (file.metadata?.size || 0) / (1024 * 1024);
             const formattedSize = size.toFixed(2);
 
             return `
@@ -201,7 +224,7 @@ async function updateFileList() {
                             <i class="fas fa-eye"></i>
                             View
                         </button>
-                        <button onclick="deleteFile('${file.name}')" class="file-action-btn delete">
+                        <button onclick="deleteFile('${file.name}')" class="file-action-btn delete-btn">
                             <i class="fas fa-trash"></i>
                             Delete
                         </button>
@@ -212,13 +235,16 @@ async function updateFileList() {
 
         fileListContent.innerHTML = fileItems.join('');
         emptyState.style.display = 'none';
+        
+        // Update the models grid as well
+        await updateModelsGrid();
     } catch (error) {
         console.error('Error updating file list:', error);
         showErrorMessage('Failed to update file list: ' + error.message);
         fileListContent.innerHTML = '';
         emptyState.style.display = 'block';
     } finally {
-        loadingOverlay.classList.remove('active');
+        loadingOverlay.style.display = 'none';
     }
 }
 
