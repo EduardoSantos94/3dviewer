@@ -2574,6 +2574,175 @@ window.removeModel = function(modelIndex) {
 // Export only the necessary functions for index.html
 export { initializeApp, process3DMFile };
 
+// --- Add back missing UI handlers --- 
+
+function handleAmbientLightChange(event) {
+    const intensity = parseFloat(event.target.value);
+    if (ambientLight) {
+        ambientLight.intensity = intensity;
+    }
+}
+
+function handleDirectionalLightChange(event) {
+    if (!directionalLight) return;
+    
+    const intensity = parseFloat(event.target.value);
+    directionalLight.intensity = intensity;
+    
+    // Update the scene to reflect the changes
+    if (renderer && scene && camera) { // Add check
+        renderer.render(scene, camera);
+    }
+}
+
+function handleClick(event) {
+    if (!renderer || !camera || !scene) return;
+
+    // Calculate mouse position in normalized device coordinates
+    const mouse = new THREE.Vector2();
+    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+    // Create raycaster
+    const raycaster = new THREE.Raycaster();
+    raycaster.setFromCamera(mouse, camera);
+
+    // Find intersections
+    const intersects = raycaster.intersectObjects(scene.children, true);
+
+    if (intersects.length > 0) {
+        // Find the first mesh in the intersection
+        let intersectedObject = intersects[0].object;
+        
+        // Traverse up to find the main model group if part of a complex object
+        let targetModel = null;
+        while (intersectedObject) {
+            // Find the model object associated with this intersected part
+            targetModel = models.find(m => m.object === intersectedObject);
+            if (targetModel) break; 
+            intersectedObject = intersectedObject.parent;
+        }
+        
+        if (targetModel) {
+            const modelIndex = models.indexOf(targetModel);
+            selectModel(modelIndex); // Use selectModel to handle selection logic
+        }
+
+    } else {
+        // Deselect if clicking empty space
+        selectModel(-1); // Pass -1 or null to deselect
+    }
+}
+
+// Update model list UI
+function updateLoadedModelsUI() {
+    const modelListContent = document.getElementById('model-list-content');
+    if (!modelListContent) {
+        console.error("Model list content element not found!");
+        return;
+    }
+
+    // Clear existing content
+    modelListContent.innerHTML = '';
+
+    if (models.length === 0) {
+        modelListContent.innerHTML = '<div class="empty-model-list">No models loaded</div>';
+    } else {
+        // Create model list items
+        models.forEach((model, index) => {
+            const modelItem = document.createElement('div');
+            // Check if this model is the selected one by comparing object references
+            const isSelected = selectedObject && selectedObject === model.object;
+            modelItem.className = `model-item ${isSelected ? 'selected' : ''}`;
+            
+            const modelLabel = document.createElement('div');
+            modelLabel.className = 'model-label';
+            modelLabel.innerHTML = `
+                <span>${model.name || 'Unnamed Model'}</span>
+            `;
+             // Add click listener to the label/name to select the model
+            modelLabel.onclick = (event) => {
+                event.stopPropagation(); // Prevent triggering click on the parent div if needed
+                selectModel(index);
+            };
+            
+            const modelControls = document.createElement('div');
+            modelControls.className = 'model-controls';
+            modelControls.innerHTML = `
+                <button class="model-action-btn visibility-btn" title="Toggle Visibility" onclick="window.toggleModelVisibility(${index})">
+                    <i class="fas ${model.visible ? 'fa-eye' : 'fa-eye-slash'}"></i>
+                </button>
+                <button class="model-action-btn material-btn" title="Change Material" onclick="window.showMaterialDialog(${index})">
+                    <i class="fas fa-palette"></i>
+                </button>
+                <button class="model-action-btn delete-btn" title="Remove Model" onclick="window.removeModel(${index})">
+                    <i class="fas fa-trash"></i>
+                </button>
+            `;
+
+            modelItem.appendChild(modelLabel);
+            modelItem.appendChild(modelControls);
+            modelListContent.appendChild(modelItem);
+        });
+    }
+
+    // Add "Add More Files" button at the bottom
+    const addMoreButton = document.createElement('button');
+    addMoreButton.className = 'add-more-models-btn';
+    addMoreButton.innerHTML = '<i class="fas fa-plus"></i> Add More Files';
+    addMoreButton.onclick = () => {
+        // Trigger the hidden file input in index.html
+        const fileInput = document.getElementById('file-input');
+        if (fileInput) {
+            fileInput.click();
+        } else {
+            console.error('File input not found');
+        }
+    };
+    modelListContent.appendChild(addMoreButton);
+}
+
+// Updated selectModel function
+function selectModel(modelIndex) {
+    // Deselect previous model
+    if (selectedObject) {
+        const prevModelData = models.find(m => m.object === selectedObject);
+        if (prevModelData) {
+             // Visually deselect (e.g., remove highlight or emissive)
+            selectedObject.traverse((child) => {
+                if (child.isMesh && child.material.emissive) {
+                    child.material.emissive.setHex(0x000000);
+                }
+            });
+        }
+        selectedObject = null; // Clear the reference
+    }
+
+    // Select new model if index is valid
+    if (modelIndex >= 0 && modelIndex < models.length) {
+        const modelData = models[modelIndex];
+        if (modelData && modelData.object) {
+            selectedObject = modelData.object; // Store reference to the main THREE.Object3D
+            // Visually select (e.g., add highlight or emissive)
+             selectedObject.traverse((child) => {
+                if (child.isMesh && child.material.emissive) {
+                    child.material.emissive.setHex(0x444444); // Subtle selection glow
+                }
+            });
+            console.log('Selected model:', modelData.name || 'Unnamed Model');
+        } else {
+             console.warn('Attempted to select invalid model at index:', modelIndex);
+        }
+    } else {
+         console.log('Deselected model');
+    }
+
+    // Update UI to reflect the new selection state
+    updateLoadedModelsUI();
+}
+
+// --- End of added UI handlers ---
+
 
 
 
