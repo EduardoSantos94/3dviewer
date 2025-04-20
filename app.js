@@ -1074,24 +1074,16 @@ function toggleBackground() {
         backgroundMode = 'dark';
     } else if (backgroundMode === 'dark') {
         backgroundMode = 'light';
-    } else if (backgroundMode === 'light') {
-        backgroundMode = 'hdr'; // Cycle to HDR
-    } else { // hdr
-        backgroundMode = 'gradient'; // Cycle back to gradient
+    } else { // light
+        backgroundMode = 'gradient';
     }
     applyBackground();
-    
+
     // Update button state (optional, depends on UI design)
     const toggleBackgroundBtn = document.getElementById('toggle-background');
     if (toggleBackgroundBtn) {
         // Maybe update icon or text based on backgroundMode
-        // Example: toggle active state based on whether it's NOT light mode
         toggleBackgroundBtn.classList.toggle('active', backgroundMode !== 'light');
-        // Update tooltip or text if needed
-        if (backgroundMode === 'gradient') toggleBackgroundBtn.title = 'Switch to Dark Background';
-        else if (backgroundMode === 'dark') toggleBackgroundBtn.title = 'Switch to Light Background';
-        else if (backgroundMode === 'light') toggleBackgroundBtn.title = 'Switch to HDR Background';
-        else toggleBackgroundBtn.title = 'Switch to Gradient Background';
     }
 }
 
@@ -1784,24 +1776,6 @@ function applyBackground() {
     // Ensure environment is always the HDR map if loaded
     if (defaultEnvMap) {
          scene.environment = defaultEnvMap;
-    }
-}
-
-function toggleBackground() {
-    if (backgroundMode === 'gradient') {
-        backgroundMode = 'dark';
-    } else if (backgroundMode === 'dark') {
-        backgroundMode = 'light';
-    } else { // light
-        backgroundMode = 'gradient';
-    }
-    applyBackground();
-    
-    // Update button state (optional, depends on UI design)
-    const toggleBackgroundBtn = document.getElementById('toggle-background');
-    if (toggleBackgroundBtn) {
-        // Maybe update icon or text based on backgroundMode
-        toggleBackgroundBtn.classList.toggle('active', backgroundMode !== 'light');
     }
 }
 
