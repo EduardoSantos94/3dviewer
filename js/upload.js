@@ -37,8 +37,8 @@ function getOriginalFilename(storedName) {
 
 // Function to create a model card
 function createModelCard(file) {
-    const originalName = file.original_name || file.name.split('-').slice(2).join('-');
-    const size = (file.metadata?.size || file.size || 0) / (1024 * 1024);
+    const originalName = file.original_name || getOriginalFilename(file.name);
+    const size = (file.metadata?.size || 0) / (1024 * 1024);
     const formattedSize = size.toFixed(2);
     const timestamp = new Date(file.created_at || Date.now()).toLocaleDateString();
 
@@ -52,11 +52,11 @@ function createModelCard(file) {
             <div class="model-name">${originalName}</div>
             <div class="model-meta">${formattedSize} MB • ${timestamp}</div>
             <div class="model-actions">
-                <button class="model-btn view-btn" onclick="viewModel('${file.stored_name || file.name}', '${originalName}')">
+                <button class="model-btn view-btn" onclick="window.viewModel('${file.name}', '${originalName}')">
                     <i class="fas fa-eye"></i>
                     View
                 </button>
-                <button class="model-btn delete-btn" onclick="deleteModel('${file.stored_name || file.name}')">
+                <button class="model-btn delete-btn" onclick="window.deleteFile('${file.name}')">
                     <i class="fas fa-trash"></i>
                     Delete
                 </button>
@@ -85,6 +85,9 @@ function showError(title, message) {
         }
     }, 5000);
 }
+
+// Alias for backward compatibility
+const showErrorMessage = (message) => showError('Error', message);
 
 // Function to show success messages
 function showSuccess(message) {
