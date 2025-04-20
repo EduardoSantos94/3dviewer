@@ -2600,7 +2600,7 @@ window.removeModel = function(modelIndex) {
 };
 
 // Export only the necessary functions for index.html
-export { initializeApp, process3DMFile };
+export { initializeApp, process3DMFile, showFrontpage };
 
 // --- Add back missing UI handlers --- 
 

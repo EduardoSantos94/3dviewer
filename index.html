@@ -269,7 +269,7 @@
 
 <script type="module">
     import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.3/+esm';
-    import { initializeApp, process3DMFile } from './app.js';
+    import { initializeApp, process3DMFile, showFrontpage } from './app.js';
 
     // Make process3DMFile globally available (if needed elsewhere, otherwise remove)
     window.process3DMFile = process3DMFile;
@@ -387,9 +387,25 @@
                     if (frontpage) frontpage.style.display = 'flex';
                 }
             } else {
-                // If no model URL, initialize app normally (showing frontpage)
+                // If no model URL, initialize app normally and show frontpage
                 console.log('No model URL found, initializing app normally.');
-                await initializeApp();
+                const loadingIndicator = document.getElementById('loading-indicator');
+                if (loadingIndicator) loadingIndicator.style.display = 'flex';
+                
+                try {
+                    await initializeApp();
+                    // Explicitly show the front page after init
+                    showFrontpage(); 
+                } catch (error) {
+                     console.error('Error initializing app normally:', error);
+                     if (window.showErrorMessage) {
+                        window.showErrorMessage('Error initializing viewer: ' + error.message);
+                     } else {
+                         alert('Error initializing viewer: ' + error.message);
+                     }
+                } finally {
+                    if (loadingIndicator) loadingIndicator.style.display = 'none';
+                }
             }
         }
 
