@@ -2416,12 +2416,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     try {
         // Initialize the application
-        await initializeApp();
+        // initializeApp is now called from index.html depending on URL params
+        // await initializeApp(); 
         
-        // Hide loading indicator
-        if (loadingIndicator) {
-            loadingIndicator.style.display = 'none';
-        }
+        // Hide loading indicator (will be hidden in index.html after init/load)
+        // if (loadingIndicator) {
+        //     loadingIndicator.style.display = 'none';
+        // }
     } catch (error) {
         console.error('Error during initialization:', error);
         // Hide loading indicator even if there's an error
@@ -2429,181 +2430,34 @@ document.addEventListener('DOMContentLoaded', async () => {
             loadingIndicator.style.display = 'none';
         }
         // Show error message
-        alert('Error initializing the application: ' + error.message);
+        // Use the globally defined showErrorMessage from index.html
+        if (window.showErrorMessage) {
+            window.showErrorMessage('Error initializing the application: ' + error.message);
+        } else {
+            alert('Error initializing the application: ' + error.message);
+        }
     }
 });
 
-function handleAmbientLightChange(event) {
-    const intensity = parseFloat(event.target.value);
-    if (ambientLight) {
-        ambientLight.intensity = intensity;
-    }
-}
-
-function handleDirectionalLightChange(event) {
-    if (!directionalLight) return;
-    
-    const intensity = parseFloat(event.target.value);
-    directionalLight.intensity = intensity;
-    
-    // Update the scene to reflect the changes
-    renderer.render(scene, camera);
-}
-
-function handleClick(event) {
-    if (!renderer || !camera || !scene) return;
-
-    // Calculate mouse position in normalized device coordinates
-    const mouse = new THREE.Vector2();
-    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-
-    // Create raycaster
-    const raycaster = new THREE.Raycaster();
-    raycaster.setFromCamera(mouse, camera);
-
-    // Find intersections
-    const intersects = raycaster.intersectObjects(scene.children, true);
-
-    if (intersects.length > 0) {
-        // Find the first mesh in the intersection
-        let selectedMesh = intersects[0].object;
-        while (selectedMesh && !(selectedMesh instanceof THREE.Mesh)) {
-            selectedMesh = selectedMesh.parent;
-        }
-
-        if (selectedMesh && selectedMesh.material) {
-            // Deselect previous selection
-            if (selectedObject && selectedObject.material) {
-                selectedObject.material.emissive.setHex(0x000000);
-            }
-
-            // Select new object
-            selectedObject = selectedMesh;
-            if (selectedObject.material) {
-                selectedObject.material.emissive.setHex(0x333333);
-            }
-
-            // Update model selection in the UI
-            updateModelListInSidebar();
-        }
-    } else {
-        // Deselect if clicking empty space
-        if (selectedObject && selectedObject.material) {
-            selectedObject.material.emissive.setHex(0x000000);
-        selectedObject = null;
-            updateModelListInSidebar();
-        }
-    }
-}
-
-// Add selectModel function
-function selectModel(modelIndex) {
-    if (modelIndex < 0 || modelIndex >= models.length) return;
-    
-    // Deselect previous model
-    if (selectedObject !== null) {
-        const prevModel = models[selectedObject];
-        if (prevModel && prevModel.mesh) {
-            prevModel.mesh.traverse((child) => {
-                if (child instanceof THREE.Mesh && child.material) {
-                    child.material.emissive.setHex(0x000000);
-                }
-            });
-        }
-    }
-    
-    // Select new model
-    selectedObject = modelIndex;
-    const model = models[modelIndex];
-    if (model && model.mesh) {
-        model.mesh.traverse((child) => {
-            if (child instanceof THREE.Mesh && child.material) {
-                child.material.emissive.setHex(0x333333);
-                child.material.emissiveIntensity = 0.1;
-            }
-        });
-    }
-    
-    // Update UI
-    updateLoadedModelsUI();
-}
-
-// Update model list UI
-function updateLoadedModelsUI() {
-    const modelListContent = document.getElementById('model-list-content');
-    if (!modelListContent) return;
-
-    // Clear existing content
-    modelListContent.innerHTML = '';
-
-    if (models.length === 0) {
-        modelListContent.innerHTML = '<div class="empty-model-list">No models loaded</div>';
-        return;
-    }
-
-    // Create model list items
-    models.forEach((model, index) => {
-        const modelItem = document.createElement('div');
-        modelItem.className = `model-item ${model.selected ? 'selected' : ''}`;
-        
-        const modelLabel = document.createElement('div');
-        modelLabel.className = 'model-label';
-        modelLabel.innerHTML = `
-            <span>${model.name}</span>
-            <div class="model-controls">
-                <button class="model-btn visibility-btn" title="Toggle Visibility" onclick="toggleModelVisibility(${index})">
-                    <i class="fas ${model.visible ? 'fa-eye' : 'fa-eye-slash'}"></i>
-                </button>
-                <button class="model-btn material-btn" title="Change Material" onclick="showMaterialDialog(${index})">
-                    <i class="fas fa-palette"></i>
-                </button>
-                <button class="model-btn delete-btn" title="Remove Model" onclick="removeModel(${index})">
-                    <i class="fas fa-trash"></i>
-                </button>
-            </div>
-        `;
-
-        modelLabel.onclick = () => selectModel(index);
-        modelItem.appendChild(modelLabel);
-        modelListContent.appendChild(modelItem);
-    });
-
-    // Add "Add More Files" button at the bottom
-    const addMoreButton = document.createElement('button');
-    addMoreButton.className = 'add-more-models-btn';
-    addMoreButton.innerHTML = '<i class="fas fa-plus"></i> Add More Files';
-    addMoreButton.onclick = () => {
-        document.getElementById('file-input').click();
-    };
-    modelListContent.appendChild(addMoreButton);
-}
-
-// Expose functions to global scope
+// Expose necessary functions to global scope for UI interaction
 window.toggleModelVisibility = function(modelIndex) {
     const model = models[modelIndex];
     if (!model || !model.object) return;
 
     model.visible = !model.visible;
     model.object.visible = model.visible;
-    if (model.outline) {
-        model.outline.visible = model.visible;
-    }
+    // Note: Outlines were removed in previous steps, keep this commented or remove
+    // if (model.outline) {
+    //     model.outline.visible = model.visible;
+    // }
 
     // Update UI
-    const modelList = document.querySelector('.model-list');
-    if (modelList) {
-        const modelItem = modelList.children[modelIndex];
-        if (modelItem) {
-            const visibilityBtn = modelItem.querySelector('.visibility-btn');
-            if (visibilityBtn) {
-                visibilityBtn.innerHTML = `<i class="fas ${model.visible ? 'fa-eye' : 'fa-eye-slash'}"></i>`;
-            }
-        }
-    }
+    updateLoadedModelsUI(); // Use the correct UI update function
 
     // Force a render update
-    renderer.render(scene, camera);
+    if (renderer && scene && camera) {
+        renderer.render(scene, camera);
+    }
 };
 
 window.showMaterialDialog = function(modelIndex) {
@@ -2630,6 +2484,11 @@ window.showMaterialDialog = function(modelIndex) {
         <option value="fast-rose-gold">Rose Gold (Fast Render)</option>
         <option value="fast-white-gold">White Gold (Fast Render)</option>
     `;
+    // Pre-select the current material
+    const currentModel = models[modelIndex];
+    if (currentModel && currentModel.material) {
+        select.value = currentModel.material;
+    }
     content.appendChild(select);
     
     // Create buttons container
@@ -2663,168 +2522,57 @@ window.showMaterialDialog = function(modelIndex) {
 };
 
 window.removeModel = function(modelIndex) {
+    if (modelIndex < 0 || modelIndex >= models.length) {
+        console.error('Invalid model index for removal', modelIndex);
+        return;
+    }
+    
     const model = models[modelIndex];
-    if (!model) return;
+    if (!model) {
+        console.error('Model not found at index', modelIndex);
+        return;
+    }
+
+    if (!confirm(`Are you sure you want to remove "${model.name}"?`)) {
+        return;
+    }
 
     // Remove from scene
     if (model.object) {
         scene.remove(model.object);
-        if (model.object.geometry) model.object.geometry.dispose();
-        if (model.object.material) {
-            if (Array.isArray(model.object.material)) {
-                model.object.material.forEach(mat => mat.dispose());
-            } else {
-                model.object.material.dispose();
+        // Dispose geometry and materials
+        model.object.traverse((child) => {
+            if (child.geometry) child.geometry.dispose();
+            if (child.material) {
+                if (Array.isArray(child.material)) {
+                    child.material.forEach(mat => mat.dispose());
+                } else {
+                    child.material.dispose();
+                }
             }
-        }
+        });
     }
 
     // Remove from models array
     models.splice(modelIndex, 1);
 
+    // If the removed model was selected, clear selection
+    if (selectedObject === model.object) { // Compare objects
+        selectedObject = null;
+        // Potentially update UI to reflect no selection
+    }
+
     // Update UI
     updateLoadedModelsUI();
 
     // Force a render update
-    renderer.render(scene, camera);
+    if (renderer && scene && camera) {
+        renderer.render(scene, camera);
+    }
 };
 
-// Add applyMaterialToModel function
-function applyMaterialToModel(modelIndex, materialType) {
-    if (modelIndex < 0 || modelIndex >= models.length) return;
-    
-    const model = models[modelIndex];
-    if (!model || !model.object) return;
-    
-    // Apply material to the object and all its children
-    model.object.traverse((child) => {
-        if (child.isMesh) {
-            applyMaterial(child, materialType);
-        }
-    });
-    
-    // Update the model's material type
-    model.materialType = materialType;
-    
-    // Force a render update
-    renderer.render(scene, camera);
-}
-
-// Add these functions before loadModel
-function showLoadingProgress() {
-    const container = document.getElementById('progress-container');
-    if (container) {
-        container.style.display = 'block';
-    }
-}
-
-function hideLoadingProgress() {
-    const container = document.getElementById('progress-container');
-    if (container) {
-        container.style.display = 'none';
-    }
-}
-
-function updateLoadingProgress(progress) {
-    const progressBar = document.getElementById('progress');
-    if (progressBar) {
-        progressBar.style.width = progress + '%';
-    }
-}
-
-// ... existing code ...
-
-// Function to load a model
-export async function loadModel(modelInfo) {
-    if (!modelInfo || (!modelInfo.url && !modelInfo.file)) {
-        console.error('No model URL or file provided');
-        return;
-    }
-
-    // Clear scene and show loading progress
-    clearScene();
-    showLoadingProgress();
-
-    try {
-        const filename = modelInfo.filename || (modelInfo.file ? modelInfo.file.name : modelInfo.url.split('/').pop());
-        const extension = filename.split('.').pop().toLowerCase();
-
-        // Initialize loader based on file type
-        let loader;
-        if (extension === '3dm') {
-            await initRhino3dm();
-            loader = new Rhino3dmLoader();
-            loader.setLibraryPath('https://cdn.jsdelivr.net/npm/rhino3dm@7.15.0/');
-            if (modelInfo.headers) {
-                loader.setRequestHeader(modelInfo.headers);
-            }
-        } else if (extension === 'obj') {
-            loader = new OBJLoader();
-            if (modelInfo.headers) {
-                loader.setRequestHeader(modelInfo.headers);
-            }
-        } else if (extension === 'stl') {
-            loader = new STLLoader();
-            if (modelInfo.headers) {
-                loader.setRequestHeader(modelInfo.headers);
-            }
-        } else if (extension === 'glb' || extension === 'gltf') {
-            loader = new GLTFLoader();
-            if (modelInfo.headers) {
-                loader.setRequestHeader(modelInfo.headers);
-            }
-        } else {
-            throw new Error(`Unsupported file type: ${extension}`);
-        }
-
-        // Load the model
-        const model = await new Promise((resolve, reject) => {
-            const loadFn = modelInfo.file ? 
-                (callback) => loader.parse(modelInfo.file, '', callback) :
-                (callback) => loader.load(
-                    modelInfo.url,
-                    callback,
-                    (event) => {
-                        if (event.lengthComputable) {
-                            const progress = (event.loaded / event.total) * 100;
-                            updateLoadingProgress(progress);
-                        }
-                    },
-                    reject
-                );
-
-            loadFn((result) => {
-                if (extension === 'glb' || extension === 'gltf') {
-                    resolve(result.scene);
-                } else {
-                    resolve(result);
-                }
-            });
-        });
-
-        // Add model to scene
-        scene.add(model);
-        models.push({ object: model, filename: filename });
-        selectedObject = model;
-
-        // Apply materials if specified
-        if (modelInfo.materials) {
-            applyMaterialToModel(model, modelInfo.materials);
-        }
-
-        // Update camera and controls
-        fitCameraToObject(camera, model, controls);
-        hideLoadingProgress();
-
-        return model;
-    } catch (error) {
-        console.error('Error loading model:', error);
-        hideLoadingProgress();
-        showErrorMessage(`Failed to load model: ${error.message}`);
-        throw error;
-    }
-}
-// ... existing code ...
+// Export only the necessary functions for index.html
+export { initializeApp, process3DMFile };
 
 
 
