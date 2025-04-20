@@ -220,7 +220,7 @@ function hideFrontpage() {
 }
 
 // Initialize the application
-async function initializeApp() {
+export async function initializeApp() {
     console.log('Initializing application...');
     
     try {
@@ -2507,7 +2507,8 @@ function updateLoadingProgress(progress) {
 
 // ... existing code ...
 
-async function loadModel(modelInfo) {
+// Function to load a model
+export async function loadModel(modelInfo) {
     if (!modelInfo || (!modelInfo.url && !modelInfo.file)) {
         console.error('No model URL or file provided');
         return;

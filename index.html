@@ -269,7 +269,7 @@
 
 <script type="module">
     import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.3/+esm';
-    import { loadModel } from './app.js';
+    import { initializeApp, loadModel } from './app.js';
 
     // Make loadModel globally available
     window.loadModel = loadModel;
@@ -322,22 +322,27 @@
                 const frontpage = document.getElementById('frontpage');
                 const loadingIndicator = document.getElementById('loading-indicator');
                 const container = document.querySelector('.container');
+                const dropZone = document.getElementById('drop-zone');
                 
                 if (frontpage) frontpage.style.display = 'none';
                 if (loadingIndicator) loadingIndicator.style.display = 'flex';
-                if (container) container.style.display = 'flex';
+                if (container) container.style.display = 'block';
+                if (dropZone) dropZone.style.display = 'none';
 
                 // Configure storage settings
                 const bucketName = 'client-files';
                 
                 console.log('Loading model with:', {
-                    url: modelUrl,
+                    url: decodeURIComponent(modelUrl),
                     type: fileType,
                     bucket: bucketName
                 });
 
+                // Initialize the viewer
+                await initializeApp();
+
                 // Load the model with the signed URL
-                await window.loadModel({ 
+                await loadModel({ 
                     url: decodeURIComponent(modelUrl),
                     filename: `model.${fileType}`,
                     bucket: bucketName
