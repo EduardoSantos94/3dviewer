@@ -99,7 +99,9 @@ async function updateModelsGrid() {
 // Function to show/hide upload modal
 function toggleUploadModal(show) {
     const modal = document.getElementById('upload-modal');
-    modal.style.display = show ? 'flex' : 'none';
+    if (modal) {
+        modal.style.display = show ? 'flex' : 'none';
+    }
 }
 
 // Function to view a model
@@ -405,29 +407,48 @@ document.addEventListener('DOMContentLoaded', () => {
     const closeModalBtn = document.getElementById('close-modal');
     const selectFileBtn = document.getElementById('select-file-btn');
     const fileInput = document.getElementById('file-input');
-    const dropZone = document.getElementById('drop-zone');
+    const dropZone = document.querySelector('.upload-drop-zone');
+    const modal = document.getElementById('upload-modal');
 
+    // Upload button click handlers
     [uploadBtn, uploadFirstBtn].forEach(btn => {
         if (btn) {
             btn.addEventListener('click', () => toggleUploadModal(true));
         }
     });
 
+    // Close modal handler
     if (closeModalBtn) {
         closeModalBtn.addEventListener('click', () => toggleUploadModal(false));
     }
 
-    if (selectFileBtn) {
-        selectFileBtn.addEventListener('click', () => fileInput.click());
+    // Close modal when clicking outside
+    if (modal) {
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                toggleUploadModal(false);
+            }
+        });
     }
 
+    // File selection handler
+    if (selectFileBtn) {
+        selectFileBtn.addEventListener('click', () => {
+            if (fileInput) {
+                fileInput.click();
+            }
+        });
+    }
+
+    // File input change handler
     if (fileInput) {
         fileInput.addEventListener('change', async (e) => {
             const files = Array.from(e.target.files);
             if (files.length > 0) {
-                await uploadFile(files[0]); // Upload first file only
+                toggleUploadModal(false);
+                await uploadFile(files[0]);
+                e.target.value = ''; // Reset input
             }
-            e.target.value = ''; // Reset input
         });
     }
 
@@ -455,10 +476,14 @@ document.addEventListener('DOMContentLoaded', () => {
         dropZone.addEventListener('drop', async (e) => {
             const files = Array.from(e.dataTransfer.files);
             if (files.length > 0) {
-                await uploadFile(files[0]); // Upload first file only
+                toggleUploadModal(false);
+                await uploadFile(files[0]);
             }
         });
     }
+
+    // Initialize the models grid
+    updateModelsGrid();
 
     // Logout handler
     const logoutBtn = document.getElementById('logout-btn');
