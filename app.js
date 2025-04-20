@@ -1781,38 +1781,6 @@ function applyBackground() {
 
 // --- Environment Map Loading ---
 
-async function loadEnvironment(renderer, url = 'assets/studio_small_03_1k.hdr') {
-    console.log(`Loading environment map from ${url}...`);
-    try {
-        const rgbeLoader = new RGBELoader();
-        const texture = await rgbeLoader.loadAsync(url);
-        
-        texture.mapping = THREE.EquirectangularReflectionMapping;
-        
-        const pmremGenerator = new THREE.PMREMGenerator(renderer);
-        pmremGenerator.compileEquirectangularShader();
-        
-        defaultEnvMap = pmremGenerator.fromEquirectangular(texture).texture;
-        
-        scene.environment = defaultEnvMap; // Apply immediately
-        console.log('HDR Environment map loaded and applied.');
-        
-        texture.dispose();
-        pmremGenerator.dispose();
-        
-        // Apply background based on the current mode
-        applyBackground();
-
-    } catch (error) {
-        console.error('Failed to load environment map:', error);
-        // Fallback or show error message
-        // Use the procedural one as fallback?
-        // scene.environment = createJewelryEnvironmentMap(renderer);
-        if (window.showErrorMessage) {
-            window.showErrorMessage('Failed to load environment map. Using default lighting.');
-        }
-    }
-}
 
 // Add setupLights function that was referenced but not defined
 function setupLights() {
