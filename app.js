@@ -1708,7 +1708,7 @@ function createStudioScene() {
 }
 
 // Update environment map loading
-async function loadEnvironment(renderer, url = 'studio_small_09_2k.hdr') {
+async function loadEnvironment(renderer, url = 'assets/studio_small_09_2k.hdr') {
     console.log(`Loading environment map from ${url}...`);
     try {
         const rgbeLoader = new RGBELoader();
