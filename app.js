@@ -7,6 +7,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { Rhino3dmLoader } from 'three/addons/loaders/3DMLoader.js';
+import { RGBELoader } from 'three/addons/loaders/RGBELoader.js'; // Import RGBELoader
 import * as TWEEN from './lib/tween/tween.module.js';
 import { PLYLoader } from 'three/addons/loaders/PLYLoader.js';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
@@ -17,8 +18,9 @@ let models = []; // Array to store multiple models
 let loadedMeshes = []; // Array to track all meshes for disposal
 let groundPlane = null;
 let selectedObject = null;
-let ambientLight, directionalLight;
+let ambientLight, directionalLight, hemisphereLight; // Add hemisphereLight
 let isDarkBackground = false;
+let backgroundMode = 'gradient'; // Modes: 'gradient', 'dark', 'light', 'hdr'
 let isTurntableActive = false;
 let turntableClock = new THREE.Clock();
 let turntableSpeed = 0.5; // radians per second
@@ -27,6 +29,8 @@ let bloomPass;
 let rhino = null; // Global rhino3dm instance
 let animationId = null; // For tracking animation frames
 let currentMaterial = 'gold'; // Default material for new models
+let defaultEnvMap = null; // Store the HDR env map
+let gradientBackgroundTexture = null; // Store gradient texture
 
 // Function to check if rhino3dm is loaded
 function isRhino3dmLoaded() {
@@ -394,16 +398,17 @@ function AddModelToScene(mesh) {
 
 // Initialize the scene
 async function init() {
-    // Create scene with darker background
+    // Create scene
     scene = new THREE.Scene();
-    scene.background = new THREE.Color(0xe8e8e8); // Light gray for better contrast with gold
+    // Initial background setting (will be replaced by gradient/HDR)
+    scene.background = new THREE.Color(0xf0f0f0); // Default light gray
     
     // Setup camera
     camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
     camera.position.set(5, 5, 5);
     camera.lookAt(0, 0, 0);
 
-    // Setup renderer with improved exposure
+    // Setup renderer
     renderer = new THREE.WebGLRenderer({ 
         antialias: true,
         powerPreference: "high-performance",
@@ -415,40 +420,46 @@ async function init() {
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.2; // Increased exposure for brighter display
+    renderer.toneMappingExposure = 1.2; // Keep initial value, adjust later if needed
     document.getElementById('viewer-container').appendChild(renderer.domElement);
 
-    // Initialize post-processing with reduced bloom
+    // Initialize post-processing
     composer = new EffectComposer(renderer);
     const renderPass = new RenderPass(scene, camera);
     composer.addPass(renderPass);
     
-    // Add bloom effect with subtle settings for jewelry
     bloomPass = new UnrealBloomPass(
         new THREE.Vector2(window.innerWidth, window.innerHeight),
-        0.2,   // Increased strength for more glow
-        0.5,   // radius
-        0.8    // Lower threshold to bloom more parts
+        0.2,   
+        0.5,   
+        0.8    
     );
     composer.addPass(bloomPass);
     
-    // Setup lights
+    // Setup lights (including Hemisphere)
     setupLights();
     
     // Setup controls
     setupControls();
     
-    // Create a jewelry-specific environment map
-    const envMap = createJewelryEnvironmentMap(renderer);
-    scene.environment = envMap;
+    // Load HDR Environment Map
+    await loadEnvironment(renderer); // Load the default HDR
+
+    // Create gradient background texture (but don't apply yet)
+    createGradientBackground(); 
+
+    // Apply initial background based on default mode
+    applyBackground(); 
     
-    // Update all material presets with the environment map
-    Object.values(materialPresets).forEach(material => {
-        if (material.envMap !== undefined) {
-            material.envMap = envMap;
-            material.needsUpdate = true;
-        }
-    });
+    // Update all material presets with the default environment map (if loaded)
+    if (defaultEnvMap) {
+        Object.values(materialPresets).forEach(material => {
+            if (material.envMap !== undefined) {
+                material.envMap = defaultEnvMap;
+                material.needsUpdate = true;
+            }
+        });
+    }
     
     // Add floor grid - hidden by default
     const gridHelper = new THREE.GridHelper(20, 20);
@@ -476,11 +487,11 @@ async function init() {
         toggleFloorBtn.classList.remove('active');
     }
     
-    // Note: setupEventListeners() and animate() are called in initializeApp()
-    // to avoid duplicate initialization
+    console.log("Scene init complete.");
 }
 
-// Update the setupEventListeners function to properly handle file selection
+// Note: setupEventListeners() is called in initializeApp()
+// Make sure it's only called once.
 function setupEventListeners() {
     console.log('Setting up event listeners...');
     
@@ -671,6 +682,14 @@ function setupEventListeners() {
         console.log('Directional light slider initialized');
     } else {
         console.error('Directional light slider not found!');
+    }
+
+    // Add listener for hemisphere light slider
+    const hemisphereLightSlider = document.getElementById('hemisphere-light');
+    if (hemisphereLightSlider && hemisphereLight) {
+        hemisphereLightSlider.addEventListener('input', handleHemisphereLightChange);
+    } else {
+        console.warn('Hemisphere light slider or light object not found.');
     }
 
     // Click handling for object selection
@@ -1051,13 +1070,28 @@ function toggleFloor() {
 }
 
 function toggleBackground() {
-    isDarkBackground = !isDarkBackground;
-    scene.background = new THREE.Color(isDarkBackground ? 0x000000 : 0xf0f0f0);
+    if (backgroundMode === 'gradient') {
+        backgroundMode = 'dark';
+    } else if (backgroundMode === 'dark') {
+        backgroundMode = 'light';
+    } else if (backgroundMode === 'light') {
+        backgroundMode = 'hdr'; // Cycle to HDR
+    } else { // hdr
+        backgroundMode = 'gradient'; // Cycle back to gradient
+    }
+    applyBackground();
     
-    // Update button state
+    // Update button state (optional, depends on UI design)
     const toggleBackgroundBtn = document.getElementById('toggle-background');
     if (toggleBackgroundBtn) {
-        toggleBackgroundBtn.classList.toggle('active', isDarkBackground);
+        // Maybe update icon or text based on backgroundMode
+        // Example: toggle active state based on whether it's NOT light mode
+        toggleBackgroundBtn.classList.toggle('active', backgroundMode !== 'light');
+        // Update tooltip or text if needed
+        if (backgroundMode === 'gradient') toggleBackgroundBtn.title = 'Switch to Dark Background';
+        else if (backgroundMode === 'dark') toggleBackgroundBtn.title = 'Switch to Light Background';
+        else if (backgroundMode === 'light') toggleBackgroundBtn.title = 'Switch to HDR Background';
+        else toggleBackgroundBtn.title = 'Switch to Gradient Background';
     }
 }
 
@@ -1682,43 +1716,153 @@ function createStudioScene() {
 }
 
 // Update environment map loading
-async function loadEnvironmentMap() {
+async function loadEnvironment(renderer, url = 'assets/studio_small_03_1k.hdr') {
+    console.log(`Loading environment map from ${url}...`);
     try {
-        // Create default environment map
-        const envMap = createDefaultEnvironment();
-        scene.environment = envMap;
-        scene.background = new THREE.Color(0xf0f0f0);
+        const rgbeLoader = new RGBELoader();
+        const texture = await rgbeLoader.loadAsync(url);
         
-        // Update material presets with environment map
-        Object.values(materialPresets).forEach(material => {
-            material.envMap = envMap;
-            material.needsUpdate = true;
-        });
+        texture.mapping = THREE.EquirectangularReflectionMapping;
+        
+        const pmremGenerator = new THREE.PMREMGenerator(renderer);
+        pmremGenerator.compileEquirectangularShader();
+        
+        defaultEnvMap = pmremGenerator.fromEquirectangular(texture).texture;
+        
+        scene.environment = defaultEnvMap; // Apply immediately
+        console.log('HDR Environment map loaded and applied.');
+        
+        texture.dispose();
+        pmremGenerator.dispose();
+        
+        // Apply background based on the current mode
+        applyBackground();
+
     } catch (error) {
-        console.warn('Failed to create environment map:', error);
+        console.error('Failed to load environment map:', error);
+        // Fallback or show error message
+        // Use the procedural one as fallback?
+        // scene.environment = createJewelryEnvironmentMap(renderer);
+        if (window.showErrorMessage) {
+            window.showErrorMessage('Failed to load environment map. Using default lighting.');
+        }
+    }
+}
+
+// --- Background Management ---
+
+function createGradientBackground() {
+    const canvas = document.createElement('canvas');
+    canvas.width = 2;
+    canvas.height = 512;
+    const context = canvas.getContext('2d');
+
+    const gradient = context.createLinearGradient(0, 0, 0, canvas.height);
+    gradient.addColorStop(0, '#d8e1ec'); // Lighter sky blue/gray
+    gradient.addColorStop(1, '#a1b0c0'); // Darker blue/gray
+
+    context.fillStyle = gradient;
+    context.fillRect(0, 0, canvas.width, canvas.height);
+
+    gradientBackgroundTexture = new THREE.CanvasTexture(canvas);
+    gradientBackgroundTexture.needsUpdate = true;
+    console.log('Gradient background texture created.');
+}
+
+function applyBackground() {
+    if (backgroundMode === 'gradient' && gradientBackgroundTexture) {
+        scene.background = gradientBackgroundTexture;
+        scene.backgroundBlurriness = 0; // No blur for gradient
+        console.log('Applied gradient background');
+    } else if (backgroundMode === 'dark') {
+        scene.background = new THREE.Color(0x1a1a1a); // Darker background
+        console.log('Applied dark background');
+    } else { // light mode (default)
+        scene.background = new THREE.Color(0xf0f0f0); // Original light gray
+        console.log('Applied light background');
+    }
+    // Ensure environment is always the HDR map if loaded
+    if (defaultEnvMap) {
+         scene.environment = defaultEnvMap;
+    }
+}
+
+function toggleBackground() {
+    if (backgroundMode === 'gradient') {
+        backgroundMode = 'dark';
+    } else if (backgroundMode === 'dark') {
+        backgroundMode = 'light';
+    } else { // light
+        backgroundMode = 'gradient';
+    }
+    applyBackground();
+    
+    // Update button state (optional, depends on UI design)
+    const toggleBackgroundBtn = document.getElementById('toggle-background');
+    if (toggleBackgroundBtn) {
+        // Maybe update icon or text based on backgroundMode
+        toggleBackgroundBtn.classList.toggle('active', backgroundMode !== 'light');
+    }
+}
+
+// --- Environment Map Loading ---
+
+async function loadEnvironment(renderer, url = 'assets/studio_small_03_1k.hdr') {
+    console.log(`Loading environment map from ${url}...`);
+    try {
+        const rgbeLoader = new RGBELoader();
+        const texture = await rgbeLoader.loadAsync(url);
+        
+        texture.mapping = THREE.EquirectangularReflectionMapping;
+        
+        const pmremGenerator = new THREE.PMREMGenerator(renderer);
+        pmremGenerator.compileEquirectangularShader();
+        
+        defaultEnvMap = pmremGenerator.fromEquirectangular(texture).texture;
+        
+        scene.environment = defaultEnvMap; // Apply immediately
+        console.log('HDR Environment map loaded and applied.');
+        
+        texture.dispose();
+        pmremGenerator.dispose();
+        
+        // Apply background based on the current mode
+        applyBackground();
+
+    } catch (error) {
+        console.error('Failed to load environment map:', error);
+        // Fallback or show error message
+        // Use the procedural one as fallback?
+        // scene.environment = createJewelryEnvironmentMap(renderer);
+        if (window.showErrorMessage) {
+            window.showErrorMessage('Failed to load environment map. Using default lighting.');
+        }
     }
 }
 
 // Add setupLights function that was referenced but not defined
 function setupLights() {
-    // Ambient light
-    ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+    // Ambient light (reduce intensity, Hemisphere will help)
+    ambientLight = new THREE.AmbientLight(0xffffff, 0.2); 
     scene.add(ambientLight);
 
     // Directional light
     directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-    directionalLight.position.set(5, 5, 5);
+    directionalLight.position.set(5, 10, 7.5); // Adjust position for better angles
     directionalLight.castShadow = true;
+    // Configure shadow map
+    directionalLight.shadow.mapSize.width = 1024;
+    directionalLight.shadow.mapSize.height = 1024;
+    directionalLight.shadow.camera.near = 0.5;
+    directionalLight.shadow.camera.far = 50;
     scene.add(directionalLight);
 
-    // Add additional lights for better material rendering
-    const fillLight = new THREE.DirectionalLight(0xffffff, 0.3);
-    fillLight.position.set(-5, 5, -5);
-    scene.add(fillLight);
+    // Add HemisphereLight
+    hemisphereLight = new THREE.HemisphereLight(0xDBE9FF, 0x444444, 0.4); // Soft blue sky, gray ground, moderate intensity
+    hemisphereLight.position.set(0, 10, 0);
+    scene.add(hemisphereLight);
 
-    const rimLight = new THREE.DirectionalLight(0xffffff, 0.2);
-    rimLight.position.set(0, -5, 5);
-    scene.add(rimLight);
+    console.log("Lights setup complete (Ambient, Directional, Hemisphere).");
 }
 
 // Add setupControls function that was referenced but not defined
@@ -2083,6 +2227,14 @@ async function process3DMFile(file) {
             throw new Error('Failed to parse 3DM file');
         }
 
+        // Get materials from the document
+        const rhinoMaterials = doc.materials();
+        const materials = [];
+        for (let i = 0; i < rhinoMaterials.count; i++) {
+            materials.push(rhinoMaterials.get(i));
+        }
+        console.log(`Found ${materials.length} materials in file`);
+
         // Create model container
         const modelInfo = {
             path: file.name,
@@ -2093,7 +2245,7 @@ async function process3DMFile(file) {
             boundingBox: null,
             selected: false,
             visible: true,
-            material: currentMaterial || 'gold'
+            material: currentMaterial || 'gold' // Default override material
         };
 
         // Get all objects from the document
@@ -2111,80 +2263,104 @@ async function process3DMFile(file) {
                 if (!rhinoObject) continue;
 
                 const geometry = rhinoObject.geometry();
+                const attributes = rhinoObject.attributes(); // Get attributes early
+                
                 if (!geometry) {
                     console.log(`Object ${i}: No geometry`);
+                    if (attributes) attributes.delete();
+                    rhinoObject.delete();
                     continue;
                 }
 
                 console.log(`Processing object ${i}, type:`, geometry.objectType);
 
-                let mesh = null;
+                let threeMesh = null;
+                let objectMaterial = null;
+
+                // Determine material for this object
+                if (attributes) {
+                    const matIndex = attributes.materialIndex;
+                    if (matIndex >= 0 && matIndex < materials.length) {
+                        const rhinoMat = materials[matIndex];
+                        objectMaterial = convertRhinoMaterialToThree(rhinoMat);
+                        if (objectMaterial && defaultEnvMap) {
+                             objectMaterial.envMap = defaultEnvMap;
+                             objectMaterial.needsUpdate = true;
+                        }
+                    }
+                }
 
                 // Handle different geometry types
                 if (geometry.objectType === rhino.ObjectType.Mesh) {
-                    // Direct mesh conversion
-                    mesh = await convertRhinoMeshToThree(geometry, rhino);
+                    threeMesh = await convertRhinoMeshToThree(geometry, rhino);
                 } else if (geometry.objectType === rhino.ObjectType.Brep) {
-                    // Convert Brep to mesh
                     const meshes = await convertBrepToMeshes(geometry, rhino);
                     if (meshes && meshes.length > 0) {
-                        const group = new THREE.Group();
-                        meshes.forEach(m => {
-                            if (m) group.add(m);
-                        });
-                        mesh = group;
+                        if (meshes.length === 1) {
+                            threeMesh = meshes[0];
+                        } else {
+                            const group = new THREE.Group();
+                            meshes.forEach(m => { if (m) group.add(m); });
+                            threeMesh = group; // Treat as a single logical mesh group
+                        }
                     }
                 } else if (geometry.objectType === rhino.ObjectType.SubD) {
-                    // Convert SubD to mesh
                     const meshGeometry = geometry.toMesh();
                     if (meshGeometry) {
-                        mesh = await convertRhinoMeshToThree(meshGeometry, rhino);
+                        threeMesh = await convertRhinoMeshToThree(meshGeometry, rhino);
                         meshGeometry.delete();
                     }
                 }
 
-                if (mesh) {
-                    // Apply any attributes (layer, material, etc)
-                    const attributes = rhinoObject.attributes();
+                if (threeMesh) {
+                    // Apply the determined material (or default)
+                    const finalMaterial = objectMaterial || (materialPresets[modelInfo.material] ? materialPresets[modelInfo.material].clone() : materialPresets['gold'].clone());
+                    if (defaultEnvMap) finalMaterial.envMap = defaultEnvMap;
+                    
+                    if (threeMesh.isGroup) {
+                        threeMesh.traverse(child => {
+                            if (child.isMesh) child.material = finalMaterial.clone();
+                        });
+                    } else {
+                         threeMesh.material = finalMaterial;
+                    }
+                     
+                    // Store original Rhino attributes in userData
                     if (attributes) {
-                        // Store attributes in userData
-                        mesh.userData.attributes = {
+                        threeMesh.userData.attributes = {
                             name: attributes.name || '',
                             layerIndex: attributes.layerIndex,
                             materialIndex: attributes.materialIndex,
                             materialSource: attributes.materialSource
                         };
-
-                        // Handle user strings if available
                         if (typeof attributes.getUserStrings === 'function') {
-                            try {
-                                const userStrings = attributes.getUserStrings();
-                                if (userStrings && userStrings.length > 0) {
-                                    mesh.userData.userStrings = userStrings;
-                                }
-                            } catch (e) {
-                                console.warn('Error getting user strings:', e);
-                            }
+                             try { threeMesh.userData.userStrings = attributes.getUserStrings(); } catch (e) { /* ignore */ }
                         }
-
-                        attributes.delete();
                     }
 
-                    modelInfo.object.add(mesh);
+                    modelInfo.object.add(threeMesh);
                     processedCount++;
                 }
 
                 // Clean up
                 if (geometry) geometry.delete();
+                if (attributes) attributes.delete();
                 rhinoObject.delete();
 
             } catch (error) {
                 console.error(`Error processing object ${i}:`, error);
                 errorCount++;
+                // Ensure cleanup even on error within the loop
+                if (attributes) attributes.delete(); 
+                if (geometry) geometry.delete(); 
+                if (rhinoObject) rhinoObject.delete();
             }
         }
 
-        // Clean up document
+        // Clean up materials array
+        materials.forEach(mat => mat.delete());
+        rhinoMaterials.delete();
+        objects.delete();
         doc.delete();
 
         console.log(`Processed ${processedCount} objects, ${errorCount} errors`);
@@ -2196,8 +2372,8 @@ async function process3DMFile(file) {
         // Add to scene
         scene.add(modelInfo.object);
 
-        // Apply material
-        applyMaterial(modelInfo.object, modelInfo.material);
+        // Apply default override material (this shouldn't be needed if loading worked)
+        // applyMaterial(modelInfo.object, modelInfo.material);
 
         // Calculate bounding box
         modelInfo.boundingBox = new THREE.Box3().setFromObject(modelInfo.object);
@@ -2222,79 +2398,53 @@ async function process3DMFile(file) {
     }
 }
 
-// Helper function to convert Rhino mesh to Three.js mesh
-async function convertRhinoMeshToThree(rhinoMesh, rhino) {
+// Helper function to convert Rhino Material to Three.js Material
+function convertRhinoMaterialToThree(rhinoMaterial) {
+    if (!rhinoMaterial) return null;
+
     try {
-        // First check if we have a valid mesh
-        if (!rhinoMesh || !rhino) {
-            console.warn('Invalid rhinoMesh or rhino instance');
-            return null;
+        const pbrMaterial = rhinoMaterial.physicallyBased();
+        if (!pbrMaterial) {
+            // Basic material conversion if not PBR
+            const diffuse = rhinoMaterial.diffuseColor;
+            const color = new THREE.Color(diffuse.r / 255, diffuse.g / 255, diffuse.b / 255);
+            const basicMat = new THREE.MeshStandardMaterial({ color: color, side: THREE.DoubleSide });
+            console.log('Converted basic Rhino material');
+            return basicMat;
         }
 
-        // Get the mesh vertices
-        const vertices = rhinoMesh.vertices();
-        if (!vertices || vertices.count < 3) {
-            console.warn('Mesh has insufficient vertices');
-            return null;
-        }
+        // PBR Conversion
+        const baseColor = pbrMaterial.baseColor;
+        const color = new THREE.Color(baseColor.r / 255, baseColor.g / 255, baseColor.b / 255);
 
-        // Get the mesh faces
-        const faces = rhinoMesh.faces();
-        if (!faces || faces.count < 1) {
-            console.warn('Mesh has no faces');
-            return null;
-        }
-
-        // Create geometry
-        const geometry = new THREE.BufferGeometry();
-        
-        // Create arrays for vertices and faces
-        const positions = new Float32Array(faces.count * 3 * 3); // 3 vertices per face, 3 components per vertex
-        const indices = new Uint32Array(faces.count * 3);
-        
-        // Process faces and vertices
-        for (let faceIndex = 0; faceIndex < faces.count; faceIndex++) {
-            const face = faces.get(faceIndex);
-            
-            // Get vertices for this face
-            for (let i = 0; i < 3; i++) {
-                const vertexIndex = face[i];
-                const vertex = vertices.get(vertexIndex);
-                
-                const posIndex = (faceIndex * 9) + (i * 3);
-                positions[posIndex] = vertex[0];
-                positions[posIndex + 1] = vertex[1];
-                positions[posIndex + 2] = vertex[2];
-                
-                indices[faceIndex * 3 + i] = faceIndex * 3 + i;
-            }
-        }
-        
-        // Set geometry attributes
-        geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-        geometry.setIndex(new THREE.BufferAttribute(indices, 1));
-        
-        // Compute vertex normals
-        geometry.computeVertexNormals();
-        
-        // Create mesh with standard material
-        const material = new THREE.MeshStandardMaterial({
-            color: 0xffd700,
-            metalness: 0.8,
-            roughness: 0.2,
+        const threeMaterial = new THREE.MeshPhysicalMaterial({
+            color: color,
+            metalness: pbrMaterial.metallic,
+            roughness: pbrMaterial.roughness,
+            ior: pbrMaterial.ior,
+            transmission: 1.0 - pbrMaterial.opacity, // Approximate transmission from opacity
+            thickness: pbrMaterial.opacityThickness, // Use if available
+            clearcoat: pbrMaterial.clearcoat,
+            clearcoatRoughness: pbrMaterial.clearcoatRoughness,
+            sheen: pbrMaterial.sheen,
+            sheenRoughness: pbrMaterial.sheenRoughness,
+            emissive: new THREE.Color(pbrMaterial.emission.r / 255, pbrMaterial.emission.g / 255, pbrMaterial.emission.b / 255),
+            emissiveIntensity: 1.0, // Rhino emission doesn't have intensity separate?
             side: THREE.DoubleSide
         });
-        
-        const mesh = new THREE.Mesh(geometry, material);
-        
-        // Clean up rhino objects
-        vertices.delete();
-        faces.delete();
-        
-        return mesh;
+
+        // Apply base color texture if available
+        // const baseColorTexture = rhinoMaterial.getTexture(Rhino.TextureType.PhysicallyBased_BaseColor);
+        // if (baseColorTexture) { /* TODO: Texture loading logic */ }
+
+        pbrMaterial.delete(); // Clean up PBR material object
+        console.log('Converted PBR Rhino material');
+        return threeMaterial;
+
     } catch (error) {
-        console.error('Error converting Rhino mesh:', error);
-        return null;
+        console.warn('Error converting Rhino material:', error);
+        // Fallback to a default material
+        return new THREE.MeshStandardMaterial({ color: 0xcccccc, side: THREE.DoubleSide });
     }
 }
 
@@ -2612,14 +2762,24 @@ function handleAmbientLightChange(event) {
 }
 
 function handleDirectionalLightChange(event) {
-    if (!directionalLight) return;
-    
-    const intensity = parseFloat(event.target.value);
-    directionalLight.intensity = intensity;
-    
-    // Update the scene to reflect the changes
-    if (renderer && scene && camera) { // Add check
-        renderer.render(scene, camera);
+    if (dirLight) {
+        const intensity = parseFloat(event.target.value);
+        dirLight.intensity = intensity;
+        // Update shadow map if needed (optional)
+        // renderer.shadowMap.needsUpdate = true;
+        console.log(`Directional Light intensity set to ${intensity}`);
+    } else {
+        console.warn('Directional light object not found.');
+    }
+}
+
+function handleHemisphereLightChange(event) {
+    if (hemisphereLight) {
+        const intensity = parseFloat(event.target.value);
+        hemisphereLight.intensity = intensity;
+        console.log(`Hemisphere Light intensity set to ${intensity}`);
+    } else {
+        console.warn('Hemisphere light object not found.');
     }
 }
 

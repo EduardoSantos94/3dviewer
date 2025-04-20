@@ -232,31 +232,17 @@
                     </div>
                     <div class="control-group">
                         <div class="control-buttons">
-                            <button id="toggle-turntable">
-                                <i class="fas fa-sync-alt"></i>
-                                Turntable
-                            </button>
-                            <button id="toggle-floor">
-                                <i class="fas fa-border-all"></i>
-                                Toggle Floor
-                            </button>
-                            <button id="toggle-background">
-                                <i class="fas fa-fill-drip"></i>
-                                Toggle Background
-                            </button>
-                            <button id="reset-camera">
-                                <i class="fas fa-camera-retro"></i>
-                                Reset Camera
-                            </button>
+                            <label for="ambient-light">Ambient Light:</label>
+                            <input type="range" id="ambient-light" name="ambient-light" min="0" max="2" step="0.05" value="0.5">
+                            <label for="directional-light">Directional Light:</label>
+                            <input type="range" id="directional-light" name="directional-light" min="0" max="2" step="0.05" value="0.8">
+                            <label for="hemisphere-light">Hemisphere Light:</label>
+                            <input type="range" id="hemisphere-light" name="hemisphere-light" min="0" max="2" step="0.05" value="0.4">
                         </div>
-                    </div>
-                    <div class="control-group">
-                        <label>Ambient Light</label>
-                        <input type="range" id="ambient-light" min="0" max="1" step="0.1" value="0.5">
-                    </div>
-                    <div class="control-group">
-                        <label>Directional Light</label>
-                        <input type="range" id="directional-light" min="0" max="1" step="0.1" value="0.8">
+                        <div class="control-group">
+                            <button id="toggle-background"><i class="fas fa-adjust"></i> Toggle Background</button>
+                            <button id="toggle-turntable"><i class="fas fa-sync-alt"></i> Toggle Turntable</button>
+                        </div>
                     </div>
                 </div>
                 <div class="model-list">
