@@ -2200,12 +2200,15 @@ async function process3DMFile(file) {
 
         // Process each object
         for (let i = 0; i < objectCount; i++) {
+            let rhinoObject = null; // Declare here for catch block access
+            let geometry = null; // Declare here for catch block access
+            let attributes = null; // Declare here for catch block access
             try {
-                const rhinoObject = objects.get(i);
+                rhinoObject = objects.get(i);
                 if (!rhinoObject) continue;
 
-                const geometry = rhinoObject.geometry();
-                const attributes = rhinoObject.attributes(); // Get attributes early
+                geometry = rhinoObject.geometry();
+                attributes = rhinoObject.attributes(); // Get attributes early
                 
                 if (!geometry) {
                     console.log(`Object ${i}: No geometry`);
@@ -2293,6 +2296,7 @@ async function process3DMFile(file) {
                 console.error(`Error processing object ${i}:`, error);
                 errorCount++;
                 // Ensure cleanup even on error within the loop
+                // Need to check if they were successfully assigned before deleting
                 if (attributes) attributes.delete(); 
                 if (geometry) geometry.delete(); 
                 if (rhinoObject) rhinoObject.delete();
@@ -2336,6 +2340,8 @@ async function process3DMFile(file) {
         console.error('Error processing 3DM file:', error);
         hideLoadingIndicator();
         showErrorMessage(`Failed to load 3DM file: ${error.message}`);
+        // We don't have access to the loop variables here,
+        // so removing the cleanup attempt for attributes/geometry/rhinoObject
         throw error;
     }
 }
@@ -2356,8 +2362,14 @@ function convertRhinoMaterialToThree(rhinoMaterial) {
         }
 
         // PBR Conversion
-        const baseColor = pbrMaterial.baseColor;
-        const color = new THREE.Color(baseColor.r / 255, baseColor.g / 255, baseColor.b / 255);
+        let color;
+        try {
+            const baseColor = pbrMaterial.baseColor;
+            color = new THREE.Color(baseColor.r / 255, baseColor.g / 255, baseColor.b / 255);
+        } catch (colorError) {
+            console.warn('Error getting baseColor from PBR material, using default:', colorError);
+            color = new THREE.Color(0xcccccc); // Default gray
+        }
 
         const threeMaterial = new THREE.MeshPhysicalMaterial({
             color: color,
