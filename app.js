@@ -2259,9 +2259,20 @@ function applyRhinoAttributes(mesh, attributes) {
         if (attributes.materialIndex !== undefined) {
             mesh.userData.materialIndex = attributes.materialIndex;
         }
+
+        // Safely check for and handle decals
+        if (attributes.decals && typeof attributes.decals === 'object') {
+            try {
+                mesh.userData.decals = attributes.decals;
+            } catch (decalError) {
+                console.warn('Error applying decals:', decalError);
+                // Continue without decals rather than failing
+            }
+        }
         
     } catch (error) {
         console.error('Error applying Rhino attributes:', error);
+        // Continue without failing - we don't want attribute errors to prevent model loading
     }
 }
 
