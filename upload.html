@@ -238,21 +238,22 @@
     </nav>
 
     <main class="container">
-        <div class="upload-area">
+        <div class="upload-area" id="upload-area">
             <div class="drop-zone" id="drop-zone">
                 <i class="fas fa-cloud-upload-alt" style="font-size: 3rem; color: #007AFF; margin-bottom: 1rem;"></i>
                 <h2>Upload 3D Models</h2>
                 <p>Drag and drop your files here or click the buttons below</p>
                 <div class="button-group">
-                    <button class="add-files-btn" id="add-files">
+                    <button class="add-files-btn" id="add-files-btn">
                         <i class="fas fa-plus"></i>
                         Add Files
                     </button>
-                    <button class="add-files-btn-secondary" id="select-files">
+                    <button class="add-files-btn-secondary" id="select-files-btn">
                         <i class="fas fa-folder-open"></i>
                         Select Files
                     </button>
                 </div>
+                <input type="file" id="file-input" accept=".glb,.gltf,.obj,.fbx,.3dm,.stl" multiple style="display: none;">
                 <p class="supported-formats">Supported formats: .glb, .gltf, .obj, .fbx, .3dm, .stl</p>
             </div>
         </div>
@@ -260,14 +261,22 @@
         <div id="empty-state" style="text-align: center; padding: 2rem;">
             <i class="fas fa-cube" style="font-size: 3rem; color: #ddd; margin-bottom: 1rem;"></i>
             <p style="color: #666; margin-bottom: 1rem;">No files uploaded yet</p>
-            <button class="add-files-btn" id="add-files-empty">
+            <button class="add-files-btn" id="add-first-model-btn">
                 <i class="fas fa-plus"></i>
                 Add Your First Model
             </button>
         </div>
 
-        <div class="uploaded-files" id="file-list" style="display: none;">
-            <!-- File items will be added here dynamically -->
+        <div id="file-list" class="uploaded-files" style="display: none;">
+            <div id="file-list-content">
+                <!-- File items will be added here dynamically -->
+            </div>
+        </div>
+
+        <!-- Add progress bar container -->
+        <div class="upload-progress" style="display: none;">
+            <div class="progress-bar"></div>
+            <div class="progress-text">Uploading...</div>
         </div>
     </main>
 
@@ -277,6 +286,6 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="upload.js"></script>
+    <script type="module" src="js/upload.js"></script>
 </body>
 </html> 

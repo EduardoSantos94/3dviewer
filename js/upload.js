@@ -103,9 +103,14 @@ async function uploadFile(file) {
     const progressBar = document.querySelector('.upload-progress');
     const progressBarFill = progressBar?.querySelector('.progress-bar');
     const progressText = progressBar?.querySelector('.progress-text');
+    const loadingOverlay = document.getElementById('loading-overlay');
 
     try {
         if (!currentSession?.user?.id) throw new Error('No active session');
+
+        // Show progress elements
+        if (progressBar) progressBar.style.display = 'block';
+        if (loadingOverlay) loadingOverlay.style.display = 'flex';
 
         // Validate file size (max 50MB)
         const MAX_FILE_SIZE = 50 * 1024 * 1024;
@@ -114,22 +119,20 @@ async function uploadFile(file) {
         }
 
         // Validate file type
-        const allowedTypes = ['.3dm', '.obj', '.stl', '.glb', '.gltf'];
+        const allowedTypes = ['.3dm', '.obj', '.stl', '.glb', '.gltf', '.fbx'];
         const fileExt = '.' + file.name.split('.').pop().toLowerCase();
         if (!allowedTypes.includes(fileExt)) {
             throw new Error(`Unsupported file type: ${fileExt}`);
         }
 
-        // Create a safe filename
+        // Create a safe filename with timestamp
         const timestamp = Date.now();
         const safeFileName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
         const fileName = `${timestamp}-${safeFileName}`;
         const filePath = `${currentSession.user.id}/${fileName}`;
 
-        // Show upload progress
-        if (progressBar) progressBar.style.display = 'block';
-        if (progressBarFill) progressBarFill.style.width = '0%';
-        if (progressText) progressText.textContent = 'Uploading...';
+        // Update progress text
+        if (progressText) progressText.textContent = `Uploading ${file.name}...`;
 
         // Upload the file
         const { data, error } = await supabase.storage
@@ -143,12 +146,14 @@ async function uploadFile(file) {
 
         // Update the file list
         await updateFileList();
-        showSuccess('File uploaded successfully');
+        showSuccess(`${file.name} uploaded successfully`);
     } catch (error) {
         console.error('Upload error:', error);
         showErrorMessage(error.message || 'Failed to upload file');
     } finally {
+        // Hide progress elements
         if (progressBar) progressBar.style.display = 'none';
+        if (loadingOverlay) loadingOverlay.style.display = 'none';
     }
 }
 
@@ -220,13 +225,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const addFilesBtn = document.getElementById('add-files-btn');
     if (addFilesBtn) {
         addFilesBtn.addEventListener('click', () => {
-            const uploadArea = document.getElementById('upload-area');
-            if (uploadArea) {
-                uploadArea.style.display = uploadArea.style.display === 'none' ? 'block' : 'none';
-                addFilesBtn.innerHTML = uploadArea.style.display === 'none' ? 
-                    '<i class="fas fa-plus"></i> Add Files' : 
-                    '<i class="fas fa-times"></i> Cancel';
-            }
+            document.getElementById('file-input').click();
         });
     }
 
@@ -234,14 +233,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const addFirstModelBtn = document.getElementById('add-first-model-btn');
     if (addFirstModelBtn) {
         addFirstModelBtn.addEventListener('click', () => {
-            const uploadArea = document.getElementById('upload-area');
-            if (uploadArea) {
-                uploadArea.style.display = 'block';
-                const addFilesBtn = document.getElementById('add-files-btn');
-                if (addFilesBtn) {
-                    addFilesBtn.innerHTML = '<i class="fas fa-times"></i> Cancel';
-                }
-            }
+            document.getElementById('file-input').click();
         });
     }
 
@@ -256,20 +248,69 @@ document.addEventListener('DOMContentLoaded', () => {
     // File input change
     const fileInput = document.getElementById('file-input');
     if (fileInput) {
-        fileInput.addEventListener('change', (e) => {
+        fileInput.addEventListener('change', async (e) => {
             const files = Array.from(e.target.files);
             if (files.length > 0) {
-                const uploadArea = document.getElementById('upload-area');
-                if (uploadArea) {
-                    uploadArea.style.display = 'none';
+                // Hide empty state if visible
+                const emptyState = document.getElementById('empty-state');
+                if (emptyState) {
+                    emptyState.style.display = 'none';
                 }
-                const addFilesBtn = document.getElementById('add-files-btn');
-                if (addFilesBtn) {
-                    addFilesBtn.innerHTML = '<i class="fas fa-plus"></i> Add Files';
+                
+                // Show file list
+                const fileList = document.getElementById('file-list');
+                if (fileList) {
+                    fileList.style.display = 'block';
                 }
-                files.forEach(file => uploadFile(file));
+                
+                // Upload each file
+                for (const file of files) {
+                    await uploadFile(file);
+                }
             }
             e.target.value = ''; // Reset input
+        });
+    }
+
+    // Drop zone handlers
+    const dropZone = document.getElementById('drop-zone');
+    if (dropZone) {
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            dropZone.classList.add('dragover');
+        });
+
+        dropZone.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            dropZone.classList.remove('dragover');
+        });
+
+        dropZone.addEventListener('drop', async (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            dropZone.classList.remove('dragover');
+            
+            const files = Array.from(e.dataTransfer.files);
+            if (files.length > 0) {
+                // Hide empty state if visible
+                const emptyState = document.getElementById('empty-state');
+                if (emptyState) {
+                    emptyState.style.display = 'none';
+                }
+                
+                // Show file list
+                const fileList = document.getElementById('file-list');
+                if (fileList) {
+                    fileList.style.display = 'block';
+                }
+                
+                // Upload each file
+                for (const file of files) {
+                    await uploadFile(file);
+                }
+            }
         });
     }
 
