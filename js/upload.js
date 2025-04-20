@@ -27,7 +27,8 @@ function getOriginalFilename(storedName) {
 
 // Function to create a model card
 function createModelCard(file) {
-    const originalName = getOriginalFilename(file.name);
+    // Extract original filename from the stored name
+    const originalName = file.name.split('-').slice(2).join('-');
     const size = (file.metadata?.size || file.size || 0) / (1024 * 1024);
     const formattedSize = size.toFixed(2);
     const timestamp = new Date(file.created_at || Date.now()).toLocaleDateString();
@@ -240,11 +241,10 @@ async function uploadFile(file) {
             throw new Error(`Unsupported file type: ${ext}`);
         }
 
-        // Create safe filename
+        // Create safe filename with timestamp
         const timestamp = Date.now();
-        const safeFileName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
-        const fileName = `${timestamp}-${safeFileName}`;
-        const filePath = `${currentSession.user.id}/${fileName}`;
+        const safeFileName = `${timestamp}-${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
+        const filePath = `${currentSession.user.id}/${safeFileName}`;
 
         // Upload with progress
         const { error: uploadError } = await supabase.storage
@@ -252,6 +252,10 @@ async function uploadFile(file) {
             .upload(filePath, file, {
                 cacheControl: '3600',
                 upsert: false,
+                metadata: {
+                    originalName: file.name,
+                    uploadedAt: new Date().toISOString()
+                },
                 onUploadProgress: (progress) => {
                     const percentage = Math.round((progress.loaded / progress.total) * 100);
                     progressFill.style.width = `${percentage}%`;
