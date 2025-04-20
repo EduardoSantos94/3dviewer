@@ -16,6 +16,9 @@ try {
     showErrorMessage('Failed to initialize Supabase: ' + error.message);
 }
 
+// Add this after the supabase initialization
+const FILE_TABLE = 'file_mappings';
+
 // Function to extract original filename from stored name
 function getOriginalFilename(storedName) {
     // If the name contains a timestamp prefix (e.g., "1234567890-filename.ext")
@@ -27,8 +30,7 @@ function getOriginalFilename(storedName) {
 
 // Function to create a model card
 function createModelCard(file) {
-    // Extract original filename from the stored name
-    const originalName = file.name.split('-').slice(2).join('-');
+    const originalName = file.original_name || file.name.split('-').slice(2).join('-');
     const size = (file.metadata?.size || file.size || 0) / (1024 * 1024);
     const formattedSize = size.toFixed(2);
     const timestamp = new Date(file.created_at || Date.now()).toLocaleDateString();
@@ -43,11 +45,11 @@ function createModelCard(file) {
             <div class="model-name">${originalName}</div>
             <div class="model-meta">${formattedSize} MB • ${timestamp}</div>
             <div class="model-actions">
-                <button class="model-btn view-btn" onclick="viewModel('${file.name}', '${originalName}')">
+                <button class="model-btn view-btn" onclick="viewModel('${file.stored_name || file.name}', '${originalName}')">
                     <i class="fas fa-eye"></i>
                     View
                 </button>
-                <button class="model-btn delete-btn" onclick="deleteModel('${file.name}')">
+                <button class="model-btn delete-btn" onclick="deleteModel('${file.stored_name || file.name}')">
                     <i class="fas fa-trash"></i>
                     Delete
                 </button>
@@ -65,20 +67,23 @@ async function updateModelsGrid() {
     try {
         if (!currentSession?.user?.id) throw new Error('No active session');
         
-        const { data: files, error } = await supabase.storage
-            .from('client-files')
-            .list(currentSession.user.id + '/');
+        // Get file mappings
+        const { data: mappings, error: mappingError } = await supabase
+            .from(FILE_TABLE)
+            .select('*')
+            .eq('user_id', currentSession.user.id)
+            .order('created_at', { ascending: false });
 
-        if (error) throw error;
+        if (mappingError) throw mappingError;
 
-        if (!files || files.length === 0) {
+        if (!mappings || mappings.length === 0) {
             modelsGrid.style.display = 'none';
             emptyState.style.display = 'block';
             return;
         }
 
         modelsGrid.innerHTML = '';
-        files.forEach(file => {
+        mappings.forEach(file => {
             const card = createModelCard(file);
             modelsGrid.appendChild(card);
         });
@@ -98,21 +103,34 @@ function toggleUploadModal(show) {
 }
 
 // Function to view a model
-async function viewModel(fileName, originalName) {
+async function viewModel(storedName, originalName) {
     try {
         if (!currentSession?.user?.id) throw new Error('No active session');
 
-        const { data, error } = await supabase.storage
-            .from('client-files')
-            .createSignedUrl(`${currentSession.user.id}/${fileName}`, 3600);
+        // Get the file mapping
+        const { data: mapping, error: mappingError } = await supabase
+            .from(FILE_TABLE)
+            .select('file_path, original_name')
+            .eq('stored_name', storedName)
+            .single();
 
-        if (error) throw error;
-        if (!data?.signedUrl) throw new Error('Failed to get file URL');
+        if (mappingError) throw mappingError;
 
-        // Open viewer in new tab with original filename
-        const viewerUrl = new URL(window.location.origin + '/index.html');
-        viewerUrl.searchParams.set('model', data.signedUrl);
-        viewerUrl.searchParams.set('filename', originalName);
+        // Get signed URL
+        const { data: urlData, error: urlError } = await supabase.storage
+            .from(STORAGE_CONFIG.uploadPath)
+            .createSignedUrl(mapping.file_path, 3600);
+
+        if (urlError) throw urlError;
+        if (!urlData?.signedUrl) throw new Error('Failed to get file URL');
+
+        // Construct viewer URL
+        const viewerUrl = new URL(`${window.location.origin}/index.html`);
+        viewerUrl.searchParams.set('model', urlData.signedUrl);
+        viewerUrl.searchParams.set('filename', mapping.original_name || originalName);
+        viewerUrl.searchParams.set('type', mapping.original_name.split('.').pop().toLowerCase());
+
+        // Open in new tab
         window.open(viewerUrl.toString(), '_blank');
     } catch (error) {
         console.error('Error viewing model:', error);
@@ -230,25 +248,24 @@ async function uploadFile(file) {
         progressPercentage.textContent = '0%';
 
         // Validate file
-        const maxSize = 50 * 1024 * 1024; // 50MB
+        const maxSize = STORAGE_CONFIG.maxFileSize;
         if (file.size > maxSize) {
-            throw new Error(`File size exceeds 50MB limit (${(file.size / (1024 * 1024)).toFixed(1)}MB)`);
+            throw new Error(`File size exceeds ${maxSize / (1024 * 1024)}MB limit (${(file.size / (1024 * 1024)).toFixed(1)}MB)`);
         }
 
-        const allowedTypes = ['.3dm', '.obj', '.stl', '.glb', '.gltf', '.fbx'];
-        const ext = '.' + file.name.split('.').pop().toLowerCase();
-        if (!allowedTypes.includes(ext)) {
-            throw new Error(`Unsupported file type: ${ext}`);
+        if (!STORAGE_CONFIG.allowedTypes.includes('.' + file.name.split('.').pop().toLowerCase())) {
+            throw new Error(`Unsupported file type: ${file.name.split('.').pop()}`);
         }
 
-        // Create safe filename with timestamp and user ID
+        // Create unique filename while preserving original name
         const timestamp = Date.now();
-        const safeFileName = `${currentSession.user.id}/${timestamp}-${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
-        const filePath = `${currentSession.user.id}/${safeFileName}`;
+        const uniqueId = Math.random().toString(36).substring(7);
+        const storedName = `${timestamp}-${uniqueId}-${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
+        const filePath = `${currentSession.user.id}/${storedName}`;
 
-        // Upload with progress tracking
-        const { data, error } = await supabase.storage
-            .from('client-files')
+        // Upload file
+        const { data: uploadData, error: uploadError } = await supabase.storage
+            .from(STORAGE_CONFIG.uploadPath)
             .upload(filePath, file, {
                 cacheControl: '3600',
                 upsert: false,
@@ -265,7 +282,20 @@ async function uploadFile(file) {
                 }
             });
 
-        if (error) throw error;
+        if (uploadError) throw uploadError;
+
+        // Store filename mapping
+        const { error: mappingError } = await supabase
+            .from(FILE_TABLE)
+            .insert([{
+                user_id: currentSession.user.id,
+                stored_name: storedName,
+                original_name: file.name,
+                file_path: filePath,
+                created_at: new Date().toISOString()
+            }]);
+
+        if (mappingError) throw mappingError;
 
         // Update grid and show success
         await updateModelsGrid();
@@ -276,7 +306,7 @@ async function uploadFile(file) {
             progressBar.style.display = 'none';
         }, 2000);
 
-        return data;
+        return uploadData;
     } catch (error) {
         console.error('Upload error:', error);
         showErrorMessage(error.message || 'Failed to upload file');
