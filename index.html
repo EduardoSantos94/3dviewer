@@ -346,7 +346,16 @@
                     console.log('Model data fetched successfully, size:', blob.size);
 
                     // Determine filename
+                    console.log(`Raw filename param: ${filenameParam}`); // Log raw param
                     let filename = filenameParam ? decodeURIComponent(filenameParam) : 'model_from_url.3dm';
+                    console.log(`Decoded filename param: ${filenameParam ? decodeURIComponent(filenameParam) : 'null'}`); // Log decoded
+                    
+                    // Add check if filename is empty after decoding
+                    if (!filename || filename.trim() === '') {
+                        console.warn('Filename parameter was empty or invalid, defaulting.');
+                        filename = 'model_from_url.3dm';
+                    }
+
                     if (!filename.includes('.')) {
                         // Attempt to guess extension from URL if filename lacks one
                         const urlPath = new URL(decodeURIComponent(modelUrl)).pathname;

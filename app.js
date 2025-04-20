@@ -591,10 +591,20 @@ function setupEventListeners() {
     const materialSelect = document.getElementById('material-select');
     if (materialSelect) {
         materialSelect.addEventListener('change', () => {
-            for (const model of models) {
-                if (model.selected) {
-                    applyMaterialToModel(models.indexOf(model), materialSelect.value);
+            const selectedMaterialType = materialSelect.value;
+            if (selectedObject) {
+                // Find the index of the selected model
+                const modelIndex = models.findIndex(m => m.object === selectedObject);
+                if (modelIndex !== -1) {
+                    applyMaterialToModel(modelIndex, selectedMaterialType);
+                    // Optionally update the material select in the model list item if needed
+                    // updateLoadedModelsUI(); // Might cause issues if called too often
+                } else {
+                    console.warn('Selected object not found in models array.');
                 }
+            } else {
+                console.warn('No model selected to apply material to.');
+                // Optionally provide feedback to the user, e.g., select a model first
             }
         });
     } else {
@@ -1144,25 +1154,33 @@ function setupKeyboardShortcuts() {
 }
 
 // Improved zoom to fit function
-function zoomToFit(models) {
-    if (!models || models.length === 0) {
-        console.warn('No models provided to zoomToFit');
+function zoomToFit(modelsToFit) { // Renamed parameter for clarity
+    if (!Array.isArray(modelsToFit) || modelsToFit.length === 0) { // Check if it's a non-empty array
+        console.warn('No valid models array provided to zoomToFit');
         return;
     }
 
     // Create a bounding box that will contain all models
     const boundingBox = new THREE.Box3();
 
-    // Expand the bounding box to include all models
-    models.forEach(model => {
-        if (model.boundingBox) {
-            boundingBox.union(model.boundingBox);
+    // Expand the bounding box to include all models in the array
+    modelsToFit.forEach(modelData => { // Iterate through the array
+        if (modelData && modelData.boundingBox) { // Check if model data and its boundingBox exist
+            boundingBox.union(modelData.boundingBox);
+        } else if (modelData && modelData.object) {
+            // Fallback: calculate bounds if not pre-calculated
+            const tempBox = new THREE.Box3().setFromObject(modelData.object);
+            if (isValidBoundingBox(tempBox)) {
+                boundingBox.union(tempBox);
+                // Optionally store it back if missing
+                if (!modelData.boundingBox) modelData.boundingBox = tempBox.clone(); 
+            }
         }
     });
 
     // Check if we have a valid bounding box
-    if (boundingBox.isEmpty()) {
-        console.warn('No valid geometry found to fit in view');
+    if (boundingBox.isEmpty() || !isValidBoundingBox(boundingBox)) { // Use helper
+        console.warn('No valid geometry found to fit in view after checking models');
         return;
     }
 
@@ -1179,7 +1197,9 @@ function zoomToFit(models) {
     cameraZ *= 1.5;
 
     // Position the camera
-    camera.position.set(center.x, center.y, center.z + cameraZ);
+    // Use a consistent direction for zooming
+    const direction = new THREE.Vector3(0, 0.5, 1).normalize(); // Slightly elevated view
+    camera.position.copy(center).add(direction.multiplyScalar(cameraZ));
     camera.lookAt(center);
 
     // Update camera controls
@@ -1187,11 +1207,26 @@ function zoomToFit(models) {
     controls.update();
 
     // Update the camera's near and far planes based on the model size
-    const minZ = Math.min(0.1, maxDim * 0.01);
+    const minZ = Math.max(0.1, maxDim * 0.01);
     const maxZ = Math.max(1000, maxDim * 10);
     camera.near = minZ;
     camera.far = maxZ;
     camera.updateProjectionMatrix();
+}
+
+// Add centerSelectedModel function back
+function centerSelectedModel() {
+    if (selectedObject) {
+        // Find the corresponding model data object in the models array
+        const selectedModelData = models.find(m => m.object === selectedObject);
+        if (selectedModelData) {
+            zoomToFit([selectedModelData]); // Pass the model data object in an array
+        } else {
+             console.warn('Selected object not found in models array. Cannot center.');
+        }
+    } else {
+        console.warn('No model selected to center');
+    }
 }
 
 // Function has been moved to the exported version at line 2451
@@ -1366,15 +1401,6 @@ function positionAndScaleModel(object, model) {
     } catch (error) {
         console.error('Error positioning and scaling model:', error);
         return false;
-    }
-}
-
-// Add centerSelectedModel function back
-function centerSelectedModel() {
-    if (selectedObject) {
-        zoomToFit(selectedObject);
-    } else {
-        console.warn('No model selected to center');
     }
 }
 
