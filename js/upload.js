@@ -25,6 +25,120 @@ function getOriginalFilename(storedName) {
     return storedName;
 }
 
+// Function to create a model card
+function createModelCard(file) {
+    const originalName = getOriginalFilename(file.name);
+    const size = (file.metadata?.size || file.size || 0) / (1024 * 1024);
+    const formattedSize = size.toFixed(2);
+    const timestamp = new Date(file.created_at || Date.now()).toLocaleDateString();
+
+    const card = document.createElement('div');
+    card.className = 'model-card';
+    card.innerHTML = `
+        <div class="model-preview">
+            <i class="fas fa-cube"></i>
+        </div>
+        <div class="model-info">
+            <div class="model-name">${originalName}</div>
+            <div class="model-meta">${formattedSize} MB • ${timestamp}</div>
+            <div class="model-actions">
+                <button class="model-btn view-btn" onclick="viewModel('${file.name}', '${originalName}')">
+                    <i class="fas fa-eye"></i>
+                    View
+                </button>
+                <button class="model-btn delete-btn" onclick="deleteModel('${file.name}')">
+                    <i class="fas fa-trash"></i>
+                    Delete
+                </button>
+            </div>
+        </div>
+    `;
+    return card;
+}
+
+// Function to update the models grid
+async function updateModelsGrid() {
+    const modelsGrid = document.getElementById('models-grid');
+    const emptyState = document.getElementById('empty-state');
+    
+    try {
+        if (!currentSession?.user?.id) throw new Error('No active session');
+        
+        const { data: files, error } = await supabase.storage
+            .from('client-files')
+            .list(currentSession.user.id + '/');
+
+        if (error) throw error;
+
+        if (!files || files.length === 0) {
+            modelsGrid.style.display = 'none';
+            emptyState.style.display = 'block';
+            return;
+        }
+
+        modelsGrid.innerHTML = '';
+        files.forEach(file => {
+            const card = createModelCard(file);
+            modelsGrid.appendChild(card);
+        });
+
+        modelsGrid.style.display = 'grid';
+        emptyState.style.display = 'none';
+    } catch (error) {
+        console.error('Error updating models grid:', error);
+        showErrorMessage('Failed to load models: ' + error.message);
+    }
+}
+
+// Function to show/hide upload modal
+function toggleUploadModal(show) {
+    const modal = document.getElementById('upload-modal');
+    modal.style.display = show ? 'flex' : 'none';
+}
+
+// Function to view a model
+async function viewModel(fileName, originalName) {
+    try {
+        if (!currentSession?.user?.id) throw new Error('No active session');
+
+        const { data, error } = await supabase.storage
+            .from('client-files')
+            .createSignedUrl(`${currentSession.user.id}/${fileName}`, 3600);
+
+        if (error) throw error;
+        if (!data?.signedUrl) throw new Error('Failed to get file URL');
+
+        // Open viewer in new tab with original filename
+        const viewerUrl = new URL(window.location.origin + '/index.html');
+        viewerUrl.searchParams.set('model', data.signedUrl);
+        viewerUrl.searchParams.set('filename', originalName);
+        window.open(viewerUrl.toString(), '_blank');
+    } catch (error) {
+        console.error('Error viewing model:', error);
+        showErrorMessage('Failed to view model: ' + error.message);
+    }
+}
+
+// Function to delete a model
+async function deleteModel(fileName) {
+    try {
+        if (!confirm('Are you sure you want to delete this model?')) return;
+        if (!currentSession?.user?.id) throw new Error('No active session');
+
+        const { error } = await supabase.storage
+            .from('client-files')
+            .remove([`${currentSession.user.id}/${fileName}`]);
+
+        if (error) throw error;
+
+        await updateModelsGrid();
+        showSuccess('Model deleted successfully');
+    } catch (error) {
+        console.error('Error deleting model:', error);
+        showErrorMessage('Failed to delete model: ' + error.message);
+    }
+}
+
 // Function to update the file list
 async function updateFileList() {
     const fileListContent = document.getElementById('file-list-content');
@@ -100,60 +214,68 @@ async function updateFileList() {
 
 // Function to handle file uploads
 async function uploadFile(file) {
-    const progressBar = document.querySelector('.upload-progress');
-    const progressBarFill = progressBar?.querySelector('.progress-bar');
-    const progressText = progressBar?.querySelector('.progress-text');
-    const loadingOverlay = document.getElementById('loading-overlay');
+    const progressBar = document.getElementById('upload-progress');
+    const progressFill = document.getElementById('progress-fill');
+    const progressFilename = document.getElementById('progress-filename');
+    const progressPercentage = document.getElementById('progress-percentage');
 
     try {
         if (!currentSession?.user?.id) throw new Error('No active session');
 
-        // Show progress elements
-        if (progressBar) progressBar.style.display = 'block';
-        if (loadingOverlay) loadingOverlay.style.display = 'flex';
+        // Show progress
+        progressBar.style.display = 'block';
+        progressFilename.textContent = file.name;
+        progressFill.style.width = '0%';
+        progressPercentage.textContent = '0%';
 
-        // Validate file size (max 50MB)
-        const MAX_FILE_SIZE = 50 * 1024 * 1024;
-        if (file.size > MAX_FILE_SIZE) {
-            throw new Error(`File size exceeds 50MB limit: ${formatFileSize(file.size)}`);
+        // Validate file
+        const maxSize = 50 * 1024 * 1024; // 50MB
+        if (file.size > maxSize) {
+            throw new Error(`File size exceeds 50MB limit (${(file.size / (1024 * 1024)).toFixed(1)}MB)`);
         }
 
-        // Validate file type
         const allowedTypes = ['.3dm', '.obj', '.stl', '.glb', '.gltf', '.fbx'];
-        const fileExt = '.' + file.name.split('.').pop().toLowerCase();
-        if (!allowedTypes.includes(fileExt)) {
-            throw new Error(`Unsupported file type: ${fileExt}`);
+        const ext = '.' + file.name.split('.').pop().toLowerCase();
+        if (!allowedTypes.includes(ext)) {
+            throw new Error(`Unsupported file type: ${ext}`);
         }
 
-        // Create a safe filename with timestamp
+        // Create safe filename
         const timestamp = Date.now();
         const safeFileName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
         const fileName = `${timestamp}-${safeFileName}`;
         const filePath = `${currentSession.user.id}/${fileName}`;
 
-        // Update progress text
-        if (progressText) progressText.textContent = `Uploading ${file.name}...`;
-
-        // Upload the file
-        const { data, error } = await supabase.storage
+        // Upload with progress
+        const { error: uploadError } = await supabase.storage
             .from('client-files')
             .upload(filePath, file, {
                 cacheControl: '3600',
-                upsert: false
+                upsert: false,
+                onUploadProgress: (progress) => {
+                    const percentage = Math.round((progress.loaded / progress.total) * 100);
+                    progressFill.style.width = `${percentage}%`;
+                    progressPercentage.textContent = `${percentage}%`;
+                }
             });
 
-        if (error) throw error;
+        if (uploadError) throw uploadError;
 
-        // Update the file list
-        await updateFileList();
+        // Update grid and show success
+        await updateModelsGrid();
         showSuccess(`${file.name} uploaded successfully`);
+
+        // Hide progress after a delay
+        setTimeout(() => {
+            progressBar.style.display = 'none';
+        }, 2000);
+
+        // Close modal
+        toggleUploadModal(false);
     } catch (error) {
         console.error('Upload error:', error);
         showErrorMessage(error.message || 'Failed to upload file');
-    } finally {
-        // Hide progress elements
-        if (progressBar) progressBar.style.display = 'none';
-        if (loadingOverlay) loadingOverlay.style.display = 'none';
+        progressBar.style.display = 'none';
     }
 }
 
@@ -221,108 +343,71 @@ async function deleteFile(fileName) {
 
 // Event Listeners
 document.addEventListener('DOMContentLoaded', () => {
-    // Add Files button
-    const addFilesBtn = document.getElementById('add-files-btn');
-    if (addFilesBtn) {
-        addFilesBtn.addEventListener('click', () => {
-            document.getElementById('file-input').click();
-        });
-    }
+    // Initialize auth state
+    checkAuth();
 
-    // Add First Model button
-    const addFirstModelBtn = document.getElementById('add-first-model-btn');
-    if (addFirstModelBtn) {
-        addFirstModelBtn.addEventListener('click', () => {
-            document.getElementById('file-input').click();
-        });
-    }
-
-    // Select Files button
-    const selectFilesBtn = document.getElementById('select-files-btn');
-    if (selectFilesBtn) {
-        selectFilesBtn.addEventListener('click', () => {
-            document.getElementById('file-input').click();
-        });
-    }
-
-    // File input change
+    // Upload button handlers
+    const uploadBtn = document.getElementById('upload-btn');
+    const uploadFirstBtn = document.getElementById('upload-first-btn');
+    const closeModalBtn = document.getElementById('close-modal');
+    const selectFileBtn = document.getElementById('select-file-btn');
     const fileInput = document.getElementById('file-input');
+    const dropZone = document.getElementById('drop-zone');
+
+    [uploadBtn, uploadFirstBtn].forEach(btn => {
+        if (btn) {
+            btn.addEventListener('click', () => toggleUploadModal(true));
+        }
+    });
+
+    if (closeModalBtn) {
+        closeModalBtn.addEventListener('click', () => toggleUploadModal(false));
+    }
+
+    if (selectFileBtn) {
+        selectFileBtn.addEventListener('click', () => fileInput.click());
+    }
+
     if (fileInput) {
         fileInput.addEventListener('change', async (e) => {
             const files = Array.from(e.target.files);
             if (files.length > 0) {
-                // Hide empty state if visible
-                const emptyState = document.getElementById('empty-state');
-                if (emptyState) {
-                    emptyState.style.display = 'none';
-                }
-                
-                // Show file list
-                const fileList = document.getElementById('file-list');
-                if (fileList) {
-                    fileList.style.display = 'block';
-                }
-                
-                // Upload each file
-                for (const file of files) {
-                    await uploadFile(file);
-                }
+                await uploadFile(files[0]); // Upload first file only
             }
             e.target.value = ''; // Reset input
         });
     }
 
     // Drop zone handlers
-    const dropZone = document.getElementById('drop-zone');
     if (dropZone) {
-        dropZone.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            dropZone.classList.add('dragover');
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+            });
         });
 
-        dropZone.addEventListener('dragleave', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            dropZone.classList.remove('dragover');
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, () => {
+                dropZone.classList.add('dragover');
+            });
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, () => {
+                dropZone.classList.remove('dragover');
+            });
         });
 
         dropZone.addEventListener('drop', async (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            dropZone.classList.remove('dragover');
-            
             const files = Array.from(e.dataTransfer.files);
             if (files.length > 0) {
-                // Hide empty state if visible
-                const emptyState = document.getElementById('empty-state');
-                if (emptyState) {
-                    emptyState.style.display = 'none';
-                }
-                
-                // Show file list
-                const fileList = document.getElementById('file-list');
-                if (fileList) {
-                    fileList.style.display = 'block';
-                }
-                
-                // Upload each file
-                for (const file of files) {
-                    await uploadFile(file);
-                }
+                await uploadFile(files[0]); // Upload first file only
             }
         });
     }
 
-    // Login button
-    const loginBtn = document.getElementById('login-btn');
-    if (loginBtn) {
-        loginBtn.addEventListener('click', () => {
-            window.location.href = 'login.html';
-        });
-    }
-
-    // Logout button
+    // Logout handler
     const logoutBtn = document.getElementById('logout-btn');
     if (logoutBtn) {
         logoutBtn.addEventListener('click', async () => {
@@ -336,9 +421,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
-
-    // Initialize
-    checkAuth();
 });
 
 // Make functions globally available
@@ -347,6 +429,9 @@ window.deleteFile = deleteFile;
 window.uploadFile = uploadFile;
 window.showSuccess = showSuccess;
 window.showErrorMessage = showErrorMessage;
+window.viewModel = viewModel;
+window.deleteModel = deleteModel;
+window.toggleUploadModal = toggleUploadModal;
 
 // Helper functions
 function showSuccess(message) {
@@ -386,7 +471,7 @@ async function checkAuth() {
 
         currentSession = session;
         updateAuthUI(session);
-        await updateFileList();
+        await updateModelsGrid();
     } catch (error) {
         console.error('Auth check failed:', error);
         showErrorMessage('Authentication failed: ' + error.message);

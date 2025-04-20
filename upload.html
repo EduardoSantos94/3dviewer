@@ -16,9 +16,10 @@
         object-src 'none';
         base-uri 'self';
     ">
-    <title>3D Model Viewer - Upload</title>
-    <link rel="stylesheet" href="styles.css">
+    <title>3D Model Upload - Jewelry Viewer</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=SF+Pro+Display:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
     <style>
         .top-nav {
             display: flex;
@@ -213,70 +214,89 @@
         }
     </style>
 </head>
-<body>
+<body class="upload-page">
+    <!-- Top Navigation -->
     <nav class="top-nav">
-        <div class="nav-links">
-            <a href="index.html" class="nav-link">
-                <i class="fas fa-home"></i>
-                Home
+        <div class="nav-content">
+            <a href="index.html" class="nav-brand">
+                <i class="fas fa-cube"></i>
+                Jewelry Viewer
             </a>
-            <a href="upload.html" class="nav-link active">
-                <i class="fas fa-upload"></i>
-                Upload
-            </a>
-        </div>
-        <div class="auth-buttons">
-            <button id="login-btn" class="auth-btn">
-                <i class="fas fa-sign-in-alt"></i>
-                Login
-            </button>
-            <button id="logout-btn" class="auth-btn" style="display: none;">
-                <i class="fas fa-sign-out-alt"></i>
-                Logout
-            </button>
+            <div class="nav-actions">
+                <span id="user-email" class="user-email"></span>
+                <button id="logout-btn" class="nav-btn">
+                    <i class="fas fa-sign-out-alt"></i>
+                    Logout
+                </button>
+            </div>
         </div>
     </nav>
 
-    <main class="container">
-        <div class="upload-area" id="upload-area">
-            <div class="drop-zone" id="drop-zone">
-                <i class="fas fa-cloud-upload-alt" style="font-size: 3rem; color: #007AFF; margin-bottom: 1rem;"></i>
-                <h2>Upload 3D Models</h2>
-                <p>Drag and drop your files here or click the buttons below</p>
-                <div class="button-group">
-                    <button class="add-files-btn" id="add-files-btn">
-                        <i class="fas fa-plus"></i>
-                        Add Files
-                    </button>
-                    <button class="add-files-btn-secondary" id="select-files-btn">
-                        <i class="fas fa-folder-open"></i>
-                        Select Files
-                    </button>
-                </div>
-                <input type="file" id="file-input" accept=".glb,.gltf,.obj,.fbx,.3dm,.stl" multiple style="display: none;">
-                <p class="supported-formats">Supported formats: .glb, .gltf, .obj, .fbx, .3dm, .stl</p>
-            </div>
-        </div>
-
-        <div id="empty-state" style="text-align: center; padding: 2rem;">
-            <i class="fas fa-cube" style="font-size: 3rem; color: #ddd; margin-bottom: 1rem;"></i>
-            <p style="color: #666; margin-bottom: 1rem;">No files uploaded yet</p>
-            <button class="add-files-btn" id="add-first-model-btn">
+    <!-- Main Content -->
+    <main class="main-content">
+        <div class="content-header">
+            <h1>Your 3D Models</h1>
+            <button id="upload-btn" class="primary-btn">
                 <i class="fas fa-plus"></i>
-                Add Your First Model
+                Upload Model
             </button>
         </div>
 
-        <div id="file-list" class="uploaded-files" style="display: none;">
-            <div id="file-list-content">
-                <!-- File items will be added here dynamically -->
+        <!-- File List -->
+        <div id="models-container" class="models-container">
+            <!-- Empty State -->
+            <div id="empty-state" class="empty-state">
+                <i class="fas fa-cube"></i>
+                <h2>No Models Yet</h2>
+                <p>Upload your first 3D model to get started</p>
+                <button id="upload-first-btn" class="primary-btn">
+                    <i class="fas fa-plus"></i>
+                    Upload Your First Model
+                </button>
+            </div>
+
+            <!-- Models Grid -->
+            <div id="models-grid" class="models-grid" style="display: none">
+                <!-- Models will be added here dynamically -->
             </div>
         </div>
 
-        <!-- Add progress bar container -->
-        <div class="upload-progress" style="display: none;">
-            <div class="progress-bar"></div>
-            <div class="progress-text">Uploading...</div>
+        <!-- Upload Modal -->
+        <div id="upload-modal" class="modal" style="display: none">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Upload 3D Model</h2>
+                    <button id="close-modal" class="close-btn">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div id="drop-zone" class="drop-zone">
+                        <i class="fas fa-cloud-upload-alt"></i>
+                        <h3>Drag and drop your file here</h3>
+                        <p>or</p>
+                        <button id="select-file-btn" class="secondary-btn">
+                            Choose File
+                        </button>
+                        <input type="file" id="file-input" accept=".glb,.gltf,.obj,.fbx,.3dm,.stl" style="display: none">
+                        <p class="file-info">Maximum file size: 50MB</p>
+                        <p class="file-info">Supported formats: .glb, .gltf, .obj, .fbx, .3dm, .stl</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Upload Progress -->
+        <div id="upload-progress" class="upload-progress" style="display: none">
+            <div class="progress-content">
+                <div class="progress-info">
+                    <span id="progress-filename">Uploading...</span>
+                    <span id="progress-percentage">0%</span>
+                </div>
+                <div class="progress-bar">
+                    <div id="progress-fill" class="progress-fill"></div>
+                </div>
+            </div>
         </div>
     </main>
 
