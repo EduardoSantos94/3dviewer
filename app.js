@@ -2743,6 +2743,38 @@ function selectModel(modelIndex) {
 
 // --- End of added UI handlers ---
 
+// Add applyMaterialToModel function definition here
+function applyMaterialToModel(modelIndex, materialType) {
+    if (modelIndex < 0 || modelIndex >= models.length) {
+        console.error('Invalid model index for applying material:', modelIndex);
+        return;
+    }
+    
+    const model = models[modelIndex];
+    if (!model || !model.object) {
+        console.error('Model or model object not found for material application at index:', modelIndex);
+        return;
+    }
+    
+    console.log(`Applying material '${materialType}' to model '${model.name}'`);
+    
+    // Apply material to the object and all its children recursively
+    model.object.traverse((child) => {
+        if (child.isMesh) {
+            // Use the original applyMaterial function which handles cloning and env maps
+            applyMaterial(child, materialType);
+        }
+    });
+    
+    // Update the model's stored material type
+    model.material = materialType; // Store the selected material type key
+    
+    // Force a render update to show the new material
+    if (renderer && scene && camera) {
+        renderer.render(scene, camera);
+    }
+}
+
 
 
 
