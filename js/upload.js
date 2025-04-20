@@ -105,36 +105,27 @@ function toggleUploadModal(show) {
 // Function to view a model
 async function viewModel(storedName, originalName) {
     try {
-        if (!currentSession?.user?.id) throw new Error('No active session');
+        const { data: { signedUrl } } = await supabase.storage
+            .from(STORAGE_CONFIG.bucketName)
+            .createSignedUrl(storedName, 3600);
 
-        // Get the file mapping
-        const { data: mapping, error: mappingError } = await supabase
-            .from(FILE_TABLE)
-            .select('file_path, original_name')
-            .eq('stored_name', storedName)
-            .single();
+        if (!signedUrl) {
+            throw new Error('Could not get signed URL');
+        }
 
-        if (mappingError) throw mappingError;
+        // Get file extension from original name, fallback to stored name if needed
+        const fileNameToUse = originalName || storedName;
+        const fileExtension = fileNameToUse.split('.').pop()?.toLowerCase();
+        
+        if (!fileExtension) {
+            throw new Error('Could not determine file type');
+        }
 
-        // Get signed URL
-        const { data: urlData, error: urlError } = await supabase.storage
-            .from(STORAGE_CONFIG.uploadPath)
-            .createSignedUrl(mapping.file_path, 3600);
-
-        if (urlError) throw urlError;
-        if (!urlData?.signedUrl) throw new Error('Failed to get file URL');
-
-        // Construct viewer URL - using viewer.html instead of index.html
-        const viewerUrl = new URL(`${window.location.origin}/viewer.html`);
-        viewerUrl.searchParams.set('model', urlData.signedUrl);
-        viewerUrl.searchParams.set('filename', mapping.original_name || originalName);
-        viewerUrl.searchParams.set('type', (mapping.original_name || originalName).split('.').pop().toLowerCase());
-
-        // Open in new tab
-        window.open(viewerUrl.toString(), '_blank');
+        // Redirect to index.html (our viewer) with the model URL
+        window.location.href = `index.html?model=${encodeURIComponent(signedUrl)}&type=${encodeURIComponent(fileExtension)}`;
     } catch (error) {
         console.error('Error viewing model:', error);
-        showErrorMessage('Failed to view model: ' + error.message);
+        showError('Error viewing model', error.message);
     }
 }
 
@@ -538,5 +529,6 @@ const STORAGE_CONFIG = {
         width: 800,
         height: 600,
         quality: 80
-    }
+    },
+    bucketName: 'client-files'
 }; 

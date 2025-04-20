@@ -314,7 +314,7 @@
     async function checkForModelUrl() {
         const urlParams = new URLSearchParams(window.location.search);
         const modelUrl = urlParams.get('model');
-        const filename = urlParams.get('filename');
+        const fileType = urlParams.get('type') || '3dm';
         
         if (modelUrl) {
             try {
@@ -327,19 +327,20 @@
                 if (loadingIndicator) loadingIndicator.style.display = 'flex';
                 if (container) container.style.display = 'flex';
 
-                // Get file extension from filename
-                const fileExt = filename ? ('.' + filename.split('.').pop().toLowerCase()) : null;
+                // Configure storage settings
+                const bucketName = 'client-files';
                 
                 console.log('Loading model with:', {
                     url: modelUrl,
-                    filename: filename,
-                    extension: fileExt
+                    type: fileType,
+                    bucket: bucketName
                 });
 
                 // Load the model with the signed URL
                 await window.loadModel({ 
                     url: decodeURIComponent(modelUrl),
-                    filename: filename ? decodeURIComponent(filename) : 'model' + (fileExt || '.3dm')
+                    filename: `model.${fileType}`,
+                    bucket: bucketName
                 });
 
                 // Hide loading indicator
