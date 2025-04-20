@@ -220,7 +220,7 @@ function hideFrontpage() {
 }
 
 // Initialize the application
-export async function initializeApp() {
+async function initializeApp() {
     console.log('Initializing application...');
     
     try {
