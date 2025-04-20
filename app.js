@@ -2060,8 +2060,7 @@ async function process3DMFile(file) {
         const objects = rhinoDoc.objects();
         console.log('Found', objects.count, 'objects in 3DM file');
 
-        // Process all objects in the document
-        const rhinoObjects = rhinoDoc.objects();
+        // Create model info
         const modelInfo = {
             path: file.name,
             name: file.name.split('/').pop().split('.')[0],
@@ -2074,62 +2073,62 @@ async function process3DMFile(file) {
             material: currentMaterial || 'gold'
         };
 
-        for (let i = 0; i < rhinoObjects.count; i++) {
-            const rhinoObject = rhinoObjects.get(i);
-            const rhinoGeometry = rhinoObject.geometry();
-            const objectType = rhinoGeometry.objectType;
+        // Process all objects in the document
+        for (let i = 0; i < objects.count; i++) {
+            const rhinoObject = objects.get(i);
+            
+            // Get geometry and attributes
+            const geometry = rhinoObject.geometry();
+            const attributes = rhinoObject.attributes();
+            
+            if (!geometry) {
+                console.warn(`Object ${i} has no geometry`);
+                continue;
+            }
 
             try {
-                if (objectType === rhino.ObjectType.Mesh) {
-                    // Direct mesh conversion
-                    const threeJson = rhinoGeometry.toThreejsJSON();
-                    const geometry = new THREE.BufferGeometry();
-                    geometry.setAttribute('position', new THREE.Float32BufferAttribute(threeJson.data.attributes.position.array, 3));
-                    geometry.setAttribute('normal', new THREE.Float32BufferAttribute(threeJson.data.attributes.normal.array, 3));
-                    geometry.setIndex(new THREE.Uint32BufferAttribute(threeJson.data.index.array, 1));
-                    geometry.computeBoundingSphere();
-                    
-                    const mesh = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial());
-                    modelInfo.object.add(mesh);
-                } else if (objectType === rhino.ObjectType.Brep) {
-                    // Convert Brep to mesh
-                    const rhinoMesh = new rhino.Mesh();
-                    const faces = rhinoGeometry.faces();
-                    
-                    for (let j = 0; j < faces.count; j++) {
-                        const face = faces.get(j);
-                        const faceMesh = face.getMesh(rhino.MeshType.Any);
-                        if (faceMesh) {
-                            rhinoMesh.append(faceMesh);
-                            faceMesh.delete();
+                if (geometry.objectType === rhino.ObjectType.Mesh) {
+                    // Convert Rhino mesh to Three.js mesh
+                    const mesh = await convertRhinoMeshToThree(geometry, rhino);
+                    if (mesh) {
+                        // Apply attributes if available
+                        if (attributes) {
+                            applyRhinoAttributes(mesh, attributes);
                         }
-                        face.delete();
+                        modelInfo.object.add(mesh);
                     }
-                    faces.delete();
-                    
-                    rhinoMesh.compact();
-                    const threeJson = rhinoMesh.toThreejsJSON();
-                    const geometry = new THREE.BufferGeometry();
-                    geometry.setAttribute('position', new THREE.Float32BufferAttribute(threeJson.data.attributes.position.array, 3));
-                    geometry.setAttribute('normal', new THREE.Float32BufferAttribute(threeJson.data.attributes.normal.array, 3));
-                    geometry.setIndex(new THREE.Uint32BufferAttribute(threeJson.data.index.array, 1));
-                    geometry.computeBoundingSphere();
-                    
-                    const mesh = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial());
-                    modelInfo.object.add(mesh);
-                    rhinoMesh.delete();
+                } else if (geometry.objectType === rhino.ObjectType.Brep) {
+                    // Convert Brep to mesh first
+                    const meshes = await convertBrepToMeshes(geometry, rhino);
+                    for (const mesh of meshes) {
+                        if (mesh) {
+                            // Apply attributes if available
+                            if (attributes) {
+                                applyRhinoAttributes(mesh, attributes);
+                            }
+                            modelInfo.object.add(mesh);
+                        }
+                    }
                 }
+                
+                // Clean up Rhino objects
+                if (geometry) geometry.delete();
+                if (attributes) attributes.delete();
+                rhinoObject.delete();
+                
             } catch (error) {
                 console.error(`Error processing object ${i}:`, error);
             }
         }
 
-        // Clean up Rhino resources
+        // Clean up Rhino document
         rhinoDoc.delete();
         
-        // Add the model to the scene and apply material
+        // Add the model to the scene if it has any children
         if (modelInfo.object.children.length > 0) {
             scene.add(modelInfo.object);
+            
+            // Apply material
             applyMaterial(modelInfo.object, modelInfo.material);
             
             // Calculate bounding box
@@ -2150,6 +2149,119 @@ async function process3DMFile(file) {
         console.error('Error processing 3DM file:', error);
         hideLoadingIndicator();
         throw error;
+    }
+}
+
+// Helper function to convert Rhino mesh to Three.js mesh
+async function convertRhinoMeshToThree(rhinoMesh, rhino) {
+    try {
+        const meshData = rhinoMesh.toThreejsJSON();
+        if (!meshData) return null;
+
+        const geometry = new THREE.BufferGeometry();
+        
+        // Add vertices
+        if (meshData.data.attributes.position) {
+            geometry.setAttribute('position', 
+                new THREE.Float32BufferAttribute(meshData.data.attributes.position.array, 3));
+        }
+        
+        // Add normals if available
+        if (meshData.data.attributes.normal) {
+            geometry.setAttribute('normal',
+                new THREE.Float32BufferAttribute(meshData.data.attributes.normal.array, 3));
+        } else {
+            geometry.computeVertexNormals();
+        }
+        
+        // Add UVs if available
+        if (meshData.data.attributes.uv) {
+            geometry.setAttribute('uv',
+                new THREE.Float32BufferAttribute(meshData.data.attributes.uv.array, 2));
+        }
+        
+        // Add indices if available
+        if (meshData.data.index) {
+            geometry.setIndex(new THREE.Uint32BufferAttribute(meshData.data.index.array, 1));
+        }
+        
+        // Create mesh with standard material
+        const material = new THREE.MeshStandardMaterial();
+        const mesh = new THREE.Mesh(geometry, material);
+        
+        return mesh;
+    } catch (error) {
+        console.error('Error converting Rhino mesh:', error);
+        return null;
+    }
+}
+
+// Helper function to convert Brep to meshes
+async function convertBrepToMeshes(brep, rhino) {
+    const meshes = [];
+    try {
+        // Create meshing parameters
+        const mp = new rhino.MeshingParameters();
+        mp.gridMinCount = 16;
+        mp.gridMaxCount = 64;
+        mp.simplePlanes = false;
+        mp.refineGrid = true;
+        
+        // Get Brep faces
+        const faces = brep.faces();
+        for (let i = 0; i < faces.count; i++) {
+            const face = faces.get(i);
+            const mesh = face.getMesh(rhino.MeshType.Any);
+            
+            if (mesh) {
+                const threeMesh = await convertRhinoMeshToThree(mesh, rhino);
+                if (threeMesh) {
+                    meshes.push(threeMesh);
+                }
+                mesh.delete();
+            }
+            face.delete();
+        }
+        faces.delete();
+        
+    } catch (error) {
+        console.error('Error converting Brep to meshes:', error);
+    }
+    return meshes;
+}
+
+// Helper function to apply Rhino attributes to Three.js mesh
+function applyRhinoAttributes(mesh, attributes) {
+    try {
+        // Apply name if available
+        if (attributes.name) {
+            mesh.name = attributes.name;
+        }
+        
+        // Apply layer info if available
+        if (attributes.layerIndex !== undefined) {
+            mesh.userData.layerIndex = attributes.layerIndex;
+        }
+        
+        // Store any user strings
+        if (attributes.getUserStrings) {
+            const userStrings = attributes.getUserStrings();
+            if (userStrings && userStrings.length > 0) {
+                mesh.userData.userStrings = userStrings;
+            }
+        }
+        
+        // Handle material attributes
+        if (attributes.materialSource !== undefined) {
+            mesh.userData.materialSource = attributes.materialSource;
+        }
+        
+        if (attributes.materialIndex !== undefined) {
+            mesh.userData.materialIndex = attributes.materialIndex;
+        }
+        
+    } catch (error) {
+        console.error('Error applying Rhino attributes:', error);
     }
 }
 

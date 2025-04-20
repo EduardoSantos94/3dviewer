@@ -294,76 +294,64 @@
     const supabaseUrl = 'https://lwmcnwwkgdauqgxukwhn.supabase.co';
     const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx3bWNud3drZ2RhdXFneHVrd2huIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQ5NzcwNzcsImV4cCI6MjA2MDU1MzA3N30._NfRA6_3PL9JLEG9-X9P3Tzg5E59NuXtcmQzOdkraNE';
 
-    // Update auth UI function
-    function updateAuthUI(session) {
-        const userInfo = document.getElementById('user-info');
-        const loginInfo = document.getElementById('login-info');
-        const userEmail = document.getElementById('user-email');
-
-        if (session?.user) {
-            if (userEmail) userEmail.textContent = session.user.email;
-            if (userInfo) userInfo.style.display = 'flex';
-            if (loginInfo) loginInfo.style.display = 'none';
-        } else {
-            if (userInfo) userInfo.style.display = 'none';
-            if (loginInfo) loginInfo.style.display = 'flex';
-        }
-    }
-
-    // Check for model URL parameter
-    async function checkForModelUrl() {
-        const urlParams = new URLSearchParams(window.location.search);
-        const modelUrl = urlParams.get('model');
-        const fileType = urlParams.get('type') || '3dm';
-        
-        if (modelUrl) {
-            try {
-                // Hide frontpage and show loading indicator
-                const frontpage = document.getElementById('frontpage');
-                const loadingIndicator = document.getElementById('loading-indicator');
-                const container = document.querySelector('.container');
-                const dropZone = document.getElementById('drop-zone');
-                
-                if (frontpage) frontpage.style.display = 'none';
-                if (loadingIndicator) loadingIndicator.style.display = 'flex';
-                if (container) container.style.display = 'block';
-                if (dropZone) dropZone.style.display = 'none';
-
-                // Configure storage settings
-                const bucketName = 'client-files';
-                
-                console.log('Loading model with:', {
-                    url: decodeURIComponent(modelUrl),
-                    type: fileType,
-                    bucket: bucketName
-                });
-
-                // Initialize the viewer
-                await initializeApp();
-
-                // Load the model with the signed URL
-                await loadModel({ 
-                    url: decodeURIComponent(modelUrl),
-                    filename: `model.${fileType}`,
-                    bucket: bucketName
-                });
-
-                // Hide loading indicator
-                if (loadingIndicator) loadingIndicator.style.display = 'none';
-            } catch (error) {
-                console.error('Error loading model:', error);
-                const loadingIndicator = document.getElementById('loading-indicator');
-                if (loadingIndicator) loadingIndicator.style.display = 'none';
-                showErrorMessage('Failed to load model: ' + error.message);
-            }
-        }
-    }
-
     try {
         const supabase = createClient(supabaseUrl, supabaseKey);
-
-        // Make supabase client available globally
         window.supabase = supabase;
+
+        // Update auth UI function
+        function updateAuthUI(session) {
+            const userInfo = document.getElementById('user-info');
+            const loginInfo = document.getElementById('login-info');
+            const userEmail = document.getElementById('user-email');
+
+            if (session?.user) {
+                if (userEmail) userEmail.textContent = session.user.email;
+                if (userInfo) userInfo.style.display = 'flex';
+                if (loginInfo) loginInfo.style.display = 'none';
+            } else {
+                if (userInfo) userInfo.style.display = 'none';
+                if (loginInfo) loginInfo.style.display = 'flex';
+            }
+        }
+
+        // Check for model URL parameter
+        async function checkForModelUrl() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const modelUrl = urlParams.get('model');
+            const fileType = urlParams.get('type') || '3dm';
+            
+            if (modelUrl) {
+                try {
+                    // Hide frontpage and show loading indicator
+                    const frontpage = document.getElementById('frontpage');
+                    const loadingIndicator = document.getElementById('loading-indicator');
+                    const container = document.querySelector('.container');
+                    const dropZone = document.getElementById('drop-zone');
+                    
+                    if (frontpage) frontpage.style.display = 'none';
+                    if (loadingIndicator) loadingIndicator.style.display = 'flex';
+                    if (container) container.style.display = 'block';
+                    if (dropZone) dropZone.style.display = 'none';
+
+                    // Initialize the viewer
+                    await initializeApp();
+
+                    // Load the model with the signed URL
+                    await loadModel({ 
+                        url: decodeURIComponent(modelUrl),
+                        filename: `model.${fileType}`
+                    });
+
+                    // Hide loading indicator
+                    if (loadingIndicator) loadingIndicator.style.display = 'none';
+                } catch (error) {
+                    console.error('Error loading model:', error);
+                    const loadingIndicator = document.getElementById('loading-indicator');
+                    if (loadingIndicator) loadingIndicator.style.display = 'none';
+                    showErrorMessage('Failed to load model: ' + error.message);
+                }
+            }
+        }
 
         // Initialize auth state listener
         supabase.auth.onAuthStateChange((event, session) => {
@@ -376,23 +364,15 @@
             }
         });
 
-        // Check initial session
+        // Check initial session and load model if URL parameter exists
         supabase.auth.getSession().then(({ data: { session } }) => {
             updateAuthUI(session);
-            // Check for model URL after auth is initialized
             checkForModelUrl();
         });
 
-        // Make a test request to validate the token
-        const { error: testError } = await supabase.storage
-            .from('client-files')
-            .list(session.user.id + '/', { limit: 1 });
-
-        if (testError?.message?.includes('401')) {
-            throw new Error('Invalid session');
-        }
     } catch (error) {
         console.error('Failed to initialize Supabase:', error);
+        showErrorMessage('Failed to initialize Supabase: ' + error.message);
     }
 </script>
 </body>
