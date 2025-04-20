@@ -2049,8 +2049,12 @@ async function process3DMFile(file) {
             throw new Error('Invalid file object - not a Blob');
         }
 
+        console.log('Processing 3DM file:', file.name);
+
         // Load and parse the 3DM file
         const arrayBuffer = await readFileAsArrayBuffer(file);
+        console.log('File loaded as ArrayBuffer, size:', arrayBuffer.byteLength);
+
         const rhinoDoc = await rhino.File3dm.fromByteArray(arrayBuffer);
         if (!rhinoDoc) {
             throw new Error('Failed to decode 3DM file');
@@ -2074,19 +2078,24 @@ async function process3DMFile(file) {
         };
 
         // Process all objects in the document
+        let processedCount = 0;
+        let errorCount = 0;
+
         for (let i = 0; i < objects.count; i++) {
             const rhinoObject = objects.get(i);
             
-            // Get geometry and attributes
-            const geometry = rhinoObject.geometry();
-            const attributes = rhinoObject.attributes();
-            
-            if (!geometry) {
-                console.warn(`Object ${i} has no geometry`);
-                continue;
-            }
-
             try {
+                // Get geometry and attributes
+                const geometry = rhinoObject.geometry();
+                const attributes = rhinoObject.attributes();
+                
+                if (!geometry) {
+                    console.warn(`Object ${i} has no geometry, skipping`);
+                    continue;
+                }
+
+                console.log(`Processing object ${i}, type:`, geometry.objectType);
+
                 if (geometry.objectType === rhino.ObjectType.Mesh) {
                     // Convert Rhino mesh to Three.js mesh
                     const mesh = await convertRhinoMeshToThree(geometry, rhino);
@@ -2096,6 +2105,7 @@ async function process3DMFile(file) {
                             applyRhinoAttributes(mesh, attributes);
                         }
                         modelInfo.object.add(mesh);
+                        processedCount++;
                     }
                 } else if (geometry.objectType === rhino.ObjectType.Brep) {
                     // Convert Brep to mesh first
@@ -2107,6 +2117,7 @@ async function process3DMFile(file) {
                                 applyRhinoAttributes(mesh, attributes);
                             }
                             modelInfo.object.add(mesh);
+                            processedCount++;
                         }
                     }
                 }
@@ -2118,14 +2129,18 @@ async function process3DMFile(file) {
                 
             } catch (error) {
                 console.error(`Error processing object ${i}:`, error);
+                errorCount++;
             }
         }
+
+        console.log(`Processed ${processedCount} objects successfully, ${errorCount} errors`);
 
         // Clean up Rhino document
         rhinoDoc.delete();
         
         // Add the model to the scene if it has any children
         if (modelInfo.object.children.length > 0) {
+            console.log('Adding model to scene with', modelInfo.object.children.length, 'children');
             scene.add(modelInfo.object);
             
             // Apply material
@@ -2142,12 +2157,17 @@ async function process3DMFile(file) {
             
             // Center and fit the camera
             zoomToFit([modelInfo]);
+        } else {
+            console.warn('No valid geometry found in the 3DM file');
+            throw new Error('No valid geometry found in the file');
         }
         
         hideLoadingIndicator();
+        return modelInfo;
     } catch (error) {
         console.error('Error processing 3DM file:', error);
         hideLoadingIndicator();
+        showErrorMessage(`Failed to load 3DM file: ${error.message}`);
         throw error;
     }
 }
@@ -2232,6 +2252,8 @@ async function convertBrepToMeshes(brep, rhino) {
 
 // Helper function to apply Rhino attributes to Three.js mesh
 function applyRhinoAttributes(mesh, attributes) {
+    if (!mesh || !attributes) return;
+
     try {
         // Apply name if available
         if (attributes.name) {
@@ -2243,15 +2265,19 @@ function applyRhinoAttributes(mesh, attributes) {
             mesh.userData.layerIndex = attributes.layerIndex;
         }
         
-        // Store any user strings
-        if (attributes.getUserStrings) {
-            const userStrings = attributes.getUserStrings();
-            if (userStrings && userStrings.length > 0) {
-                mesh.userData.userStrings = userStrings;
+        // Safely handle user strings
+        if (typeof attributes.getUserStrings === 'function') {
+            try {
+                const userStrings = attributes.getUserStrings();
+                if (userStrings && userStrings.length > 0) {
+                    mesh.userData.userStrings = userStrings;
+                }
+            } catch (error) {
+                console.warn('Error getting user strings:', error);
             }
         }
         
-        // Handle material attributes
+        // Safely handle material attributes
         if (attributes.materialSource !== undefined) {
             mesh.userData.materialSource = attributes.materialSource;
         }
@@ -2260,13 +2286,37 @@ function applyRhinoAttributes(mesh, attributes) {
             mesh.userData.materialIndex = attributes.materialIndex;
         }
 
-        // Safely check for and handle decals
-        if (attributes.decals && typeof attributes.decals === 'object') {
+        // Safely handle decals
+        if (attributes.decals) {
             try {
-                mesh.userData.decals = attributes.decals;
+                let decalData;
+                // Check if decals is a function, property, or direct data
+                if (typeof attributes.decals === 'function') {
+                    decalData = attributes.decals();
+                } else if (attributes.decals.getData && typeof attributes.decals.getData === 'function') {
+                    decalData = attributes.decals.getData();
+                } else {
+                    decalData = attributes.decals;
+                }
+                
+                if (decalData) {
+                    mesh.userData.decals = decalData;
+                }
             } catch (decalError) {
-                console.warn('Error applying decals:', decalError);
+                console.warn('Non-critical error handling decals:', decalError);
                 // Continue without decals rather than failing
+            }
+        }
+
+        // Safely handle user dictionary if available
+        if (typeof attributes.getUserDictionary === 'function') {
+            try {
+                const userDict = attributes.getUserDictionary();
+                if (userDict) {
+                    mesh.userData.userDictionary = userDict;
+                }
+            } catch (error) {
+                console.warn('Error getting user dictionary:', error);
             }
         }
         
