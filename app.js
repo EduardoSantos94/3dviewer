@@ -643,13 +643,13 @@ function setupEventListeners() {
         console.error('Turntable button not found!');
     }
 
-    const floorBtn = document.getElementById('toggle-floor');
-    if (floorBtn) {
-        floorBtn.addEventListener('click', toggleFloor);
-        console.log('Floor button initialized');
-    } else {
-        console.error('Floor button not found!');
-    }
+    // const floorBtn = document.getElementById('toggle-floor');
+    // if (floorBtn) {
+    //     floorBtn.addEventListener('click', toggleFloor);
+    //     console.log('Floor button initialized');
+    // } else {
+    //     console.error('Floor button not found!');
+    // }
 
     const backgroundBtn = document.getElementById('toggle-background');
     if (backgroundBtn) {
@@ -659,13 +659,13 @@ function setupEventListeners() {
         console.error('Background button not found!');
     }
     
-    const resetCameraBtn = document.getElementById('reset-camera');
-    if (resetCameraBtn) {
-        resetCameraBtn.addEventListener('click', resetCamera);
-        console.log('Reset camera button initialized');
-    } else {
-        console.error('Reset camera button not found!');
-    }
+    // const resetCameraBtn = document.getElementById('reset-camera');
+    // if (resetCameraBtn) {
+    //     resetCameraBtn.addEventListener('click', resetCamera);
+    //     console.log('Reset camera button initialized');
+    // } else {
+    //     console.error('Reset camera button not found!');
+    // }
     
     // Set up sliders for controlling lights
     const ambientLightSlider = document.getElementById('ambient-light');
@@ -1708,7 +1708,7 @@ function createStudioScene() {
 }
 
 // Update environment map loading
-async function loadEnvironment(renderer, url = 'assets/studio_small_03_1k.hdr') {
+async function loadEnvironment(renderer, url = 'studio_small_09_2k.hdr') {
     console.log(`Loading environment map from ${url}...`);
     try {
         const rgbeLoader = new RGBELoader();
@@ -2142,6 +2142,40 @@ function rhinoMeshToThreeGeometry(rhinoMesh) {
     }
 }
 
+// Helper function to convert Brep to meshes
+async function convertBrepToMeshes(brep, rhino) {
+    const meshes = [];
+    try {
+        // Create meshing parameters
+        const mp = new rhino.MeshingParameters();
+        mp.gridMinCount = 16;
+        mp.gridMaxCount = 64;
+        mp.simplePlanes = false;
+        mp.refineGrid = true;
+        
+        // Get Brep faces
+        const faces = brep.faces();
+        for (let i = 0; i < faces.count; i++) {
+            const face = faces.get(i);
+            const mesh = face.getMesh(rhino.MeshType.Any);
+            
+            if (mesh) {
+                const threeMesh = await convertRhinoMeshToThree(mesh, rhino);
+                if (threeMesh) {
+                    meshes.push(threeMesh);
+                }
+                mesh.delete();
+            }
+            face.delete();
+        }
+        faces.delete();
+        
+    } catch (error) {
+        console.error('Error converting Brep to meshes:', error);
+    }
+    return meshes;
+}
+
 // Process 3DM file - using the simplified version from our last update
 async function process3DMFile(file) {
     try {
@@ -2371,19 +2405,35 @@ function convertRhinoMaterialToThree(rhinoMaterial) {
             color = new THREE.Color(0xcccccc); // Default gray
         }
 
+        // Helper to safely get PBR properties with defaults
+        const safeGet = (prop, defaultValue) => {
+            try {
+                const value = pbrMaterial[prop];
+                // Check for null/undefined, potentially NaN if numeric
+                if (value === null || typeof value === 'undefined') return defaultValue;
+                if (typeof defaultValue === 'number' && isNaN(value)) return defaultValue;
+                return value;
+            } catch (e) {
+                console.warn(`Error getting PBR property '${prop}', using default ${defaultValue}:`, e);
+                return defaultValue;
+            }
+        };
+
         const threeMaterial = new THREE.MeshPhysicalMaterial({
             color: color,
-            metalness: pbrMaterial.metallic,
-            roughness: pbrMaterial.roughness,
-            ior: pbrMaterial.ior,
-            transmission: 1.0 - pbrMaterial.opacity, // Approximate transmission from opacity
-            thickness: pbrMaterial.opacityThickness, // Use if available
-            clearcoat: pbrMaterial.clearcoat,
-            clearcoatRoughness: pbrMaterial.clearcoatRoughness,
-            sheen: pbrMaterial.sheen,
-            sheenRoughness: pbrMaterial.sheenRoughness,
-            emissive: new THREE.Color(pbrMaterial.emission.r / 255, pbrMaterial.emission.g / 255, pbrMaterial.emission.b / 255),
-            emissiveIntensity: 1.0, // Rhino emission doesn't have intensity separate?
+            metalness: safeGet('metallic', 0.5), // Default to semi-metallic
+            roughness: safeGet('roughness', 0.5), // Default to semi-rough
+            ior: safeGet('ior', 1.5), // Default IOR
+            transmission: 1.0 - safeGet('opacity', 1.0), // Default to opaque
+            thickness: safeGet('opacityThickness', 0.0), // Default thickness
+            clearcoat: safeGet('clearcoat', 0.0),
+            clearcoatRoughness: safeGet('clearcoatRoughness', 0.0),
+            sheen: safeGet('sheen', 0.0),
+            sheenRoughness: safeGet('sheenRoughness', 0.0),
+            emissive: new THREE.Color(safeGet('emission', { r: 0, g: 0, b: 0 }).r / 255, 
+                                        safeGet('emission', { r: 0, g: 0, b: 0 }).g / 255, 
+                                        safeGet('emission', { r: 0, g: 0, b: 0 }).b / 255),
+            emissiveIntensity: 1.0, 
             side: THREE.DoubleSide
         });
 
@@ -2400,40 +2450,6 @@ function convertRhinoMaterialToThree(rhinoMaterial) {
         // Fallback to a default material
         return new THREE.MeshStandardMaterial({ color: 0xcccccc, side: THREE.DoubleSide });
     }
-}
-
-// Helper function to convert Brep to meshes
-async function convertBrepToMeshes(brep, rhino) {
-    const meshes = [];
-    try {
-        // Create meshing parameters
-        const mp = new rhino.MeshingParameters();
-        mp.gridMinCount = 16;
-        mp.gridMaxCount = 64;
-        mp.simplePlanes = false;
-        mp.refineGrid = true;
-        
-        // Get Brep faces
-        const faces = brep.faces();
-        for (let i = 0; i < faces.count; i++) {
-            const face = faces.get(i);
-            const mesh = face.getMesh(rhino.MeshType.Any);
-            
-            if (mesh) {
-                const threeMesh = await convertRhinoMeshToThree(mesh, rhino);
-                if (threeMesh) {
-                    meshes.push(threeMesh);
-                }
-                mesh.delete();
-            }
-            face.delete();
-        }
-        faces.delete();
-        
-    } catch (error) {
-        console.error('Error converting Brep to meshes:', error);
-    }
-    return meshes;
 }
 
 // Helper function to apply Rhino attributes to Three.js mesh
