@@ -587,33 +587,37 @@ function setupEventListeners() {
         console.error('Drop zone not found!');
     }
     
-    // Material selection
+    // Material selection (Top dropdown)
     const materialSelect = document.getElementById('material-select');
     if (materialSelect) {
         materialSelect.addEventListener('change', () => {
             const selectedMaterialType = materialSelect.value;
             if (selectedObject) {
-                // Find the index of the selected model
+                // Find the index of the selected model data
                 const modelIndex = models.findIndex(m => m.object === selectedObject);
                 if (modelIndex !== -1) {
+                    console.log(`Applying material ${selectedMaterialType} from top dropdown to selected model index ${modelIndex}`);
                     applyMaterialToModel(modelIndex, selectedMaterialType);
-                    // Optionally update the material select in the model list item if needed
-                    // updateLoadedModelsUI(); // Might cause issues if called too often
+                    // Update the UI list to reflect the change potentially
+                    // updateLoadedModelsUI(); 
                 } else {
-                    console.warn('Selected object not found in models array.');
+                    console.warn('Top dropdown: Selected object not found in models array.');
                 }
             } else {
-                console.warn('No model selected to apply material to.');
-                // Optionally provide feedback to the user, e.g., select a model first
+                console.warn('Top dropdown: No model selected to apply material to.');
+                // Provide feedback: e.g., show a temporary message
+                // alert("Please select a model first by clicking on it in the list or viewer.");
             }
         });
+        console.log('Top material select listener initialized.'); // Add log
     } else {
-        console.error('Material select not found!');
+        console.error('Material select dropdown not found!');
     }
 
     // Control buttons - verify each exists before adding listener
     const centerBtn = document.getElementById('center-model');
     if (centerBtn) {
+        // Ensure this button calls centerSelectedModel, not zoomToFit directly
         centerBtn.addEventListener('click', centerSelectedModel);
         console.log('Center model button initialized');
     } else {
@@ -1145,9 +1149,7 @@ function setupKeyboardShortcuts() {
                 centerSelectedModel();
                 break;
             case 'z': // Z key to fit selected model to view
-                if (selectedObject) {
-                    zoomToFit(selectedObject, camera, controls);
-                }
+                centerSelectedModel();
                 break;
         }
     });

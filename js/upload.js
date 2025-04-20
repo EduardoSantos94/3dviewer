@@ -179,6 +179,7 @@ function toggleUploadModal(show) {
 
 // Function to view a model
 async function viewModel(storedName, originalName) {
+    console.log(`[viewModel] Called with storedName: ${storedName}, originalName: ${originalName}`);
     try {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session?.user?.id) {
@@ -186,7 +187,7 @@ async function viewModel(storedName, originalName) {
         }
 
         const filePath = `${session.user.id}/${storedName}`;
-        console.log('Creating signed URL for:', filePath);
+        console.log('[viewModel] Creating signed URL for:', filePath);
 
         const { data, error } = await supabase.storage
             .from(STORAGE_CONFIG.bucketName)
@@ -195,19 +196,34 @@ async function viewModel(storedName, originalName) {
         if (error) throw error;
         if (!data?.signedUrl) throw new Error('Failed to get signed URL');
 
+        console.log('[viewModel] Signed URL obtained:', data.signedUrl);
+
         // Get file extension from original name
-        const fileExtension = originalName.split('.').pop()?.toLowerCase();
-        if (!fileExtension) throw new Error('Could not determine file type');
+        const fileExtension = originalName ? originalName.split('.').pop()?.toLowerCase() : null; 
+        if (!fileExtension) {
+             console.error(`[viewModel] Could not determine file extension from originalName: ${originalName}`);
+             throw new Error('Could not determine file type');
+        }
+        console.log(`[viewModel] Determined file extension: ${fileExtension}`); 
 
         // Construct viewer URL
         const viewerUrl = new URL('index.html', window.location.origin);
         viewerUrl.searchParams.set('model', encodeURIComponent(data.signedUrl));
         viewerUrl.searchParams.set('type', fileExtension);
+        
+        // Ensure originalName is valid before setting
+        if (originalName) {
+            viewerUrl.searchParams.set('filename', encodeURIComponent(originalName));
+            console.log(`[viewModel] Added filename param: ${encodeURIComponent(originalName)}`); 
+        } else {
+             console.warn('[viewModel] originalName is invalid, filename param not set.'); 
+        }
 
-        console.log('Redirecting to viewer:', viewerUrl.toString());
+
+        console.log('[viewModel] Final viewer URL:', viewerUrl.toString()); 
         window.location.href = viewerUrl.toString();
     } catch (error) {
-        console.error('Error viewing model:', error);
+        console.error('[viewModel] Error:', error);
         showError('View Error', error.message);
     }
 }
