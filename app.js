@@ -2162,7 +2162,7 @@ async function convertBrepToMeshes(brep, rhino) {
             const mesh = face.getMesh(rhino.MeshType.Any);
             
             if (mesh) {
-                const threeMesh = await convertRhinoMeshToThree(mesh, rhino);
+                const threeMesh = await convertRhinoMeshToThree(mesh, rhino); // Call the renamed function
                 if (threeMesh) {
                     meshes.push(threeMesh);
                 }
@@ -2176,6 +2176,96 @@ async function convertBrepToMeshes(brep, rhino) {
         console.error('Error converting Brep to meshes:', error);
     }
     return meshes;
+}
+
+// ADDED: Define the missing conversion function
+// Helper function to convert Rhino Mesh to Three.js Mesh
+async function convertRhinoMeshToThree(rhinoMesh, rhino) {
+    try {
+        const geometry = new THREE.BufferGeometry();
+        const vertices = rhinoMesh.vertices();
+        const faces = rhinoMesh.faces();
+        const normals = rhinoMesh.normals(); // Get normals from Rhino mesh
+
+        if (!vertices || !faces) {
+            console.warn('Rhino mesh missing vertices or faces');
+            return null;
+        }
+
+        const positions = new Float32Array(vertices.count * 3);
+        const normalArray = new Float32Array(vertices.count * 3);
+        const indices = [];
+
+        // Populate positions and normals directly from Rhino data
+        for (let i = 0; i < vertices.count; i++) {
+            const vertex = vertices.get(i);
+            positions[i * 3] = vertex[0];
+            positions[i * 3 + 1] = vertex[1];
+            positions[i * 3 + 2] = vertex[2];
+
+            // Use normals from Rhino if available, otherwise they'll be computed later
+            if (normals && normals.count === vertices.count) {
+                const normal = normals.get(i);
+                normalArray[i * 3] = normal[0];
+                normalArray[i * 3 + 1] = normal[1];
+                normalArray[i * 3 + 2] = normal[2];
+            }
+        }
+
+        // Populate indices for faces
+        for (let i = 0; i < faces.count; i++) {
+            const face = faces.get(i);
+            indices.push(face[0], face[1], face[2]);
+            if (face[2] !== face[3]) { // Handle quads if necessary
+                indices.push(face[2], face[3], face[0]);
+            }
+        }
+
+        geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        geometry.setIndex(indices);
+
+        // If normals were successfully read from Rhino, use them
+        if (normals && normals.count === vertices.count) {
+            geometry.setAttribute('normal', new THREE.BufferAttribute(normalArray, 3));
+        } else {
+            // Otherwise, compute normals
+            geometry.computeVertexNormals();
+            console.log('Computed vertex normals for mesh part');
+        }
+
+        // Handle texture coordinates if present
+        const textureCoordinates = rhinoMesh.textureCoordinates();
+        if (textureCoordinates && textureCoordinates.count > 0) {
+            const uvs = new Float32Array(vertices.count * 2);
+            for (let i = 0; i < vertices.count; i++) {
+                 const uv = textureCoordinates.get(i);
+                 uvs[i * 2] = uv[0];
+                 uvs[i * 2 + 1] = 1.0 - uv[1]; // Invert V coordinate for Three.js
+            }
+            geometry.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
+        }
+        
+        // Store original Rhino attributes if available
+        const attributes = rhinoMesh.getUserData('attributes'); // Example, adjust if needed
+        if (attributes) {
+            geometry.userData.rhinoAttributes = attributes;
+        }
+
+        geometry.computeBoundingSphere();
+        geometry.computeBoundingBox();
+
+        // Create the Three.js mesh (material will be applied later)
+        const threeMesh = new THREE.Mesh(geometry);
+        
+        return threeMesh;
+
+    } catch (error) {
+        console.error('Error converting Rhino mesh:', error);
+        return null;
+    } finally {
+        // Clean up Rhino geometry object if needed (might be deleted elsewhere)
+        // rhinoMesh.delete(); 
+    }
 }
 
 // Process 3DM file - using the simplified version from our last update
