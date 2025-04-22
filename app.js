@@ -3165,9 +3165,8 @@ function applyMaterialToModel(modelIndex, materialType) {
 // --- Exports ---
 export {
     initializeApp,
-    process3DMFile,
-    processOtherFile, // Added export
-    toggleBackground, // Added other potentially useful exports
+    processOtherFile,
+    toggleBackground, 
     toggleTurntable,
     centerSelectedModel,
     applyMaterialToModel,
