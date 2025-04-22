@@ -1,3 +1,65 @@
+    /* Add these to the top of styles.css */
+    :root {
+        --bg-primary: #f5f5f7;
+        --bg-secondary: #ffffff;
+        --bg-tertiary: #e5e5e7;
+        --bg-overlay: rgba(255, 255, 255, 0.95);
+        --bg-overlay-darker: rgba(0, 0, 0, 0.5);
+        --text-primary: #1d1d1f;
+        --text-secondary: #666666;
+        --text-tertiary: #86868b;
+        --text-inverted: #ffffff;
+        --border-primary: #e5e5e7;
+        --border-secondary: #d2d2d7;
+        --accent-primary: #007AFF;
+        --accent-primary-hover: #0056b3;
+        --accent-primary-light: rgba(0, 122, 255, 0.1);
+        --accent-secondary: #4285f4;
+        --accent-secondary-hover: #3367d6;
+        --danger-primary: #ff3b30;
+        --danger-primary-hover: #dc3545;
+        --danger-light: #fff5f5;
+        --success-primary: #2ecc71;
+        --success-primary-hover: #27ae60;
+        --success-light: #e8f5e9;
+        --shadow-color-light: rgba(0, 0, 0, 0.1);
+        --shadow-color-medium: rgba(0, 0, 0, 0.15);
+        --shadow-color-dark: rgba(0, 0, 0, 0.2);
+        --icon-primary: #007AFF;
+        --icon-secondary: #86868b;
+        --link-color: #007AFF;
+    }
+
+    body.dark-mode {
+        --bg-primary: #000000;
+        --bg-secondary: #1c1c1e;
+        --bg-tertiary: #2c2c2e;
+        --bg-overlay: rgba(0, 0, 0, 0.85);
+        --bg-overlay-darker: rgba(0, 0, 0, 0.7);
+        --text-primary: #ffffff;
+        --text-secondary: #a0a0a5;
+        --text-tertiary: #8e8e93;
+        --text-inverted: #000000;
+        --border-primary: #3a3a3c;
+        --border-secondary: #4a4a4c;
+        --accent-primary: #0A84FF;
+        --accent-primary-hover: #3F9FFF;
+        --accent-primary-light: rgba(10, 132, 255, 0.15);
+        --accent-secondary: #5E9CFE;
+        --accent-secondary-hover: #7DAFFA;
+        --danger-primary: #FF453A;
+        --danger-primary-hover: #FF6B61;
+        --danger-light: rgba(255, 69, 58, 0.1);
+        --success-primary: #30D158;
+        --success-primary-hover: #54E07A;
+        --success-light: rgba(48, 209, 88, 0.1);
+        --shadow-color-light: rgba(255, 255, 255, 0.1);
+        --shadow-color-medium: rgba(255, 255, 255, 0.15);
+        --shadow-color-dark: rgba(255, 255, 255, 0.2);
+        --icon-primary: #0A84FF;
+        --icon-secondary: #8e8e93;
+        --link-color: #0A84FF;
+    }
 :root {
     --apple-blue: #007AFF;
     --apple-gray-1: #F5F5F7;
