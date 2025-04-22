@@ -3160,12 +3160,19 @@ function applyMaterialToModel(modelIndex, materialType) {
 }
 
 // --- Exports ---
-// Export only the functions explicitly imported by index.html
+// Export all functions imported by index.html
 export {
     initializeApp,
-    processOtherFile
-    // process3DMFile, // Keep removed - likely exported elsewhere or implicitly?
-    // showFrontpage   // Keep removed - likely exported elsewhere or implicitly?
+    process3DMFile,   // Added back
+    processOtherFile,
+    showFrontpage     // Added back
+    // Keep others commented out for now unless needed
+    // toggleBackground, 
+    // toggleTurntable,
+    // centerSelectedModel,
+    // applyMaterialToModel,
+    // selectModel,
+    // showErrorMessage
 };
 
 
