@@ -157,28 +157,157 @@
         .theme-toggle-btn:hover {
             color: #007AFF;
         }
+
+        /* Added Top Navigation Styles */
+        .top-nav {
+            background-color: var(--bg-overlay); /* Use variable */
+            backdrop-filter: saturate(180%) blur(20px);
+            -webkit-backdrop-filter: saturate(180%) blur(20px);
+            border-bottom: 1px solid var(--border-primary); /* Use variable */
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1500; /* Higher than sidebar/frontpage, but allow modals over */
+            height: 48px;
+            display: flex;
+            align-items: center;
+        }
+
+        .nav-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 24px;
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .nav-left, .nav-right {
+            display: flex;
+            align-items: center;
+        }
+
+        .nav-brand {
+            text-decoration: none;
+            color: var(--text-primary); /* Use variable */
+            font-size: 1.1rem;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: opacity 0.2s ease;
+        }
+
+        .nav-brand:hover {
+            opacity: 0.7;
+        }
+
+        .nav-brand i {
+            color: var(--icon-primary); /* Use variable */
+        }
+
+        .auth-status-inline {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .auth-status-inline #user-info,
+        .auth-status-inline #login-info {
+            display: flex; /* Ensure these are flex containers */
+            align-items: center;
+            gap: 10px; /* Spacing between buttons */
+        }
+
+        #user-email {
+            color: var(--text-secondary); /* Use variable */
+            font-size: 0.9rem;
+            margin-right: 6px; /* Reduced margin */
+        }
+
+        .nav-btn {
+            background: none;
+            border: none;
+            color: var(--link-color); /* Use variable */
+            font-size: 0.9rem;
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s ease;
+            background-color: transparent; /* Explicitly transparent */
+        }
+
+        .nav-btn:hover {
+            background-color: var(--accent-primary-light); /* Use variable */
+            color: var(--accent-primary-hover); /* Use variable */
+        }
+
+        .nav-btn i {
+             color: inherit; /* Icons inherit button color */
+        }
+
+        .logout-btn {
+            color: var(--danger-primary); /* Use variable */
+        }
+        
+        .logout-btn:hover {
+            background-color: var(--danger-light); /* Use variable */
+            color: var(--danger-primary-hover); /* Use variable */
+        }
+
+        /* Adjust main container padding for fixed nav */
+        .container {
+            padding-top: 48px; /* Height of the nav bar */
+            height: calc(100% - 48px); /* Adjust height */
+            position: relative; /* Ensure positioning context */
+            top: 48px; /* Push down */
+        }
+
+        /* Remove fixed position from old auth styles if they exist elsewhere */
+        /* .auth-status { position: static; ... } */
+        
     </style>
 </head>
 <body>
-    <!-- Auth Status -->
-    <div id="auth-status" class="auth-status">
-        <div id="user-info" style="display: none;">
-            <span id="user-email"></span>
-            <button id="upload-btn" class="auth-btn" onclick="window.location.href='upload.html'">
-                <i class="fas fa-upload"></i> Upload
-            </button>
-            <button id="logout-btn" class="auth-btn">Logout</button>
-            <button id="theme-toggle" class="auth-btn theme-toggle-btn" title="Toggle Theme">
-                <i class="fas fa-moon"></i>
-            </button>
+    <!-- Top Navigation -->
+    <nav class="top-nav">
+        <div class="nav-content">
+            <div class="nav-left">
+                <a href="#" class="nav-brand">
+                    <i class="fas fa-gem"></i> <!-- Changed icon -->
+                    Jewelry Viewer
+                </a>
+            </div>
+            <div class="nav-right">
+                <!-- Moved Auth Status Here -->
+                <div id="auth-status" class="auth-status-inline">
+                    <div id="user-info" style="display: none;">
+                        <span id="user-email"></span>
+                        <button id="upload-btn" class="nav-btn" onclick="window.location.href='upload.html'">
+                            <i class="fas fa-upload"></i> Upload
+                        </button>
+                        <button id="logout-btn" class="nav-btn logout-btn">Logout</button>
+                        <button id="theme-toggle" class="nav-btn theme-toggle-btn" title="Toggle Theme">
+                            <i class="fas fa-moon"></i>
+                        </button>
+                    </div>
+                    <div id="login-info">
+                        <button id="login-btn" class="nav-btn" onclick="window.location.href='login.html'">
+                             <i class="fas fa-sign-in-alt"></i> Login
+                        </button>
+                        <button id="theme-toggle-login" class="nav-btn theme-toggle-btn" title="Toggle Theme">
+                            <i class="fas fa-moon"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
         </div>
-        <div id="login-info">
-            <button id="login-btn" class="auth-btn" onclick="window.location.href='login.html'">Login</button>
-            <button id="theme-toggle-login" class="auth-btn theme-toggle-btn" title="Toggle Theme">
-                <i class="fas fa-moon"></i>
-            </button>
-        </div>
-    </div>
+    </nav>
 
     <!-- Loading Indicator -->
     <div id="loading-indicator">

@@ -31,6 +31,8 @@ let animationId = null; // For tracking animation frames
 let currentMaterial = 'gold'; // Default material for new models
 let defaultEnvMap = null; // Store the HDR env map
 let gradientBackgroundTexture = null; // Store gradient texture
+let gradientBackgroundTextureLight = null;
+let gradientBackgroundTextureDark = null;
 
 // Function to check if rhino3dm is loaded
 function isRhino3dmLoaded() {
@@ -1853,35 +1855,48 @@ async function loadEnvironment(renderer, url = 'assets/studio_small_09_2k.hdr') 
 // --- Background Management ---
 
 function createGradientBackground() {
-    const canvas = document.createElement('canvas');
-    canvas.width = 2;
-    canvas.height = 512;
-    const context = canvas.getContext('2d');
+    // --- Light Theme Gradient ---
+    const canvasLight = document.createElement('canvas');
+    canvasLight.width = 2;
+    canvasLight.height = 512;
+    const contextLight = canvasLight.getContext('2d');
+    const gradientLight = contextLight.createLinearGradient(0, 0, 0, canvasLight.height);
+    gradientLight.addColorStop(0, '#d8e1ec'); // Original light sky blue/gray
+    gradientLight.addColorStop(1, '#a1b0c0'); // Original darker blue/gray
+    contextLight.fillStyle = gradientLight;
+    contextLight.fillRect(0, 0, canvasLight.width, canvasLight.height);
+    gradientBackgroundTextureLight = new THREE.CanvasTexture(canvasLight);
+    gradientBackgroundTextureLight.needsUpdate = true;
 
-    const gradient = context.createLinearGradient(0, 0, 0, canvas.height);
-    gradient.addColorStop(0, '#d8e1ec'); // Lighter sky blue/gray
-    gradient.addColorStop(1, '#a1b0c0'); // Darker blue/gray
+    // --- Dark Theme Gradient ---
+    const canvasDark = document.createElement('canvas');
+    canvasDark.width = 2;
+    canvasDark.height = 512;
+    const contextDark = canvasDark.getContext('2d');
+    const gradientDark = contextDark.createLinearGradient(0, 0, 0, canvasDark.height);
+    gradientDark.addColorStop(0, '#2c3e50'); // Darker blue-gray top
+    gradientDark.addColorStop(1, '#1a252f'); // Very dark bottom
+    contextDark.fillStyle = gradientDark;
+    contextDark.fillRect(0, 0, canvasDark.width, canvasDark.height);
+    gradientBackgroundTextureDark = new THREE.CanvasTexture(canvasDark);
+    gradientBackgroundTextureDark.needsUpdate = true;
 
-    context.fillStyle = gradient;
-    context.fillRect(0, 0, canvas.width, canvas.height);
-
-    gradientBackgroundTexture = new THREE.CanvasTexture(canvas);
-    gradientBackgroundTexture.needsUpdate = true;
-    console.log('Gradient background texture created.');
+    console.log('Gradient background textures created for both themes.');
 }
 
 function applyBackground() {
-    if (backgroundMode === 'gradient' && gradientBackgroundTexture) {
-        scene.background = gradientBackgroundTexture;
+    const isDarkMode = document.body.classList.contains('dark-mode');
+    
+    if (backgroundMode === 'gradient') {
+        scene.background = isDarkMode ? gradientBackgroundTextureDark : gradientBackgroundTextureLight;
         scene.backgroundBlurriness = 0; // No blur for gradient
-        console.log('Applied gradient background');
-    } else if (backgroundMode === 'dark') {
-        scene.background = new THREE.Color(0x1a1a1a); // Darker background
-        console.log('Applied dark background');
-    } else { // light mode (default)
-        scene.background = new THREE.Color(0xf0f0f0); // Original light gray
-        console.log('Applied light background');
+        console.log('Applied gradient background (' + (isDarkMode ? 'dark' : 'light') + ')');
+    } else {
+         // Keep solid color options if needed, adjust for theme
+         scene.background = isDarkMode ? new THREE.Color(0x1a1a1a) : new THREE.Color(0xf0f0f0);
+         console.log('Applied solid background (' + (isDarkMode ? 'dark' : 'light') + ')');
     }
+    
     // Ensure environment is always the HDR map if loaded
     if (defaultEnvMap) {
          scene.environment = defaultEnvMap;
@@ -2526,80 +2541,102 @@ async function process3DMFile(file) {
     }
 }
 
-// Helper function to convert Rhino Material to Three.js Material
+// Function to convert Rhino Material to Three.js Material
 function convertRhinoMaterialToThree(rhinoMaterial) {
-    if (!rhinoMaterial) return null;
-    const defaultFallbackMaterial = materialPresets['gold'] ? materialPresets['gold'].clone() : new THREE.MeshStandardMaterial({ color: 0xcccccc, side: THREE.DoubleSide });
-    if (defaultEnvMap) defaultFallbackMaterial.envMap = defaultEnvMap;
-
-    let pbrMaterial = null; // Define here for finally block
     try {
-        pbrMaterial = rhinoMaterial.physicallyBased();
-        if (!pbrMaterial) {
-            // Basic material conversion if not PBR
-            const diffuse = rhinoMaterial.diffuseColor;
-            const color = new THREE.Color(diffuse.r / 255, diffuse.g / 255, diffuse.b / 255);
-            const basicMat = new THREE.MeshStandardMaterial({ color: color, side: THREE.DoubleSide });
-            if (defaultEnvMap) basicMat.envMap = defaultEnvMap;
-            // console.log('Converted basic Rhino material'); // Keep logs minimal
-            return basicMat;
+        let material = null;
+        let pbr = null;
+
+        // Check if physicallyBased method exists and returns a valid object
+        if (rhinoMaterial && typeof rhinoMaterial.physicallyBased === 'function') {
+            try {
+                pbr = rhinoMaterial.physicallyBased();
+            } catch (e) {
+                console.warn(`Error accessing physicallyBased() for material: ${rhinoMaterial.name || 'Unnamed'}`, e);
+                pbr = null;
+            }
+        } else {
+             console.log(`Material '${rhinoMaterial?.name || 'Unnamed'}' does not appear to be a PBR material.`);
         }
 
-        // Attempt PBR Conversion within one try block
-        // Any error here will lead to using the fallback material
-        const baseColor = pbrMaterial.baseColor;
-        const color = new THREE.Color(baseColor.r / 255, baseColor.g / 255, baseColor.b / 255);
-        const metalness = pbrMaterial.metallic;
-        const roughness = pbrMaterial.roughness;
-        const ior = pbrMaterial.ior || 1.5; // Provide default if undefined
-        const opacity = pbrMaterial.opacity === undefined ? 1.0 : pbrMaterial.opacity;
-        const transmission = 1.0 - opacity;
-        const thickness = pbrMaterial.opacityThickness || 0.0;
-        const clearcoat = pbrMaterial.clearcoat || 0.0;
-        const clearcoatRoughness = pbrMaterial.clearcoatRoughness || 0.0;
-        const sheen = pbrMaterial.sheen || 0.0;
-        const sheenRoughness = pbrMaterial.sheenRoughness || 0.0;
-        const emissionColor = pbrMaterial.emission || { r: 0, g: 0, b: 0 };
-        const emission = new THREE.Color(emissionColor.r / 255, emissionColor.g / 255, emissionColor.b / 255);
+        if (pbr) {
+            console.log(`Processing PBR material: ${rhinoMaterial.name || 'Unnamed'}`);
+            const params = {};
+            
+            try {
+                if (typeof pbr.baseColor === 'function') {
+                    const baseColor = pbr.baseColor();
+                    params.color = new THREE.Color(baseColor[0] / 255, baseColor[1] / 255, baseColor[2] / 255);
+                    params.opacity = baseColor[3] / 255; // Use alpha from baseColor for opacity
+                    params.transparent = params.opacity < 1.0;
+                } else { console.warn('PBR material missing baseColor function'); }
+            } catch (e) { console.warn('Error accessing PBR baseColor:', e); }
+
+            try {
+                if (typeof pbr.metallic === 'function') {
+                    params.metalness = pbr.metallic();
+                } else { console.warn('PBR material missing metallic function'); }
+            } catch (e) { console.warn('Error accessing PBR metallic:', e); }
+
+            try {
+                if (typeof pbr.roughness === 'function') {
+                    params.roughness = pbr.roughness();
+                } else { console.warn('PBR material missing roughness function'); }
+            } catch (e) { console.warn('Error accessing PBR roughness:', e); }
+
+            // Safely access other properties like emission, clearcoat, etc.
+            try {
+                 if (typeof pbr.emission === 'function') {
+                     const emissionColor = pbr.emission();
+                     params.emissive = new THREE.Color(emissionColor[0] / 255, emissionColor[1] / 255, emissionColor[2] / 255);
+                     params.emissiveIntensity = (emissionColor[0] + emissionColor[1] + emissionColor[2]) / 3 > 0 ? 1 : 0; // Basic check if emissive
+                 }
+            } catch (e) { console.warn('Error accessing PBR emission:', e); }
+            
+            // Add more safe checks for other potential PBR properties (ior, clearcoat, sheen, etc.) if needed
+
+            material = new THREE.MeshStandardMaterial(params);
+            
+        } else {
+             // Fallback to a basic material if not PBR or PBR access failed
+             console.log(`Falling back to basic material for: ${rhinoMaterial?.name || 'Unnamed'}`);
+             const diffuse = rhinoMaterial?.diffuseColor;
+             const transparency = rhinoMaterial?.transparency !== undefined ? rhinoMaterial.transparency : 0.0; // Default to opaque if undefined
+             material = new THREE.MeshStandardMaterial({
+                 color: diffuse ? new THREE.Color(diffuse[0] / 255, diffuse[1] / 255, diffuse[2] / 255) : new THREE.Color(0x808080), // Default grey
+                 metalness: 0.1, // Default low metalness
+                 roughness: 0.8, // Default high roughness
+                 opacity: 1.0 - transparency,
+                 transparent: transparency > 0.0,
+             });
+        }
+
+        // Apply general material properties
+        if (material && rhinoMaterial) {
+            material.name = rhinoMaterial.name || 'Unnamed Rhino Material';
+            // Handle transparency if not already set by PBR alpha
+            if (!material.transparent) {
+                 const transparency = rhinoMaterial.transparency !== undefined ? rhinoMaterial.transparency : 0.0;
+                 material.opacity = 1.0 - transparency;
+                 material.transparent = transparency > 0.0;
+            }
+             // Apply environment map if available
+             if (defaultEnvMap) {
+                 material.envMap = defaultEnvMap;
+                 material.needsUpdate = true; // Ensure env map is applied
+             }
+        }
+
+        // Dispose of the PBR object if it was created and has a delete method
+        if (pbr && typeof pbr.delete === 'function') {
+             try { pbr.delete(); } catch(e) { console.warn("Non-critical error deleting PBR object:", e); }
+        }
         
-        // Check for NaN values after access, use fallback if any NaN detected
-        if (isNaN(metalness) || isNaN(roughness) || isNaN(ior) || isNaN(transmission) || isNaN(thickness) || 
-            isNaN(clearcoat) || isNaN(clearcoatRoughness) || isNaN(sheen) || isNaN(sheenRoughness)) {
-             console.warn('NaN value detected in PBR properties, using fallback material.');
-             throw new Error('NaN value in PBR properties'); // Trigger fallback
-        }
-
-        const threeMaterial = new THREE.MeshPhysicalMaterial({
-            color: color,
-            metalness: metalness,
-            roughness: roughness,
-            ior: ior,
-            transmission: transmission,
-            thickness: thickness,
-            clearcoat: clearcoat,
-            clearcoatRoughness: clearcoatRoughness,
-            sheen: sheen,
-            sheenRoughness: sheenRoughness,
-            emissive: emission,
-            emissiveIntensity: emission.getHex() > 0 ? 1.0 : 0.0, // Only set intensity if emissive color is not black
-            side: THREE.DoubleSide
-        });
-
-        if (defaultEnvMap) threeMaterial.envMap = defaultEnvMap;
-
-        // console.log('Successfully converted PBR Rhino material'); // Keep logs minimal
-        return threeMaterial;
+        return material || createMeshMaterial(); // Return fallback if everything failed
 
     } catch (error) {
-        // Log only a single warning if PBR conversion fails for any reason
-        console.warn('Error converting Rhino PBR material, using default fallback:', error.message);
-        // Fallback to a default gold material preset if any error occurs
-        return defaultFallbackMaterial;
-    } finally {
-         // Clean up PBR material object if it was created
-         if (pbrMaterial) {
-             try { pbrMaterial.delete(); } catch (delErr) { console.warn('Non-critical error deleting PBR material object:', delErr); }
-         }
+        console.error(`Error converting Rhino material '${rhinoMaterial?.name || 'Unknown'}', using default fallback:`, error);
+        return createMeshMaterial(); // Return a default material on any major error
     }
 }
 
