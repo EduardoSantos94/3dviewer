@@ -144,6 +144,19 @@
         #logout-btn:hover {
             background-color: #c82333;
         }
+
+        .theme-toggle-btn {
+            background-color: transparent;
+            border: none;
+            padding: 0;
+            cursor: pointer;
+            font-size: 1rem;
+            color: #333;
+        }
+
+        .theme-toggle-btn:hover {
+            color: #007AFF;
+        }
     </style>
 </head>
 <body>
@@ -155,9 +168,15 @@
                 <i class="fas fa-upload"></i> Upload
             </button>
             <button id="logout-btn" class="auth-btn">Logout</button>
+            <button id="theme-toggle" class="auth-btn theme-toggle-btn" title="Toggle Theme">
+                <i class="fas fa-moon"></i>
+            </button>
         </div>
         <div id="login-info">
             <button id="login-btn" class="auth-btn" onclick="window.location.href='login.html'">Login</button>
+            <button id="theme-toggle-login" class="auth-btn theme-toggle-btn" title="Toggle Theme">
+                <i class="fas fa-moon"></i>
+            </button>
         </div>
     </div>
 
@@ -416,5 +435,6 @@
         showErrorMessage('Failed to initialize Supabase: ' + error.message);
     }
 </script>
+<script src="theme.js" defer></script>
 </body>
 </html> 

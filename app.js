@@ -2883,9 +2883,9 @@ function handleAmbientLightChange(event) {
 }
 
 function handleDirectionalLightChange(event) {
-    if (dirLight) {
+    if (directionalLight) { // Correct variable name
         const intensity = parseFloat(event.target.value);
-        dirLight.intensity = intensity;
+        directionalLight.intensity = intensity; // Correct variable name
         // Update shadow map if needed (optional)
         // renderer.shadowMap.needsUpdate = true;
         console.log(`Directional Light intensity set to ${intensity}`);
