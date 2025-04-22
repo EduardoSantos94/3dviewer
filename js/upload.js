@@ -517,7 +517,76 @@ document.addEventListener('DOMContentLoaded', async () => {
         await updateModelsGrid();
 
         // Set up other event listeners
-        // ... (keep existing event listeners)
+        const uploadBtn = document.getElementById('upload-btn');
+        const uploadFirstBtn = document.getElementById('upload-first-btn');
+        const selectFileBtn = document.getElementById('select-file-btn');
+        const closeModalBtn = document.getElementById('close-modal');
+        const uploadModal = document.getElementById('upload-modal');
+        const fileInput = document.getElementById('file-input'); // Assuming this ID exists in upload.html modal
+        const modalDropZone = uploadModal ? uploadModal.querySelector('.upload-drop-zone') : null;
+
+        if (uploadBtn) {
+            uploadBtn.addEventListener('click', () => toggleUploadModal(true));
+        }
+        if (uploadFirstBtn) {
+            uploadFirstBtn.addEventListener('click', () => toggleUploadModal(true));
+        }
+        if (closeModalBtn) {
+            closeModalBtn.addEventListener('click', () => toggleUploadModal(false));
+        }
+        // Close modal if clicking outside the content
+        if (uploadModal) {
+            uploadModal.addEventListener('click', (event) => {
+                if (event.target === uploadModal) { // Check if click is on the backdrop
+                    toggleUploadModal(false);
+                }
+            });
+        }
+        if (selectFileBtn && fileInput) {
+            selectFileBtn.addEventListener('click', () => fileInput.click());
+            fileInput.addEventListener('change', (event) => {
+                if (event.target.files.length > 0) {
+                    uploadFile(event.target.files[0]); // Assuming single file upload for now
+                    toggleUploadModal(false);
+                    event.target.value = null; // Reset file input
+                }
+            });
+        }
+
+        // Add Drag & Drop to modal drop zone
+        if (modalDropZone && fileInput) {
+            modalDropZone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                modalDropZone.classList.add('dragover');
+            });
+            modalDropZone.addEventListener('dragleave', () => {
+                modalDropZone.classList.remove('dragover');
+            });
+            modalDropZone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                modalDropZone.classList.remove('dragover');
+                if (e.dataTransfer.files.length > 0) {
+                    uploadFile(e.dataTransfer.files[0]); // Assuming single file upload
+                    toggleUploadModal(false);
+                }
+            });
+        }
+
+        // Also add logout listener for upload page
+        const logoutBtn = document.getElementById('logout-btn');
+        if (logoutBtn) {
+             logoutBtn.addEventListener('click', async () => {
+                 try {
+                     const { error } = await supabase.auth.signOut();
+                     if (error) throw error;
+                     window.location.href = 'login.html';
+                 } catch (error) {
+                     console.error('Error signing out:', error);
+                     showError('Sign Out Error', error.message);
+                 }
+             });
+        }
+        
     } catch (error) {
         console.error('Initialization error:', error);
         showError('Initialization Error', error.message);

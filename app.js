@@ -1874,8 +1874,8 @@ function createGradientBackground() {
     canvasDark.height = 512;
     const contextDark = canvasDark.getContext('2d');
     const gradientDark = contextDark.createLinearGradient(0, 0, 0, canvasDark.height);
-    gradientDark.addColorStop(0, '#333333'); // Dark Gray top
-    gradientDark.addColorStop(1, '#0a0a0a'); // Near Black bottom
+    gradientDark.addColorStop(0, '#222222'); // Darker Gray top
+    gradientDark.addColorStop(1, '#000000'); // Black bottom
     contextDark.fillStyle = gradientDark;
     contextDark.fillRect(0, 0, canvasDark.width, canvasDark.height);
     gradientBackgroundTextureDark = new THREE.CanvasTexture(canvasDark);
