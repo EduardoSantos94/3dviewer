@@ -28,6 +28,9 @@
         --icon-primary: #007AFF;
         --icon-secondary: #86868b;
         --link-color: #007AFF;
+        --apple-gold: #FFD700; /* Keep specific material colors if needed */
+        --apple-rose: #FFB6C1;
+        --apple-white: #FFFFFF;
     }
 
     body.dark-mode {
@@ -60,22 +63,6 @@
         --icon-secondary: #8e8e93;
         --link-color: #0A84FF;
     }
-:root {
-    --apple-blue: #007AFF;
-    --apple-gray-1: #F5F5F7;
-    --apple-gray-2: #E5E5E7;
-    --apple-gray-3: #D2D2D7;
-    --apple-gray-4: #86868B;
-    --apple-gray-5: #000000;
-    --apple-gray-6: #000000;
-    --apple-gold: #FFD700;
-    --apple-rose: #FFB6C1;
-    --apple-white: #FFFFFF;
-    --font-sf: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-    --ambient-light: 0.3;
-    --directional-light: 0.8;
-    --background-color: #f0f0f0;
-}
 
 html, body {
     margin: 0;
@@ -83,7 +70,7 @@ html, body {
     width: 100%;
     height: 100%;
     overflow: hidden;
-    background-color: var(--background-color);
+    background-color: var(--bg-primary); /* Use variable */
 }
 
 * {
@@ -91,15 +78,16 @@ html, body {
     padding: 0;
     box-sizing: border-box;
     font-family: 'Roboto', sans-serif;
-    color: #333; /* Darker text color for better readability */
+    color: var(--text-primary); /* Use variable */
 }
 
 body {
-    font-family: var(--font-sf);
-    color: #000; /* Black text for main content */
+    font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, sans-serif;
+    color: var(--text-primary); /* Use variable */
     line-height: 1.5;
     -webkit-font-smoothing: antialiased;
     position: relative;
+    background-color: var(--bg-primary); /* Ensure body background uses variable */
 }
 
 /* Container */
@@ -109,8 +97,8 @@ body {
     left: 0;
     width: 100%;
     height: 100%;
-    display: none;
-    z-index: 50;
+    display: none; /* Initial state controlled by JS */
+    z-index: 50; /* Keep relatively low */
 }
 
 .viewer-layout {
@@ -122,7 +110,7 @@ body {
 .viewer-area {
     flex: 1;
     position: relative;
-    background-color: #f0f0f0;
+    background-color: var(--bg-tertiary); /* Use variable for viewer background */
 }
 
 #viewer-container {
@@ -143,16 +131,16 @@ body {
     display: flex;
     justify-content: center;
     align-items: center;
-    background-color: #f5f5f7;
+    background-color: var(--bg-primary); /* Use variable */
     z-index: 1000;
 }
 
 .frontpage-content {
     text-align: center;
     padding: 2rem;
-    background-color: white;
+    background-color: var(--bg-secondary); /* Use variable */
     border-radius: 1rem;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 4px 6px var(--shadow-color-light); /* Use variable */
     max-width: 600px;
     width: 90%;
 }
@@ -160,25 +148,25 @@ body {
 .frontpage h1 {
     font-size: 2.5rem;
     margin-bottom: 1rem;
-    color: #000;
+    color: var(--text-primary); /* Use variable */
 }
 
 .frontpage p {
     font-size: 1.2rem;
     margin-bottom: 2rem;
-    color: #000;
+    color: var(--text-secondary); /* Use variable */
 }
 
 .supported-formats {
     margin: 2rem 0;
     padding: 20px;
-    background-color: #f8f9fa;
+    background-color: var(--bg-tertiary); /* Use variable */
     border-radius: 8px;
 }
 
 .supported-formats h3 {
     margin-bottom: 1rem;
-    color: #000;
+    color: var(--text-primary); /* Use variable */
 }
 
 .supported-formats ul {
@@ -191,17 +179,17 @@ body {
 }
 
 .supported-formats li {
-    color: #000;
+    color: var(--text-primary); /* Use variable */
     font-size: 0.9rem;
     padding: 8px 16px;
-    background-color: white;
+    background-color: var(--bg-secondary); /* Use variable */
     border-radius: 6px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    box-shadow: 0 2px 4px var(--shadow-color-light); /* Use variable */
 }
 
 .cta-button {
-    background-color: #007AFF;
-    color: white;
+    background-color: var(--accent-primary); /* Use variable */
+    color: var(--text-inverted); /* Use variable */
     border: none;
     padding: 12px 24px;
     border-radius: 8px;
@@ -213,15 +201,15 @@ body {
 }
 
 .cta-button:hover {
-    background-color: #0056b3;
+    background-color: var(--accent-primary-hover); /* Use variable */
     transform: translateY(-1px);
-    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    box-shadow: 0 4px 8px var(--shadow-color-medium); /* Use variable */
 }
 
 /* Buttons */
 .add-model-btn {
-    background-color: #007AFF;
-    color: white;
+    background-color: var(--accent-primary); /* Use variable */
+    color: var(--text-inverted); /* Use variable */
     border: none;
     padding: 8px 16px;
     border-radius: 5px;
@@ -231,7 +219,7 @@ body {
 }
 
 .add-model-btn:hover {
-    background-color: #0056b3;
+    background-color: var(--accent-primary-hover); /* Use variable */
 }
 
 /* Drop Zone */
@@ -241,45 +229,45 @@ body {
     left: 0;
     width: 100%;
     height: 100%;
-    display: none;
+    display: none; /* Controlled by JS */
     justify-content: center;
     align-items: center;
-    background-color: rgba(255, 255, 255, 0.95);
+    background-color: var(--bg-overlay); /* Use variable */
     z-index: 1000;
 }
 
 .drop-zone.dragover {
-    background-color: rgba(66, 133, 244, 0.1);
-    border: 2px dashed #4285f4;
+    background-color: var(--accent-primary-light); /* Use variable */
+    border: 2px dashed var(--accent-primary); /* Use variable */
 }
 
 .drop-zone-content {
     text-align: center;
     padding: 2rem;
-    background-color: white;
+    background-color: var(--bg-secondary); /* Use variable */
     border-radius: 1rem;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 4px 6px var(--shadow-color-light); /* Use variable */
 }
 
 .drop-zone i {
     font-size: 3rem;
-    color: #4285f4;
+    color: var(--icon-primary); /* Use variable */
     margin-bottom: 1rem;
 }
 
 .drop-zone h2 {
     margin-bottom: 1rem;
-    color: #333;
+    color: var(--text-primary); /* Use variable */
 }
 
 .drop-zone p {
     margin: 1rem 0;
-    color: #666;
+    color: var(--text-secondary); /* Use variable */
 }
 
 #select-files {
-    background-color: #4285f4;
-    color: white;
+    background-color: var(--accent-secondary); /* Use variable */
+    color: var(--text-inverted); /* Use variable */
     border: none;
     padding: 0.75rem 1.5rem;
     border-radius: 4px;
@@ -291,14 +279,14 @@ body {
 }
 
 #select-files:hover {
-    background-color: #3367d6;
+    background-color: var(--accent-secondary-hover); /* Use variable */
     transform: translateY(-1px);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 4px 8px var(--shadow-color-medium); /* Use variable */
 }
 
 #select-files:active {
     transform: translateY(0);
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 2px 4px var(--shadow-color-light); /* Use variable */
 }
 
 #select-files i {
@@ -309,13 +297,13 @@ body {
 /* Controls Panel */
 .controls-panel {
     padding: 20px;
-    border-bottom: 1px solid #e0e0e0;
+    border-bottom: 1px solid var(--border-primary); /* Use variable */
 }
 
 .controls-panel h3 {
     margin: 0 0 15px 0;
     font-size: 16px;
-    color: #333;
+    color: var(--text-primary); /* Use variable */
 }
 
 .control-group {
@@ -325,7 +313,7 @@ body {
 .control-group label {
     display: block;
     margin-bottom: 5px;
-    color: #666;
+    color: var(--text-secondary); /* Use variable */
     font-size: 14px;
 }
 
@@ -333,9 +321,10 @@ body {
 .control-group input[type="range"] {
     width: 100%;
     padding: 8px;
-    border: 1px solid #ddd;
+    border: 1px solid var(--border-secondary); /* Use variable */
     border-radius: 4px;
-    background-color: #fff;
+    background-color: var(--bg-secondary); /* Use variable */
+    color: var(--text-primary); /* Ensure text is visible */
 }
 
 .model-list {
@@ -347,7 +336,7 @@ body {
 .model-list h3 {
     margin: 0 0 15px 0;
     font-size: 16px;
-    color: #333;
+    color: var(--text-primary); /* Use variable */
 }
 
 /* Model List */
@@ -358,23 +347,28 @@ body {
     padding: 8px;
     border-radius: 4px;
     margin-bottom: 8px;
-    background-color: #f8f8f8;
+    background-color: var(--bg-tertiary); /* Use variable */
     transition: all 0.2s;
+    color: var(--text-primary); /* Use variable */
 }
 
 .model-item:hover {
-    background-color: #f0f0f0;
+    background-color: var(--border-primary); /* Lighter hover using border color */
 }
 
 .model-item.selected {
-    background-color: #e3f2fd;
-    border-left: 3px solid #007AFF;
+    background-color: var(--accent-primary-light); /* Use variable */
+    border-left: 3px solid var(--accent-primary); /* Use variable */
 }
 
 .model-label {
     display: flex;
     align-items: center;
     gap: 8px;
+}
+
+.model-label span {
+     color: var(--text-primary); /* Use variable */
 }
 
 .model-controls {
@@ -387,32 +381,32 @@ body {
     border: none;
     padding: 4px;
     cursor: pointer;
-    color: #666;
+    color: var(--text-secondary); /* Use variable */
     transition: all 0.2s;
 }
 
 .model-btn:hover {
-    color: #333;
+    color: var(--text-primary); /* Use variable */
 }
 
 .delete-btn:hover {
-    color: #d32f2f;
+    color: var(--danger-primary); /* Use variable */
 }
 
 .visibility-btn:hover {
-    color: #0277bd;
+    color: var(--accent-secondary); /* Use variable */
 }
 
 .material-btn:hover {
-    color: #f57c00;
+    color: var(--accent-primary); /* Use variable */
 }
 
 .empty-model-list {
     padding: 20px 10px;
     text-align: center;
-    color: #000; /* Black for empty state text */
+    color: var(--text-secondary); /* Use variable */
     font-style: italic;
-    background-color: #f9f9f9;
+    background-color: var(--bg-tertiary); /* Use variable */
     border-radius: 4px;
     margin-top: 10px;
 }
@@ -421,10 +415,10 @@ body {
     width: 100%;
     padding: 8px;
     margin-top: 10px;
-    background-color: #f1f1f1;
-    border: 1px dashed #ccc;
+    background-color: var(--bg-tertiary); /* Use variable */
+    border: 1px dashed var(--border-secondary); /* Use variable */
     border-radius: 4px;
-    color: #333; /* Darker color for button text */
+    color: var(--text-primary); /* Use variable */
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -434,8 +428,8 @@ body {
 }
 
 .add-more-models-btn:hover {
-    background-color: #e0e0e0;
-    border-color: #999;
+    background-color: var(--border-primary); /* Lighter hover */
+    border-color: var(--text-tertiary); /* Use variable */
 }
 
 /* Loading Indicator */
@@ -445,18 +439,18 @@ body {
     left: 0;
     width: 100%;
     height: 100%;
-    display: none;
+    display: none; /* Controlled by JS */
     justify-content: center;
     align-items: center;
-    background-color: rgba(255, 255, 255, 0.9);
+    background-color: var(--bg-overlay); /* Use variable */
     z-index: 2000;
 }
 
 .spinner {
     width: 50px;
     height: 50px;
-    border: 5px solid #f3f3f3;
-    border-top: 5px solid #3498db;
+    border: 5px solid var(--bg-tertiary); /* Use variable */
+    border-top: 5px solid var(--accent-secondary); /* Use variable */
     border-radius: 50%;
     animation: spin 1s linear infinite;
 }
@@ -468,7 +462,7 @@ body {
 
 .loading-text {
     margin-top: 1rem;
-    color: #333;
+    color: var(--text-primary); /* Use variable */
     font-size: 1.2rem;
 }
 
@@ -479,13 +473,13 @@ footer {
     left: 50%;
     transform: translateX(-50%);
     text-align: center;
-    color: #666;
+    color: var(--text-tertiary); /* Use variable */
     font-size: 12px;
     z-index: 100;
 }
 
 footer a {
-    color: #007AFF;
+    color: var(--link-color); /* Use variable */
     text-decoration: none;
 }
 
@@ -519,7 +513,7 @@ footer a:hover {
     .model-list {
         width: 250px;
     }
-    
+
     .model-label span {
         max-width: 120px;
     }
@@ -529,18 +523,18 @@ footer a:hover {
     .model-list {
         width: calc(100% - 40px);
     }
-    
+
     .controls-panel {
         top: auto;
         bottom: 20px;
         right: 20px;
     }
-    
-    #frontpage h1 {
+
+    .frontpage h1 {
         font-size: 2rem;
     }
-    
-    #frontpage p {
+
+    .frontpage p {
         font-size: 1rem;
     }
 }
@@ -550,8 +544,8 @@ footer a:hover {
     content: attr(title);
     position: absolute;
     padding: 5px 10px;
-    background-color: rgba(0, 0, 0, 0.7);
-    color: white;
+    background-color: var(--bg-overlay-darker); /* Use variable */
+    color: var(--text-inverted); /* Use variable */
     border-radius: 3px;
     font-size: 0.8rem;
     white-space: nowrap;
@@ -566,19 +560,19 @@ footer a:hover {
     display: block;
     margin-bottom: 5px;
     font-size: 0.9rem;
-    color: #000; /* Black for control labels */
+    color: var(--text-primary); /* Use variable */
 }
 
 /* Tutorial tooltips */
 .tutorial-tooltip {
     position: absolute;
-    background-color: rgba(255, 255, 255, 0.95);
+    background-color: var(--bg-overlay); /* Use variable */
     border-radius: 8px;
-    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 3px 10px var(--shadow-color-medium); /* Use variable */
     padding: 15px;
     max-width: 300px;
     z-index: 100;
-    color: #000; /* Black for tooltip text */
+    color: var(--text-primary); /* Use variable */
 }
 
 .tutorial-tooltip::after {
@@ -587,96 +581,28 @@ footer a:hover {
     border: 10px solid transparent;
 }
 
-.tutorial-tooltip.top::after {
-    border-top-color: rgba(255, 255, 255, 0.95);
-    bottom: -20px;
-    left: 50%;
-    transform: translateX(-50%);
-}
+/* Tooltip arrow colors need to match background */
+body:not(.dark-mode) .tutorial-tooltip.top::after { border-top-color: rgba(255, 255, 255, 0.95); }
+body.dark-mode .tutorial-tooltip.top::after { border-top-color: rgba(0, 0, 0, 0.85); }
+body:not(.dark-mode) .tutorial-tooltip.bottom::after { border-bottom-color: rgba(255, 255, 255, 0.95); }
+body.dark-mode .tutorial-tooltip.bottom::after { border-bottom-color: rgba(0, 0, 0, 0.85); }
+body:not(.dark-mode) .tutorial-tooltip.left::after { border-left-color: rgba(255, 255, 255, 0.95); }
+body.dark-mode .tutorial-tooltip.left::after { border-left-color: rgba(0, 0, 0, 0.85); }
+body:not(.dark-mode) .tutorial-tooltip.right::after { border-right-color: rgba(255, 255, 255, 0.95); }
+body.dark-mode .tutorial-tooltip.right::after { border-right-color: rgba(0, 0, 0, 0.85); }
 
-.tutorial-tooltip.bottom::after {
-    border-bottom-color: rgba(255, 255, 255, 0.95);
-    top: -20px;
-    left: 50%;
-    transform: translateX(-50%);
-}
-
-.tutorial-tooltip.left::after {
-    border-left-color: rgba(255, 255, 255, 0.95);
-    right: -20px;
-    top: 50%;
-    transform: translateY(-50%);
-}
-
-.tutorial-tooltip.right::after {
-    border-right-color: rgba(255, 255, 255, 0.95);
-    left: -20px;
-    top: 50%;
-    transform: translateY(-50%);
-}
-
-/* Text color fixes for better readability */
-.frontpage h1 {
-    color: #000;
-}
-
-.frontpage p {
-    color: #000;
-}
-
-.frontpage .supported-formats p {
-    color: #000;
-}
-
-.frontpage .supported-formats li {
-    color: #000;
-}
-
-.drop-zone p {
-    color: #000;
-}
-
-.control-group label {
-    color: #000;
-}
-
-.model-list h3 {
-    color: #000;
-}
-
-.model-label span {
-    color: #000;
-}
-
-/* Make sure icons in the drop zone are visible */
-.drop-zone i {
-    color: #000;
-}
-
-/* Fix for model list items */
-.model-item {
-    color: #000;
-}
-
-.empty-model-list {
-    color: #000;
-}
-
-/* Loading indicator text */
-.loading-indicator p {
-    color: #000;
-}
+/* Text color fixes already applied above by using variables */
 
 /* Right sidebar UI layout */
 .ui-sidebar {
     width: 280px;
     height: 100%;
-    background-color: #f9f9f9;
-    border-left: 1px solid #e0e0e0;
+    background-color: var(--bg-secondary); /* Use variable */
+    border-left: 1px solid var(--border-primary); /* Use variable */
     padding: 20px;
     overflow-y: auto;
     z-index: 10;
-    box-shadow: -2px 0 5px rgba(0, 0, 0, 0.05);
+    box-shadow: -2px 0 5px var(--shadow-color-light); /* Use variable */
     display: flex;
     flex-direction: column;
     gap: 20px;
@@ -691,7 +617,7 @@ footer a:hover {
     gap: 15px;
     width: 100%;
     padding-bottom: 15px;
-    border-bottom: 1px solid #e0e0e0;
+    border-bottom: 1px solid var(--border-primary); /* Use variable */
 }
 
 /* Adjust model list to be inside sidebar */
@@ -705,12 +631,13 @@ footer a:hover {
     box-shadow: none;
     padding: 0;
     max-height: none;
-    border-bottom: 1px solid #e0e0e0;
+    border-bottom: 1px solid var(--border-primary); /* Use variable */
     padding-bottom: 15px;
 }
 
 .model-list h3 {
     margin-bottom: 15px;
+    color: var(--text-primary); /* Use variable */
 }
 
 /* Adjust footer to stay at bottom of sidebar */
@@ -722,6 +649,7 @@ footer {
     margin-top: auto;
     padding-top: 15px;
     text-align: center;
+    color: var(--text-tertiary); /* Use variable */
 }
 
 /* Make viewer container full size */
@@ -735,18 +663,18 @@ footer {
 
 /* Adjust frontpage for new layout */
 .frontpage {
-    position: absolute;
+    position: absolute; /* Change from fixed to absolute */
     width: 100%;
     height: 100%;
-    z-index: 100;
+    z-index: 100; /* Lower than auth bar */
 }
 
 /* Adjust drop zone for new layout */
 .drop-zone {
-    position: absolute;
+    position: absolute; /* Change from fixed to absolute */
     width: 100%;
     height: 100%;
-    z-index: 90;
+    z-index: 90; /* Lower than frontpage */
 }
 
 /* Control buttons in a grid layout */
@@ -775,7 +703,7 @@ footer {
     background: none;
     border: none;
     cursor: pointer;
-    color: #555;
+    color: var(--text-secondary); /* Use variable */
     font-size: 0.9rem;
     width: 24px;
     height: 24px;
@@ -787,8 +715,8 @@ footer {
 }
 
 .delete-btn:hover {
-    background-color: rgba(255, 0, 0, 0.1);
-    color: #d32f2f;
+    background-color: var(--danger-light); /* Use variable */
+    color: var(--danger-primary); /* Use variable */
 }
 
 /* Fix for sidebar when initially loaded */
@@ -802,11 +730,12 @@ footer {
     flex: 1;
     position: relative;
     overflow: hidden;
+    background-color: var(--bg-primary); /* Ensure viewer area background */
 }
 
 /* Ensure the frontpage covers the entire application */
 .frontpage {
-    z-index: 1000; /* Ensure it covers everything */
+    z-index: 1000; /* Ensure it covers everything except auth/nav */
 }
 
 /* Fix for drop zone button */
@@ -819,8 +748,8 @@ footer {
 .empty-model-list {
     padding: 15px 10px;
     text-align: center;
-    color: #666;
-    background-color: #f0f0f0;
+    color: var(--text-secondary); /* Use variable */
+    background-color: var(--bg-tertiary); /* Use variable */
     border-radius: 4px;
     margin: 10px 0;
 }
@@ -837,15 +766,15 @@ footer {
     .viewer-layout {
         flex-direction: column;
     }
-    
+
     .ui-sidebar {
         width: 100%;
         height: auto;
         border-left: none;
-        border-top: 1px solid #e0e0e0;
+        border-top: 1px solid var(--border-primary); /* Use variable */
         max-height: 40vh;
     }
-    
+
     .viewer-area {
         height: 60vh;
     }
@@ -853,39 +782,41 @@ footer {
 
 /* Update button styles for a more modern look */
 .controls-panel button {
-    background-color: #f8f8f8;
-    border: none;
+    background-color: var(--bg-secondary); /* Use variable */
+    border: 1px solid var(--border-primary); /* Add subtle border */
     border-radius: 8px;
     padding: 10px 12px;
     margin: 5px;
     font-size: 14px;
-    color: #333;
+    color: var(--text-primary); /* Use variable */
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    box-shadow: 0 1px 2px var(--shadow-color-light); /* Use variable */
     transition: all 0.2s ease;
     cursor: pointer;
 }
 
 .controls-panel button:hover {
-    background-color: #fff;
-    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    background-color: var(--bg-tertiary); /* Use variable */
+    box-shadow: 0 2px 4px var(--shadow-color-medium); /* Use variable */
     transform: translateY(-1px);
 }
 
 .controls-panel button:active {
-    transform: translateY(1px);
-    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+    transform: translateY(0);
+    box-shadow: 0 1px 1px var(--shadow-color-light); /* Use variable */
+    background-color: var(--border-primary);
 }
 
 .controls-panel button i {
     margin-right: 5px;
+    color: inherit; /* Ensure icon inherits button text color */
 }
 
 /* Fix brightness issues by adjusting materials/lighting */
 .viewer-area {
-    background-color: #f5f5f5;
+    background-color: var(--bg-primary); /* Use variable */
 }
 
 /* Control sliders with a more modern look */
@@ -894,7 +825,7 @@ input[type="range"] {
     width: 100%;
     height: 4px;
     border-radius: 2px;
-    background: #ddd;
+    background: var(--border-secondary); /* Use variable */
     outline: none;
     margin: 10px 0;
 }
@@ -905,7 +836,7 @@ input[type="range"]::-webkit-slider-thumb {
     width: 16px;
     height: 16px;
     border-radius: 50%;
-    background: #4285f4;
+    background: var(--accent-secondary); /* Use variable */
     cursor: pointer;
     transition: all 0.2s ease;
 }
@@ -914,19 +845,19 @@ input[type="range"]::-moz-range-thumb {
     width: 16px;
     height: 16px;
     border-radius: 50%;
-    background: #4285f4;
+    background: var(--accent-secondary); /* Use variable */
     cursor: pointer;
     transition: all 0.2s ease;
 }
 
 input[type="range"]::-webkit-slider-thumb:hover {
-    background: #5c9aff;
-    box-shadow: 0 0 0 8px rgba(66, 133, 244, 0.15);
+    background: var(--accent-secondary-hover); /* Use variable */
+    box-shadow: 0 0 0 8px var(--accent-primary-light); /* Use variable */
 }
 
 input[type="range"]::-moz-range-thumb:hover {
-    background: #5c9aff;
-    box-shadow: 0 0 0 8px rgba(66, 133, 244, 0.15);
+    background: var(--accent-secondary-hover); /* Use variable */
+    box-shadow: 0 0 0 8px var(--accent-primary-light); /* Use variable */
 }
 
 /* Control buttons grid layout */
@@ -943,8 +874,8 @@ input[type="range"]::-moz-range-thumb:hover {
     margin-bottom: 10px;
     font-size: 18px;
     font-weight: 500;
-    color: #333;
-    border-bottom: 1px solid #eaeaea;
+    color: var(--text-primary); /* Use variable */
+    border-bottom: 1px solid var(--border-primary); /* Use variable */
     padding-bottom: 8px;
 }
 
@@ -952,70 +883,75 @@ input[type="range"]::-moz-range-thumb:hover {
 select {
     width: 100%;
     padding: 8px 12px;
-    border: 1px solid #ddd;
+    border: 1px solid var(--border-secondary); /* Use variable */
     border-radius: 6px;
-    background-color: white;
+    background-color: var(--bg-secondary); /* Use variable */
+    color: var(--text-primary); /* Use variable */
     font-size: 14px;
     cursor: pointer;
     appearance: none;
-    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23333' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23${(props) => props.theme.textPrimary.substring(1)}' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e"); /* Update SVG color dynamically if needed via JS or more CSS */
     background-repeat: no-repeat;
     background-position: right 8px center;
     background-size: 16px;
 }
 
 select:hover {
-    border-color: #aaa;
+    border-color: var(--text-tertiary); /* Use variable */
 }
 
 select:focus {
     outline: none;
-    border-color: #4285f4;
-    box-shadow: 0 0 0 3px rgba(66, 133, 244, 0.15);
+    border-color: var(--accent-secondary); /* Use variable */
+    box-shadow: 0 0 0 3px var(--accent-primary-light); /* Use variable */
 }
 
 /* Add styles for button states */
 .controls-panel button.active {
-    background-color: #4285f4;
-    color: white;
+    background-color: var(--accent-secondary); /* Use variable */
+    color: var(--text-inverted); /* Use variable */
+    border-color: var(--accent-secondary);
+}
+.controls-panel button.active:hover {
+    background-color: var(--accent-secondary-hover);
 }
 
 /* Improve model list appearance */
 .model-item {
-    background: white;
+    background: var(--bg-secondary); /* Use variable */
     border-radius: 8px;
     padding: 8px 12px;
     margin-bottom: 8px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    box-shadow: 0 1px 3px var(--shadow-color-light); /* Use variable */
     transition: all 0.2s ease;
 }
 
 .model-item:hover {
-    box-shadow: 0 2px 5px rgba(0,0,0,0.15);
+    box-shadow: 0 2px 5px var(--shadow-color-medium); /* Use variable */
 }
 
 .model-item.selected {
-    border-left: 3px solid #4285f4;
-    background-color: #f0f7ff;
+    border-left: 3px solid var(--accent-secondary); /* Use variable */
+    background-color: var(--accent-primary-light); /* Use variable */
 }
 
 .model-action-btn {
     background: transparent;
     border: none;
     padding: 4px 8px;
-    color: #666;
+    color: var(--text-secondary); /* Use variable */
     border-radius: 4px;
     cursor: pointer;
     transition: all 0.2s ease;
 }
 
 .model-action-btn:hover {
-    background-color: #f5f5f5;
-    color: #333;
+    background-color: var(--bg-tertiary); /* Use variable */
+    color: var(--text-primary); /* Use variable */
 }
 
 .delete-btn:hover {
-    color: #d93025;
+    color: var(--danger-primary); /* Use variable */
 }
 
 /* Add this to make sure we don't have duplicate Models headers */
@@ -1037,14 +973,14 @@ select:focus {
     display: flex;
     justify-content: center;
     align-items: center;
-    background-color: rgba(0, 0, 0, 0.5);
+    background-color: var(--bg-overlay-darker); /* Use variable */
     z-index: 3000;
 }
 
 .error-content {
-    background-color: #fff;
+    background-color: var(--bg-secondary); /* Use variable */
     border-radius: 8px;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 4px 8px var(--shadow-color-medium); /* Use variable */
     padding: 20px;
     max-width: 400px;
     width: 90%;
@@ -1053,23 +989,23 @@ select:focus {
 
 .error-content i {
     font-size: 32px;
-    color: #e74c3c;
+    color: var(--danger-primary); /* Use variable */
     margin-bottom: 10px;
 }
 
 .error-content h3 {
     margin-bottom: 10px;
-    color: #333;
+    color: var(--text-primary); /* Use variable */
 }
 
 .error-content p {
     margin-bottom: 20px;
-    color: #555;
+    color: var(--text-secondary); /* Use variable */
 }
 
 .error-content button {
-    background-color: #e74c3c;
-    color: #fff;
+    background-color: var(--danger-primary); /* Use variable */
+    color: var(--text-inverted); /* Use variable */
     border: none;
     padding: 8px 16px;
     border-radius: 4px;
@@ -1078,7 +1014,7 @@ select:focus {
 }
 
 .error-content button:hover {
-    background-color: #c0392b;
+    background-color: var(--danger-primary-hover); /* Use variable */
 }
 
 /* Material dialog styling */
@@ -1091,14 +1027,14 @@ select:focus {
     display: flex;
     justify-content: center;
     align-items: center;
-    background-color: rgba(0, 0, 0, 0.5);
+    background-color: var(--bg-overlay-darker); /* Use variable */
     z-index: 3000;
 }
 
 .dialog-content {
-    background-color: #fff;
+    background-color: var(--bg-secondary); /* Use variable */
     border-radius: 8px;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 4px 8px var(--shadow-color-medium); /* Use variable */
     padding: 20px;
     max-width: 400px;
     width: 90%;
@@ -1106,7 +1042,7 @@ select:focus {
 
 .dialog-content h3 {
     margin-bottom: 15px;
-    color: #333;
+    color: var(--text-primary); /* Use variable */
     text-align: center;
 }
 
@@ -1114,8 +1050,10 @@ select:focus {
     width: 100%;
     padding: 8px;
     margin-bottom: 20px;
-    border: 1px solid #ddd;
+    border: 1px solid var(--border-secondary); /* Use variable */
     border-radius: 4px;
+    background-color: var(--bg-secondary); /* Use variable */
+    color: var(--text-primary); /* Use variable */
 }
 
 .dialog-buttons {
@@ -1131,24 +1069,23 @@ select:focus {
     border-radius: 4px;
     cursor: pointer;
     transition: background-color 0.2s;
+    color: var(--text-inverted); /* Use variable */
 }
 
 .dialog-buttons button:first-child {
-    background-color: #2ecc71;
-    color: #fff;
+    background-color: var(--success-primary); /* Use variable */
 }
 
 .dialog-buttons button:last-child {
-    background-color: #e74c3c;
-    color: #fff;
+    background-color: var(--danger-primary); /* Use variable */
 }
 
 .dialog-buttons button:first-child:hover {
-    background-color: #27ae60;
+    background-color: var(--success-primary-hover); /* Use variable */
 }
 
 .dialog-buttons button:last-child:hover {
-    background-color: #c0392b;
+    background-color: var(--danger-primary-hover); /* Use variable */
 }
 
 /* Progress Bar styles */
@@ -1158,15 +1095,15 @@ select:focus {
     left: 0;
     width: 100%;
     height: 3px;
-    background-color: #f3f3f3;
+    background-color: var(--bg-tertiary); /* Use variable */
     z-index: 2100;
-    display: none;
+    display: none; /* Controlled by JS */
 }
 
 .progress-bar {
     height: 100%;
     width: 0%;
-    background-color: #4285f4;
+    background-color: var(--accent-secondary); /* Use variable */
     transition: width 0.3s ease;
 }
 
@@ -1176,14 +1113,14 @@ select:focus {
     justify-content: center;
     align-items: center;
     min-height: 100vh;
-    background-color: #f5f5f7;
+    background-color: var(--bg-primary); /* Use variable */
 }
 
 .auth-box {
-    background-color: white;
+    background-color: var(--bg-secondary); /* Use variable */
     padding: 2rem;
     border-radius: 1rem;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 4px 6px var(--shadow-color-light); /* Use variable */
     width: 100%;
     max-width: 400px;
     text-align: center;
@@ -1191,11 +1128,11 @@ select:focus {
 
 .auth-box h1 {
     margin-bottom: 0.5rem;
-    color: #333;
+    color: var(--text-primary); /* Use variable */
 }
 
 .subtitle {
-    color: #666;
+    color: var(--text-secondary); /* Use variable */
     margin-bottom: 2rem;
 }
 
@@ -1207,22 +1144,24 @@ select:focus {
 .form-group label {
     display: block;
     margin-bottom: 0.5rem;
-    color: #333;
+    color: var(--text-primary); /* Use variable */
 }
 
 .form-group input {
     width: 100%;
     padding: 0.75rem;
-    border: 1px solid #ddd;
+    border: 1px solid var(--border-secondary); /* Use variable */
     border-radius: 0.5rem;
     font-size: 1rem;
+    background-color: var(--bg-secondary); /* Use variable */
+    color: var(--text-primary); /* Use variable */
 }
 
 .auth-button {
     width: 100%;
     padding: 0.75rem;
-    background-color: #007AFF;
-    color: white;
+    background-color: var(--accent-primary); /* Use variable */
+    color: var(--text-inverted); /* Use variable */
     border: none;
     border-radius: 0.5rem;
     font-size: 1rem;
@@ -1231,20 +1170,20 @@ select:focus {
 }
 
 .auth-button:hover {
-    background-color: #0056b3;
+    background-color: var(--accent-primary-hover); /* Use variable */
 }
 
 .toggle-text {
     margin-top: 1rem;
-    color: #007AFF;
+    color: var(--link-color); /* Use variable */
     cursor: pointer;
     text-decoration: underline;
 }
 
-.error-message {
+.error-message { /* Note: This class name is reused */
     display: none;
-    background-color: #ffebee;
-    color: #c62828;
+    background-color: var(--danger-light); /* Use variable */
+    color: var(--danger-primary); /* Use variable */
     padding: 0.75rem;
     border-radius: 0.5rem;
     margin-bottom: 1rem;
@@ -1252,8 +1191,8 @@ select:focus {
 
 .success-message {
     display: none;
-    background-color: #e8f5e9;
-    color: #2e7d32;
+    background-color: var(--success-light); /* Use variable */
+    color: var(--success-primary); /* Use variable */
     padding: 0.75rem;
     border-radius: 0.5rem;
     margin-bottom: 1rem;
@@ -1261,22 +1200,22 @@ select:focus {
 
 /* Upload Page Styles */
 .upload-page {
-    background-color: #f5f5f7;
+    background-color: var(--bg-primary); /* Use variable */
     min-height: 100vh;
     font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
 /* Top Navigation */
 .top-nav {
-    background-color: rgba(255, 255, 255, 0.98);
+    background-color: var(--bg-overlay); /* Use variable */
     backdrop-filter: saturate(180%) blur(20px);
     -webkit-backdrop-filter: saturate(180%) blur(20px);
-    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+    border-bottom: 1px solid var(--border-primary); /* Use variable */
     position: fixed;
     top: 0;
     left: 0;
     right: 0;
-    z-index: 1000;
+    z-index: 1000; /* Keep lower than index.html auth bar */
     height: 48px;
     display: flex;
     align-items: center;
@@ -1299,7 +1238,7 @@ select:focus {
 
 .nav-brand {
     text-decoration: none;
-    color: #000;
+    color: var(--text-primary); /* Use variable */
     font-size: 1.1rem;
     font-weight: 500;
     display: flex;
@@ -1313,7 +1252,7 @@ select:focus {
 }
 
 .nav-brand i {
-    color: #007AFF;
+    color: var(--icon-primary); /* Use variable */
 }
 
 .user-info {
@@ -1323,14 +1262,14 @@ select:focus {
 }
 
 #user-email {
-    color: #666;
+    color: var(--text-secondary); /* Use variable */
     font-size: 0.9rem;
 }
 
 .nav-btn {
     background: none;
     border: none;
-    color: #007AFF;
+    color: var(--link-color); /* Use variable */
     font-size: 0.9rem;
     padding: 6px 12px;
     border-radius: 6px;
@@ -1342,7 +1281,7 @@ select:focus {
 }
 
 .nav-btn:hover {
-    background-color: rgba(0, 122, 255, 0.1);
+    background-color: var(--accent-primary-light); /* Use variable */
 }
 
 /* Main Content Adjustments */
@@ -1364,13 +1303,13 @@ select:focus {
 .content-header h1 {
     font-size: 24px;
     font-weight: 600;
-    color: #1d1d1f;
+    color: var(--text-primary); /* Use variable */
 }
 
 /* Buttons */
 .primary-btn {
-    background-color: #007AFF;
-    color: white;
+    background-color: var(--accent-primary); /* Use variable */
+    color: var(--text-inverted); /* Use variable */
     border: none;
     padding: 0.75rem 1.5rem;
     border-radius: 8px;
@@ -1384,14 +1323,14 @@ select:focus {
 }
 
 .primary-btn:hover {
-    background-color: #0056b3;
+    background-color: var(--accent-primary-hover); /* Use variable */
     transform: translateY(-1px);
 }
 
 .secondary-btn {
-    background-color: white;
-    color: #007AFF;
-    border: 1px solid #007AFF;
+    background-color: var(--bg-secondary); /* Use variable */
+    color: var(--link-color); /* Use variable */
+    border: 1px solid var(--link-color); /* Use variable */
     padding: 0.75rem 1.5rem;
     border-radius: 8px;
     font-size: 1rem;
@@ -1404,15 +1343,15 @@ select:focus {
 }
 
 .secondary-btn:hover {
-    background-color: rgba(0, 122, 255, 0.1);
+    background-color: var(--accent-primary-light); /* Use variable */
 }
 
 /* Models Grid */
 .models-container {
-    background-color: white;
+    background-color: var(--bg-secondary); /* Use variable */
     border-radius: 12px;
     padding: 2rem;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 2px 4px var(--shadow-color-light); /* Use variable */
 }
 
 .models-grid {
@@ -1422,21 +1361,22 @@ select:focus {
 }
 
 .model-card {
-    background-color: #f5f5f7;
+    background-color: var(--bg-primary); /* Use variable */
     border-radius: 12px;
     overflow: hidden;
     transition: all 0.2s ease;
+    border: 1px solid var(--border-primary); /* Add subtle border */
 }
 
 .model-card:hover {
     transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 4px 8px var(--shadow-color-medium); /* Use variable */
 }
 
 .model-preview {
     width: 100%;
     height: 200px;
-    background-color: #e5e5e7;
+    background-color: var(--bg-tertiary); /* Use variable */
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1444,7 +1384,7 @@ select:focus {
 
 .model-preview i {
     font-size: 3rem;
-    color: #86868b;
+    color: var(--icon-secondary); /* Use variable */
 }
 
 .model-info {
@@ -1454,13 +1394,13 @@ select:focus {
 .model-name {
     font-size: 1rem;
     font-weight: 500;
-    color: #1d1d1f;
+    color: var(--text-primary); /* Use variable */
     margin-bottom: 0.5rem;
 }
 
 .model-meta {
     font-size: 0.9rem;
-    color: #86868b;
+    color: var(--text-secondary); /* Use variable */
 }
 
 .model-actions {
@@ -1469,7 +1409,7 @@ select:focus {
     margin-top: 1rem;
 }
 
-.model-btn {
+.model-btn { /* Reusing model-btn class */
     flex: 1;
     padding: 0.5rem;
     border: none;
@@ -1484,21 +1424,21 @@ select:focus {
 }
 
 .view-btn {
-    background-color: #007AFF;
-    color: white;
+    background-color: var(--accent-primary); /* Use variable */
+    color: var(--text-inverted); /* Use variable */
 }
 
 .view-btn:hover {
-    background-color: #0056b3;
+    background-color: var(--accent-primary-hover); /* Use variable */
 }
 
 .delete-btn {
-    background-color: #ff3b30;
-    color: white;
+    background-color: var(--danger-primary); /* Use variable */
+    color: var(--text-inverted); /* Use variable */
 }
 
 .delete-btn:hover {
-    background-color: #dc3545;
+    background-color: var(--danger-primary-hover); /* Use variable */
 }
 
 /* Empty State */
@@ -1509,19 +1449,19 @@ select:focus {
 
 .empty-state i {
     font-size: 4rem;
-    color: #86868b;
+    color: var(--icon-secondary); /* Use variable */
     margin-bottom: 1.5rem;
 }
 
 .empty-state h2 {
     font-size: 1.5rem;
     font-weight: 600;
-    color: #1d1d1f;
+    color: var(--text-primary); /* Use variable */
     margin-bottom: 0.5rem;
 }
 
 .empty-state p {
-    color: #86868b;
+    color: var(--text-secondary); /* Use variable */
     margin-bottom: 2rem;
 }
 
@@ -1532,7 +1472,7 @@ select:focus {
     left: 0;
     right: 0;
     bottom: 0;
-    background-color: rgba(0, 0, 0, 0.5);
+    background-color: var(--bg-overlay-darker); /* Use variable */
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1540,16 +1480,16 @@ select:focus {
 }
 
 .modal-content {
-    background-color: white;
+    background-color: var(--bg-secondary); /* Use variable */
     border-radius: 12px;
     width: 90%;
     max-width: 600px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    box-shadow: 0 4px 12px var(--shadow-color-medium); /* Use variable */
 }
 
 .modal-header {
     padding: 1.5rem;
-    border-bottom: 1px solid #e5e5e7;
+    border-bottom: 1px solid var(--border-primary); /* Use variable */
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -1558,13 +1498,13 @@ select:focus {
 .modal-header h2 {
     font-size: 1.25rem;
     font-weight: 600;
-    color: #1d1d1f;
+    color: var(--text-primary); /* Use variable */
 }
 
 .close-btn {
     background: none;
     border: none;
-    color: #86868b;
+    color: var(--text-tertiary); /* Use variable */
     cursor: pointer;
     font-size: 1.25rem;
     padding: 0.5rem;
@@ -1573,49 +1513,50 @@ select:focus {
 }
 
 .close-btn:hover {
-    background-color: #f5f5f7;
-    color: #1d1d1f;
+    background-color: var(--bg-tertiary); /* Use variable */
+    color: var(--text-primary); /* Use variable */
 }
 
 .modal-body {
     padding: 2rem;
 }
 
-/* Drop Zone */
-.drop-zone {
-    border: 2px dashed #e5e5e7;
+/* Drop Zone in Modal */
+.upload-drop-zone { /* Renamed to avoid conflict with page-level drop-zone */
+    border: 2px dashed var(--border-primary); /* Use variable */
     border-radius: 12px;
     padding: 3rem 2rem;
     text-align: center;
     transition: all 0.2s ease;
+    background-color: var(--bg-primary); /* Use variable */
 }
 
-.drop-zone.dragover {
-    border-color: #007AFF;
-    background-color: rgba(0, 122, 255, 0.05);
+.upload-drop-zone.dragover {
+    border-color: var(--accent-primary); /* Use variable */
+    background-color: var(--accent-primary-light); /* Use variable */
 }
 
-.drop-zone i {
+.upload-drop-zone i {
     font-size: 3rem;
-    color: #007AFF;
+    color: var(--icon-primary); /* Use variable */
     margin-bottom: 1.5rem;
 }
 
-.drop-zone h3 {
+.upload-drop-zone h3 {
     font-size: 1.25rem;
     font-weight: 500;
-    color: #1d1d1f;
+    color: var(--text-primary); /* Use variable */
     margin-bottom: 0.5rem;
 }
 
-.drop-zone p {
-    color: #86868b;
+.upload-drop-zone p {
+    color: var(--text-secondary); /* Use variable */
     margin: 0.5rem 0;
 }
 
 .file-info {
     font-size: 0.9rem;
-    color: #86868b;
+    color: var(--text-secondary); /* Use variable */
     margin-top: 1rem;
 }
 
@@ -1624,10 +1565,10 @@ select:focus {
     position: fixed;
     bottom: 2rem;
     right: 2rem;
-    background-color: white;
+    background-color: var(--bg-secondary); /* Use variable */
     border-radius: 12px;
     padding: 1.5rem;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    box-shadow: 0 4px 12px var(--shadow-color-medium); /* Use variable */
     width: 300px;
     z-index: 1500;
 }
@@ -1646,19 +1587,441 @@ select:focus {
 
 .progress-info span {
     font-size: 0.9rem;
-    color: #1d1d1f;
+    color: var(--text-primary); /* Use variable */
 }
 
 .progress-bar {
     height: 4px;
-    background-color: #e5e5e7;
+    background-color: var(--bg-tertiary); /* Use variable */
     border-radius: 2px;
     overflow: hidden;
 }
 
 .progress-fill {
     height: 100%;
-    background-color: #007AFF;
+    background-color: var(--accent-primary); /* Use variable */
     width: 0%;
     transition: width 0.3s ease;
+}
+
+/* Add Theme Toggle Button Style */
+.theme-toggle-btn {
+    background-color: transparent;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    font-size: 1rem;
+    color: var(--text-primary); /* Use variable */
+}
+
+.theme-toggle-btn:hover {
+    color: var(--accent-primary); /* Use variable */
+}
+
+/* Re-apply nav-btn styles using variables */
+.nav-btn {
+    background: none;
+    border: none;
+    color: var(--link-color);
+    font-size: 0.9rem;
+    padding: 6px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.2s ease;
+}
+
+.nav-btn:hover {
+    background-color: var(--accent-primary-light);
+}
+
+/* Adjust top nav background for theme */
+.top-nav {
+    background-color: var(--bg-overlay);
+    border-bottom: 1px solid var(--border-primary);
+}
+
+/* Adjust main content background for theme */
+.main-content {
+    /* No background needed, inherits from body */
+}
+
+/* Adjust model card styles for theme */
+.model-card {
+    background-color: var(--bg-secondary); /* Use secondary for cards */
+    border: 1px solid var(--border-primary);
+}
+
+.model-preview {
+    background-color: var(--bg-tertiary);
+}
+
+.model-preview i {
+    color: var(--icon-secondary);
+}
+
+.model-name {
+    color: var(--text-primary);
+}
+
+.model-meta {
+    color: var(--text-secondary);
+}
+
+.view-btn {
+    background-color: var(--accent-primary);
+    color: var(--text-inverted);
+}
+
+.view-btn:hover {
+    background-color: var(--accent-primary-hover);
+}
+
+.delete-btn {
+    background-color: var(--danger-primary);
+    color: var(--text-inverted);
+}
+
+.delete-btn:hover {
+    background-color: var(--danger-primary-hover);
+}
+
+/* Adjust empty state styles for theme */
+.empty-state i {
+    color: var(--icon-secondary);
+}
+
+.empty-state h2 {
+    color: var(--text-primary);
+}
+
+.empty-state p {
+    color: var(--text-secondary);
+}
+
+/* Adjust upload modal styles for theme */
+.modal {
+    background-color: var(--bg-overlay-darker);
+}
+
+.modal-content {
+    background-color: var(--bg-secondary);
+    box-shadow: 0 4px 12px var(--shadow-color-medium);
+}
+
+.modal-header {
+    border-bottom: 1px solid var(--border-primary);
+}
+
+.modal-header h2 {
+    color: var(--text-primary);
+}
+
+.close-btn {
+    color: var(--text-tertiary);
+}
+
+.close-btn:hover {
+    background-color: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+/* Adjust upload drop zone styles for theme */
+.upload-drop-zone {
+    border: 2px dashed var(--border-primary);
+    background-color: var(--bg-primary);
+}
+
+.upload-drop-zone.dragover {
+    border-color: var(--accent-primary);
+    background-color: var(--accent-primary-light);
+}
+
+.upload-drop-zone i {
+    color: var(--icon-primary);
+}
+
+.upload-drop-zone h3 {
+    color: var(--text-primary);
+}
+
+.upload-drop-zone p {
+    color: var(--text-secondary);
+}
+
+.file-info {
+    color: var(--text-secondary);
+}
+
+/* Adjust upload progress styles for theme */
+.upload-progress {
+    background-color: var(--bg-secondary);
+    box-shadow: 0 4px 12px var(--shadow-color-medium);
+}
+
+.progress-info span {
+    color: var(--text-primary);
+}
+
+.progress-bar {
+    background-color: var(--bg-tertiary);
+}
+
+.progress-fill {
+    background-color: var(--accent-primary);
+}
+
+/* Auth page theme adjustments */
+.auth-container {
+    background-color: var(--bg-primary);
+}
+
+.auth-box {
+    background-color: var(--bg-secondary);
+    box-shadow: 0 4px 6px var(--shadow-color-light);
+}
+
+.auth-box h1 {
+    color: var(--text-primary);
+}
+
+.subtitle {
+    color: var(--text-secondary);
+}
+
+.form-group label {
+    color: var(--text-primary);
+}
+
+.form-group input {
+    border: 1px solid var(--border-secondary);
+    background-color: var(--bg-secondary);
+    color: var(--text-primary);
+}
+
+.form-group input::placeholder { /* Style placeholders */
+     color: var(--text-tertiary);
+}
+
+.auth-button {
+    background-color: var(--accent-primary);
+    color: var(--text-inverted);
+}
+
+.auth-button:hover {
+    background-color: var(--accent-primary-hover);
+}
+
+.toggle-text {
+    color: var(--link-color);
+}
+
+.error-message {
+    background-color: var(--danger-light);
+    color: var(--danger-primary);
+}
+
+.success-message {
+    background-color: var(--success-light);
+    color: var(--success-primary);
+}
+
+/* Add this to make sure we don't have duplicate Models headers */
+.model-list > h3:first-of-type {
+    display: block;
+}
+
+.model-list > h3:not(:first-of-type) {
+    display: none;
+}
+
+/* Adjust model card styles for theme */
+.model-card {
+    background-color: var(--bg-secondary); /* Use secondary for cards */
+    border: 1px solid var(--border-primary);
+}
+
+.model-preview {
+    background-color: var(--bg-tertiary);
+}
+
+.model-preview i {
+    color: var(--icon-secondary);
+}
+
+.model-name {
+    color: var(--text-primary);
+}
+
+.model-meta {
+    color: var(--text-secondary);
+}
+
+.view-btn {
+    background-color: var(--accent-primary);
+    color: var(--text-inverted);
+}
+
+.view-btn:hover {
+    background-color: var(--accent-primary-hover);
+}
+
+.delete-btn {
+    background-color: var(--danger-primary);
+    color: var(--text-inverted);
+}
+
+.delete-btn:hover {
+    background-color: var(--danger-primary-hover);
+}
+
+/* Adjust empty state styles for theme */
+.empty-state i {
+    color: var(--icon-secondary);
+}
+
+.empty-state h2 {
+    color: var(--text-primary);
+}
+
+.empty-state p {
+    color: var(--text-secondary);
+}
+
+/* Adjust upload modal styles for theme */
+.modal {
+    background-color: var(--bg-overlay-darker);
+}
+
+.modal-content {
+    background-color: var(--bg-secondary);
+    box-shadow: 0 4px 12px var(--shadow-color-medium);
+}
+
+.modal-header {
+    border-bottom: 1px solid var(--border-primary);
+}
+
+.modal-header h2 {
+    color: var(--text-primary);
+}
+
+.close-btn {
+    color: var(--text-tertiary);
+}
+
+.close-btn:hover {
+    background-color: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+/* Adjust upload drop zone styles for theme */
+.upload-drop-zone {
+    border: 2px dashed var(--border-primary);
+    background-color: var(--bg-primary);
+}
+
+.upload-drop-zone.dragover {
+    border-color: var(--accent-primary);
+    background-color: var(--accent-primary-light);
+}
+
+.upload-drop-zone i {
+    color: var(--icon-primary);
+}
+
+.upload-drop-zone h3 {
+    color: var(--text-primary);
+}
+
+.upload-drop-zone p {
+    color: var(--text-secondary);
+}
+
+.file-info {
+    color: var(--text-secondary);
+}
+
+/* Adjust upload progress styles for theme */
+.upload-progress {
+    background-color: var(--bg-secondary);
+    box-shadow: 0 4px 12px var(--shadow-color-medium);
+}
+
+.progress-info span {
+    color: var(--text-primary);
+}
+
+.progress-bar {
+    background-color: var(--bg-tertiary);
+}
+
+.progress-fill {
+    background-color: var(--accent-primary);
+}
+
+/* Auth page theme adjustments */
+.auth-container {
+    background-color: var(--bg-primary);
+}
+
+.auth-box {
+    background-color: var(--bg-secondary);
+    box-shadow: 0 4px 6px var(--shadow-color-light);
+}
+
+.auth-box h1 {
+    color: var(--text-primary);
+}
+
+.subtitle {
+    color: var(--text-secondary);
+}
+
+.form-group label {
+    color: var(--text-primary);
+}
+
+.form-group input {
+    border: 1px solid var(--border-secondary);
+    background-color: var(--bg-secondary);
+    color: var(--text-primary);
+}
+
+.form-group input::placeholder { /* Style placeholders */
+     color: var(--text-tertiary);
+}
+
+.auth-button {
+    background-color: var(--accent-primary);
+    color: var(--text-inverted);
+}
+
+.auth-button:hover {
+    background-color: var(--accent-primary-hover);
+}
+
+.toggle-text {
+    color: var(--link-color);
+}
+
+.error-message {
+    background-color: var(--danger-light);
+    color: var(--danger-primary);
+}
+
+.success-message {
+    background-color: var(--success-light);
+    color: var(--success-primary);
+}
+
+/* Add this to make sure we don't have duplicate Models headers */
+.model-list > h3:first-of-type {
+    display: block;
+}
+
+.model-list > h3:not(:first-of-type) {
+    display: none;
 } 
