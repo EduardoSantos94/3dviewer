@@ -3159,6 +3159,15 @@ function applyMaterialToModel(modelIndex, materialType) {
     }
 }
 
+// --- Exports ---
+// Export only the functions explicitly imported by index.html
+export {
+    initializeApp,
+    processOtherFile
+    // process3DMFile, // Keep removed - likely exported elsewhere or implicitly?
+    // showFrontpage   // Keep removed - likely exported elsewhere or implicitly?
+};
+
 
 
 
