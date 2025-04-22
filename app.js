@@ -2908,9 +2908,6 @@ window.removeModel = function(modelIndex) {
     }
 };
 
-// Export only the necessary functions for index.html
-export { initializeApp, process3DMFile, showFrontpage };
-
 // --- Add back missing UI handlers --- 
 
 function handleAmbientLightChange(event) {
@@ -3161,19 +3158,6 @@ function applyMaterialToModel(modelIndex, materialType) {
         renderer.render(scene, camera);
     }
 }
-
-// --- Exports ---
-export {
-    initializeApp,
-    processOtherFile,
-    toggleBackground, 
-    toggleTurntable,
-    centerSelectedModel,
-    applyMaterialToModel,
-    selectModel,
-    showErrorMessage
-    // Add other functions to export as needed
-};
 
 
 
