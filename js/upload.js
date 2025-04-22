@@ -381,7 +381,7 @@ async function uploadFile(file) {
 
         // Upload file
         const { data: uploadData, error: uploadError } = await supabase.storage
-            .from(STORAGE_CONFIG.uploadPath)
+            .from(STORAGE_CONFIG.bucketName)
             .upload(filePath, file, {
                 cacheControl: '3600',
                 upsert: false,
