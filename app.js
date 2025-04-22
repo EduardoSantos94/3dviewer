@@ -2513,60 +2513,42 @@ function convertRhinoMaterialToThree(rhinoMaterial) {
     const defaultFallbackMaterial = materialPresets['gold'] ? materialPresets['gold'].clone() : new THREE.MeshStandardMaterial({ color: 0xcccccc, side: THREE.DoubleSide });
     if (defaultEnvMap) defaultFallbackMaterial.envMap = defaultEnvMap;
 
+    let pbrMaterial = null; // Define here for finally block
     try {
-        const pbrMaterial = rhinoMaterial.physicallyBased();
+        pbrMaterial = rhinoMaterial.physicallyBased();
         if (!pbrMaterial) {
             // Basic material conversion if not PBR
             const diffuse = rhinoMaterial.diffuseColor;
             const color = new THREE.Color(diffuse.r / 255, diffuse.g / 255, diffuse.b / 255);
             const basicMat = new THREE.MeshStandardMaterial({ color: color, side: THREE.DoubleSide });
             if (defaultEnvMap) basicMat.envMap = defaultEnvMap;
-            console.log('Converted basic Rhino material');
+            // console.log('Converted basic Rhino material'); // Keep logs minimal
             return basicMat;
         }
 
-        // PBR Conversion - wrap property access in try...catch
-        let color, metalness, roughness, ior, transmission, thickness, clearcoat, clearcoatRoughness, sheen, sheenRoughness, emission;
-        try {
-            const baseColor = pbrMaterial.baseColor;
-            color = new THREE.Color(baseColor.r / 255, baseColor.g / 255, baseColor.b / 255);
-        } catch (e) {
-            console.warn('Error getting baseColor from PBR material, using fallback color:', e);
-            color = defaultFallbackMaterial.color; // Use fallback color
-        }
-
-        const safeGet = (prop, defaultValue) => {
-            try {
-                const value = pbrMaterial[prop];
-                if (value === null || typeof value === 'undefined') return defaultValue;
-                if (typeof defaultValue === 'number' && isNaN(value)) return defaultValue;
-                return value;
-            } catch (e) {
-                console.warn(`Error getting PBR property '${prop}', using default ${defaultValue}:`, e);
-                // If ANY property fails, maybe we should just use the fallback?
-                // For now, just use the default for the specific property.
-                return defaultValue;
-            }
-        };
-
-        metalness = safeGet('metallic', defaultFallbackMaterial.metalness);
-        roughness = safeGet('roughness', defaultFallbackMaterial.roughness);
-        ior = safeGet('ior', defaultFallbackMaterial.ior || 1.5);
-        transmission = 1.0 - safeGet('opacity', 1.0); // Invert opacity for transmission
-        thickness = safeGet('opacityThickness', 0.0);
-        clearcoat = safeGet('clearcoat', defaultFallbackMaterial.clearcoat || 0.0);
-        clearcoatRoughness = safeGet('clearcoatRoughness', defaultFallbackMaterial.clearcoatRoughness || 0.0);
-        sheen = safeGet('sheen', defaultFallbackMaterial.sheen || 0.0);
-        sheenRoughness = safeGet('sheenRoughness', defaultFallbackMaterial.sheenRoughness || 0.0);
+        // Attempt PBR Conversion within one try block
+        // Any error here will lead to using the fallback material
+        const baseColor = pbrMaterial.baseColor;
+        const color = new THREE.Color(baseColor.r / 255, baseColor.g / 255, baseColor.b / 255);
+        const metalness = pbrMaterial.metallic;
+        const roughness = pbrMaterial.roughness;
+        const ior = pbrMaterial.ior || 1.5; // Provide default if undefined
+        const opacity = pbrMaterial.opacity === undefined ? 1.0 : pbrMaterial.opacity;
+        const transmission = 1.0 - opacity;
+        const thickness = pbrMaterial.opacityThickness || 0.0;
+        const clearcoat = pbrMaterial.clearcoat || 0.0;
+        const clearcoatRoughness = pbrMaterial.clearcoatRoughness || 0.0;
+        const sheen = pbrMaterial.sheen || 0.0;
+        const sheenRoughness = pbrMaterial.sheenRoughness || 0.0;
+        const emissionColor = pbrMaterial.emission || { r: 0, g: 0, b: 0 };
+        const emission = new THREE.Color(emissionColor.r / 255, emissionColor.g / 255, emissionColor.b / 255);
         
-        try {
-             const emissionColor = safeGet('emission', { r: 0, g: 0, b: 0 });
-             emission = new THREE.Color(emissionColor.r / 255, emissionColor.g / 255, emissionColor.b / 255);
-        } catch (e) {
-             console.warn('Error getting emission color, using black:', e);
-             emission = new THREE.Color(0x000000);
+        // Check for NaN values after access, use fallback if any NaN detected
+        if (isNaN(metalness) || isNaN(roughness) || isNaN(ior) || isNaN(transmission) || isNaN(thickness) || 
+            isNaN(clearcoat) || isNaN(clearcoatRoughness) || isNaN(sheen) || isNaN(sheenRoughness)) {
+             console.warn('NaN value detected in PBR properties, using fallback material.');
+             throw new Error('NaN value in PBR properties'); // Trigger fallback
         }
-
 
         const threeMaterial = new THREE.MeshPhysicalMaterial({
             color: color,
@@ -2580,20 +2562,25 @@ function convertRhinoMaterialToThree(rhinoMaterial) {
             sheen: sheen,
             sheenRoughness: sheenRoughness,
             emissive: emission,
-            emissiveIntensity: 1.0, 
+            emissiveIntensity: emission.getHex() > 0 ? 1.0 : 0.0, // Only set intensity if emissive color is not black
             side: THREE.DoubleSide
         });
 
         if (defaultEnvMap) threeMaterial.envMap = defaultEnvMap;
 
-        pbrMaterial.delete(); // Clean up PBR material object
-        console.log('Converted PBR Rhino material (with potential fallbacks)');
+        // console.log('Successfully converted PBR Rhino material'); // Keep logs minimal
         return threeMaterial;
 
     } catch (error) {
-        console.warn('Error converting Rhino material, returning default gold fallback:', error);
-        // Fallback to a default gold material preset if major error occurs
+        // Log only a single warning if PBR conversion fails for any reason
+        console.warn('Error converting Rhino PBR material, using default fallback:', error.message);
+        // Fallback to a default gold material preset if any error occurs
         return defaultFallbackMaterial;
+    } finally {
+         // Clean up PBR material object if it was created
+         if (pbrMaterial) {
+             try { pbrMaterial.delete(); } catch (delErr) { console.warn('Non-critical error deleting PBR material object:', delErr); }
+         }
     }
 }
 
