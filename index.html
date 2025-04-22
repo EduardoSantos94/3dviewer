@@ -130,19 +130,23 @@
         }
 
         #upload-btn {
-            background-color: #28a745;
+            background-color: var(--success-primary, #28a745); /* Use success color, fallback green */
+            color: var(--text-inverted, white);
         }
 
         #upload-btn:hover {
-            background-color: #218838;
+            background-color: var(--success-primary-hover, #218838);
+            color: var(--text-inverted, white);
         }
 
-        #logout-btn {
-            background-color: #dc3545;
+        #logout-btn.nav-btn { /* Increase specificity */
+            background-color: var(--danger-primary, #dc3545); /* Use danger color, fallback red */
+            color: var(--text-inverted, white);
         }
 
-        #logout-btn:hover {
-            background-color: #c82333;
+        #logout-btn.nav-btn:hover {
+            background-color: var(--danger-primary-hover, #c82333);
+            color: var(--text-inverted, white);
         }
 
         .theme-toggle-btn {
@@ -249,15 +253,6 @@
 
         .nav-btn i {
              color: inherit; /* Icons inherit button color */
-        }
-
-        .logout-btn {
-            color: var(--danger-primary); /* Use variable */
-        }
-        
-        .logout-btn:hover {
-            background-color: var(--danger-light); /* Use variable */
-            color: var(--danger-primary-hover); /* Use variable */
         }
 
         /* Adjust main container padding for fixed nav */
@@ -558,6 +553,22 @@
             updateAuthUI(session);
             checkForModelUrl(); // This will now initializeApp inside if no URL, or after fetch if URL exists
         });
+
+        // Add Logout Listener
+        const logoutButton = document.getElementById('logout-btn');
+        if (logoutButton) {
+            logoutButton.addEventListener('click', async () => {
+                try {
+                    const { error } = await supabase.auth.signOut();
+                    if (error) throw error;
+                    // Redirect to login or index after logout
+                    window.location.href = 'login.html'; 
+                } catch (error) {
+                    console.error('Error signing out:', error);
+                    showErrorMessage('Error signing out: ' + error.message);
+                }
+            });
+        }
 
     } catch (error) {
         console.error('Failed to initialize Supabase:', error);

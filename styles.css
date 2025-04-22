@@ -66,6 +66,19 @@
         /* --apple-gold: ... */
         /* --apple-rose: ... */
         /* --apple-white: ... */
+        
+        /* Explicit Dark Mode Styles for Top Nav on Upload Page */
+        .top-nav {
+            background-color: var(--bg-overlay); /* Ensure dark overlay is used */
+            border-bottom: 1px solid var(--border-primary); /* Ensure dark border is used */
+        }
+
+        /* Explicit Dark Mode Styles for Upload Page Model Buttons */
+        .models-grid .view-btn,
+        .models-grid .delete-btn {
+            color: var(--text-primary); /* Use white text/icons in dark mode */
+        }
+        /* You might need similar overrides if these buttons appear elsewhere */
     }
 
 html, body {
