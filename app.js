@@ -3162,6 +3162,21 @@ function applyMaterialToModel(modelIndex, materialType) {
     }
 }
 
+// --- Exports ---
+export {
+    initializeApp,
+    process3DMFile,
+    processOtherFile, // Added export
+    showFrontpage,
+    toggleBackground, // Added other potentially useful exports
+    toggleTurntable,
+    centerSelectedModel,
+    applyMaterialToModel,
+    selectModel,
+    showErrorMessage
+    // Add other functions to export as needed
+};
+
 
 
 
