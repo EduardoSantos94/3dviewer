@@ -8,6 +8,7 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { Rhino3dmLoader } from 'three/addons/loaders/3DMLoader.js';
 import { RGBELoader } from 'three/addons/loaders/RGBELoader.js'; // Import RGBELoader
+import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js'; // Add if using Draco compression
 import * as TWEEN from './lib/tween/tween.module.js';
 import { PLYLoader } from 'three/addons/loaders/PLYLoader.js';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';

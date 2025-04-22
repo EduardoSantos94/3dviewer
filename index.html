@@ -399,10 +399,12 @@
 
 <script type="module">
     import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.3/+esm';
-    import { initializeApp, process3DMFile, showFrontpage } from './app.js';
+    import { initializeApp, process3DMFile, showFrontpage, processOtherFile } from './app.js';
 
     // Make process3DMFile globally available (if needed elsewhere, otherwise remove)
     window.process3DMFile = process3DMFile;
+    // Make processOtherFile globally available if needed (consider if necessary)
+    // window.processOtherFile = processOtherFile;
 
     // Add showErrorMessage function
     window.showErrorMessage = function(message) {
@@ -501,9 +503,21 @@
                     // Create a File object
                     const modelFile = new File([blob], filename, { type: blob.type });
 
-                    // Process the file using the robust process3DMFile function
-                    await process3DMFile(modelFile);
-                    console.log('Model processed successfully via process3DMFile');
+                    // ---- Updated Routing Logic ----
+                    const fileExtension = filename.split('.').pop().toLowerCase();
+
+                    if (fileExtension === '3dm') {
+                        console.log(`Routing to process3DMFile for: ${filename}`);
+                        await process3DMFile(modelFile);
+                    } else if (['obj', 'stl', 'glb', 'gltf'].includes(fileExtension)) {
+                        console.log(`Routing to processOtherFile for: ${filename}`);
+                        await processOtherFile(modelFile);
+                    } else {
+                        throw new Error(`Unsupported file type for viewing: .${fileExtension}`);
+                    }
+                    // ---- End Updated Routing Logic ----
+                    
+                    console.log(`Model processing complete for: ${filename}`);
 
                     // Hide loading indicator
                     if (loadingIndicator) loadingIndicator.style.display = 'none';
