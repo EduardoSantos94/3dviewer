@@ -2147,6 +2147,8 @@ function validateMeshGeometry(geometry) {
 // Helper function to convert Brep to meshes
 async function convertBrepToMeshes(brep, rhino, parentAttributes = null) { // Accept parent attributes
     const meshes = [];
+    let face = null; // Define face and mesh outside loop for safer cleanup
+    let mesh = null;
     try {
         // Create meshing parameters
         const mp = new rhino.MeshingParameters();
@@ -2158,20 +2160,36 @@ async function convertBrepToMeshes(brep, rhino, parentAttributes = null) { // Ac
         // Get Brep faces
         const faces = brep.faces();
         for (let i = 0; i < faces.count; i++) {
-            const face = faces.get(i);
-            const mesh = face.getMesh(rhino.MeshType.Any);
-            
-            if (mesh) {
-                // Pass parentAttributes down
-                const threeMesh = await convertRhinoMeshToThree(mesh, rhino, parentAttributes);
-                if (threeMesh) {
-                    meshes.push(threeMesh);
+            face = null; // Reset for each iteration
+            mesh = null;
+            try { // Start inner try-catch for face processing
+                face = faces.get(i);
+                mesh = face.getMesh(rhino.MeshType.Any);
+                
+                if (mesh) {
+                    // Pass parentAttributes down
+                    const threeMesh = await convertRhinoMeshToThree(mesh, rhino, parentAttributes);
+                    if (threeMesh) {
+                        meshes.push(threeMesh);
+                    }
                 }
-                mesh.delete();
+            } catch (faceError) {
+                 console.error(`Error processing face ${i} within Brep:`, faceError);
+                 // Continue to the next face
+            } finally {
+                 // Safely delete mesh and face if they were assigned
+                 if (mesh) {
+                     try { mesh.delete(); } catch (delErr) { console.warn(`Non-critical error deleting mesh for face ${i}:`, delErr); }
+                 }
+                 if (face) {
+                     try { face.delete(); } catch (delErr) { console.warn(`Non-critical error deleting face ${i}:`, delErr); }
+                 }
             }
-            face.delete();
         }
-        faces.delete();
+        // Safely delete faces collection
+        if (faces) {
+            try { faces.delete(); } catch (delErr) { console.warn('Non-critical error deleting faces collection:', delErr); }
+        }
         
     } catch (error) {
         console.error('Error converting Brep to meshes:', error);
@@ -2429,21 +2447,26 @@ async function process3DMFile(file) {
                 rhinoObject.delete();
 
             } catch (error) {
-                console.error(`Error processing object ${i}:`, error);
+                console.error(`Error processing object index ${i}:`, error);
                 errorCount++;
-                // Ensure cleanup even on error within the loop
-                // Need to check if they were successfully assigned before deleting
-                if (attributes) attributes.delete(); 
-                if (geometry) geometry.delete(); 
-                if (rhinoObject) rhinoObject.delete();
+                // Attempt to clean up even if an error occurred during processing
+                if (geometry) {
+                    try { geometry.delete(); } catch(e) { console.warn(`Non-critical error deleting geometry for object ${i}:`, e); }
+                }
+                if (attributes) {
+                    try { attributes.delete(); } catch(e) { console.warn(`Non-critical error deleting attributes for object ${i}:`, e); }
+                }
+                if (rhinoObject) {
+                    try { rhinoObject.delete(); } catch(e) { console.warn(`Non-critical error deleting rhino object ${i}:`, e); }
+                }
             }
         }
 
-        // Clean up materials array
-        materials.forEach(mat => mat.delete());
-        rhinoMaterials.delete();
-        objects.delete();
-        doc.delete();
+        // Clean up materials array and other top-level objects
+        materials.forEach(mat => { try { mat.delete(); } catch(e) { console.warn('Non-critical error deleting material:', e); } });
+        try { rhinoMaterials.delete(); } catch(e) { console.warn('Non-critical error deleting rhinoMaterials:', e); }
+        try { objects.delete(); } catch(e) { console.warn('Non-critical error deleting objects table:', e); }
+        try { doc.delete(); } catch(e) { console.warn('Non-critical error deleting doc:', e); }
 
         console.log(`Processed ${processedCount} objects, ${errorCount} errors`);
 
@@ -2475,9 +2498,11 @@ async function process3DMFile(file) {
     } catch (error) {
         console.error('Error processing 3DM file:', error);
         hideLoadingIndicator();
-        showErrorMessage(`Failed to load 3DM file: ${error.message}`);
-        // We don't have access to the loop variables here,
-        // so removing the cleanup attempt for attributes/geometry/rhinoObject
+        // Display a more specific error if it's memory related
+        const displayMessage = error.message && error.message.includes('memory access') 
+            ? 'Failed to load 3DM file: Encountered memory access issue. Some parts might be missing or corrupt.' 
+            : `Failed to load 3DM file: ${error.message}`;
+        showErrorMessage(displayMessage);
         throw error;
     }
 }
@@ -2509,7 +2534,7 @@ function convertRhinoMaterialToThree(rhinoMaterial) {
             console.warn('Error getting baseColor from PBR material, using fallback color:', e);
             color = defaultFallbackMaterial.color; // Use fallback color
         }
-        
+
         const safeGet = (prop, defaultValue) => {
             try {
                 const value = pbrMaterial[prop];
@@ -2520,7 +2545,7 @@ function convertRhinoMaterialToThree(rhinoMaterial) {
                 console.warn(`Error getting PBR property '${prop}', using default ${defaultValue}:`, e);
                 // If ANY property fails, maybe we should just use the fallback?
                 // For now, just use the default for the specific property.
-                 return defaultValue;
+                return defaultValue;
             }
         };
 
