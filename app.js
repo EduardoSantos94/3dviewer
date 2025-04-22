@@ -2416,12 +2416,28 @@ async function process3DMFile(file) {
                     const finalMaterial = objectMaterial || (materialPresets[modelInfo.material] ? materialPresets[modelInfo.material].clone() : materialPresets['gold'].clone());
                     if (defaultEnvMap) finalMaterial.envMap = defaultEnvMap;
                     
+                    // Store the original material in userData BEFORE applying overrides
+                    const storeOriginalMaterial = (mesh) => {
+                        if (mesh.isMesh) {
+                            // Clone the material determined for this part (either from file or fallback)
+                            mesh.userData.originalMaterial = finalMaterial.clone();
+                        }
+                    };
+                    
                     if (threeMesh.isGroup) {
+                        threeMesh.traverse(storeOriginalMaterial);
+                        // Now apply the initial material (which might be the same)
                         threeMesh.traverse(child => {
-                            if (child.isMesh) child.material = finalMaterial.clone();
+                             if (child.isMesh) child.material = finalMaterial.clone();
                         });
                     } else {
-                         threeMesh.material = finalMaterial;
+                         storeOriginalMaterial(threeMesh);
+                         threeMesh.material = finalMaterial; // Apply initial material
+                    }
+
+                    // Mark if original materials were potentially loaded
+                    if (objectMaterial) {
+                         modelInfo.hasOriginalMaterials = true;
                     }
                      
                     // Store original Rhino attributes in userData
@@ -2488,6 +2504,9 @@ async function process3DMFile(file) {
 
         // Update UI
         updateLoadedModelsUI();
+
+        // Set initial material state to 'original' if applicable
+        modelInfo.material = modelInfo.hasOriginalMaterials ? 'original' : (currentMaterial || 'gold');
 
         // Center and fit camera
         zoomToFit([modelInfo]);
@@ -3020,6 +3039,18 @@ function selectModel(modelIndex) {
                 }
             });
             console.log('Selected model:', modelData.name || 'Unnamed Model');
+
+            // Update the top material dropdown
+            const materialSelect = document.getElementById('material-select');
+            if (materialSelect) {
+                materialSelect.value = modelData.material || 'original'; // Default to original if not set
+
+                // Disable 'Original' option if the model doesn't have them
+                const originalOption = materialSelect.querySelector('option[value="original"]');
+                if (originalOption) {
+                    originalOption.disabled = !modelData.hasOriginalMaterials;
+                }
+            }
         } else {
              console.warn('Attempted to select invalid model at index:', modelIndex);
         }
@@ -3048,16 +3079,44 @@ function applyMaterialToModel(modelIndex, materialType) {
     
     console.log(`Applying material '${materialType}' to model '${model.name}'`);
     
-    // Apply material to the object and all its children recursively
-    model.object.traverse((child) => {
-        if (child.isMesh) {
-            // Use the original applyMaterial function which handles cloning and env maps
-            applyMaterial(child, materialType);
+    if (materialType === 'original') {
+        model.object.traverse((child) => {
+            if (child.isMesh) {
+                if (child.userData.originalMaterial) {
+                    // Apply the stored original material
+                    child.material = child.userData.originalMaterial.clone();
+                    // Ensure envMap is applied from default if needed
+                    if (defaultEnvMap && !child.material.envMap) {
+                        child.material.envMap = defaultEnvMap;
+                    }
+                    child.material.needsUpdate = true;
+                } else {
+                    // Fallback if no original stored (e.g., for non-3DM parts)
+                    applyMaterial(child, 'gold'); // Apply default gold
+                }
+            }
+        });
+        model.material = 'original'; // Update the stored material type
+        console.log(`Applied original materials to ${model.name}`);
+    } else {
+        // Apply a preset material
+        const materialPreset = materialPresets[materialType];
+        if (!materialPreset) {
+            console.error(`Material preset '${materialType}' not found.`);
+            return;
         }
-    });
-    
-    // Update the model's stored material type
-    model.material = materialType; // Store the selected material type key
+
+        model.object.traverse((child) => {
+            if (child.isMesh) {
+                // Use the original applyMaterial function which handles cloning and env maps
+                applyMaterial(child, materialType);
+            }
+        });
+        
+        // Update the model's stored material type
+        model.material = materialType; // Store the selected material type key
+        console.log(`Applied preset ${materialType} to ${model.name}`);
+    }
     
     // Force a render update to show the new material
     if (renderer && scene && camera) {
