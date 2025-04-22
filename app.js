@@ -3167,7 +3167,6 @@ export {
     initializeApp,
     process3DMFile,
     processOtherFile, // Added export
-    showFrontpage,
     toggleBackground, // Added other potentially useful exports
     toggleTurntable,
     centerSelectedModel,
