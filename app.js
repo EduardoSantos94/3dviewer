@@ -3170,18 +3170,7 @@ function toggleSidebarVisibility() {
     }
 }
 
-// --- Exports --- 
-// Make sure toggleSidebarVisibility is NOT exported unless needed globally
-// ... (existing exports) ...
-export {
-    initializeApp,
-    process3DMFile,   
-    processOtherFile, 
-    showFrontpage,
-    // NEW: Export showPasswordPrompt if it's needed by index.html
-    showPasswordPrompt 
-    // toggleSidebarVisibility // Usually keep this internal
-};
+// ... (toggleSidebarVisibility function ends here) ...
 
 
 
