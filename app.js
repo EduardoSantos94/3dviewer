@@ -3172,6 +3172,42 @@ function toggleSidebarVisibility() {
 
 // ... (toggleSidebarVisibility function ends here) ...
 
+// Add a function to show password prompt (Moved BEFORE export)
+function showPasswordPrompt(callback) {
+    const promptContainer = document.createElement('div');
+    promptContainer.id = 'password-prompt-overlay';
+    promptContainer.style.cssText = `
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background-color: rgba(0,0,0,0.6); display: flex;
+        justify-content: center; align-items: center; z-index: 4000;
+    `;
+    const promptBox = document.createElement('div');
+    promptBox.style.cssText = `
+        background-color: var(--bg-secondary); padding: 25px; border-radius: 8px;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.2); text-align: center;
+    `;
+    promptBox.innerHTML = `
+        <h3 style="margin-bottom: 15px; color: var(--text-primary);">Access Code Required</h3>
+        <p style="margin-bottom: 15px; color: var(--text-secondary);">Please enter the access code to view this model:</p>
+        <input type="password" id="share-access-code" placeholder="Access Code" style="width: 90%; padding: 10px; margin-bottom: 15px; border: 1px solid var(--border-secondary); border-radius: 4px; background-color: var(--bg-tertiary); color: var(--text-primary);"/>
+        <button id="submit-access-code" style="padding: 10px 20px; background-color: var(--accent-primary); color: var(--text-inverted); border: none; border-radius: 4px; cursor: pointer;">Submit</button>
+        <button id="cancel-access-code" style="padding: 10px 15px; background-color: var(--bg-tertiary); color: var(--text-secondary); border: none; border-radius: 4px; cursor: pointer; margin-left: 10px;">Cancel</button>
+    `;
+    promptContainer.appendChild(promptBox);
+    document.body.appendChild(promptContainer);
+
+    document.getElementById('submit-access-code').onclick = () => {
+        const code = document.getElementById('share-access-code').value;
+        document.body.removeChild(promptContainer);
+        callback(code);
+    };
+    document.getElementById('cancel-access-code').onclick = () => {
+         document.body.removeChild(promptContainer);
+         callback(null); // Indicate cancellation
+         showFrontpage(); // Or go back to some default state
+    };
+}
+
 
 
 
