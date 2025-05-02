@@ -1899,4 +1899,47 @@ select:focus {
 
 .model-list > h3:not(:first-of-type) {
     display: none;
-} 
+}
+
+/* Sidebar Toggle Button */
+#toggle-sidebar-btn {
+    position: absolute;
+    top: 15px; /* Adjust as needed */
+    right: 15px; /* Adjust as needed */
+    z-index: 100; /* Ensure it's above the viewer canvas */
+    background-color: var(--bg-secondary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-primary);
+    border-radius: 50%; /* Make it circular */
+    width: 40px;
+    height: 40px;
+    font-size: 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 5px var(--shadow-color-medium);
+    transition: all 0.2s ease;
+}
+
+#toggle-sidebar-btn:hover {
+    background-color: var(--bg-tertiary);
+    transform: scale(1.1);
+}
+
+/* Sidebar Visibility Control */
+.sidebar.hidden {
+    display: none; /* Simple hide/show */
+    /* Or use transform for animation: */
+    /* transform: translateX(100%); */
+    /* transition: transform 0.3s ease-in-out; */
+}
+
+/* Adjust viewer layout when sidebar is hidden */
+.viewer-layout .viewer-area {
+    /* No change needed if just using display:none */
+    /* If using transform, might need width adjustment */
+}
+
+/* Ensure main container takes full height */
+/* ... rest of CSS ... */ 

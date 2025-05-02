@@ -813,6 +813,15 @@ function setupEventListeners() {
         console.error('Renderer DOM element not found or not initialized yet!');
     }
     
+    // Add listener for the new sidebar toggle button
+    const toggleSidebarBtn = document.getElementById('toggle-sidebar-btn');
+    if (toggleSidebarBtn) {
+        toggleSidebarBtn.addEventListener('click', toggleSidebarVisibility);
+        console.log('Sidebar toggle button initialized');
+    } else {
+        console.error('Sidebar toggle button not found!');
+    }
+    
     console.log('All event listeners set up successfully');
 }
 
@@ -3142,6 +3151,55 @@ export {
     // applyMaterialToModel,
     // selectModel,
     // showErrorMessage
+};
+
+// Add this function
+function toggleSidebarVisibility() {
+    const sidebar = document.querySelector('.sidebar');
+    const toggleBtnIcon = document.querySelector('#toggle-sidebar-btn i');
+    if (sidebar && toggleBtnIcon) {
+        sidebar.classList.toggle('hidden');
+        const isHidden = sidebar.classList.contains('hidden');
+        // Change icon based on state
+        toggleBtnIcon.className = `fas ${isHidden ? 'fa-bars' : 'fa-times'}`;
+        // Optional: Trigger resize to adjust canvas
+        window.dispatchEvent(new Event('resize'));
+    } else {
+        console.error('Sidebar or toggle button not found');
+    }
+}
+
+// Modify setupEventListeners to add listener for the new button
+function setupEventListeners() {
+    console.log('Setting up event listeners...');
+    
+    // ... (existing listeners for start-viewing, select-files, file-input, drop-zone, material-select, etc.) ...
+
+    // Add listener for the new sidebar toggle button
+    const toggleSidebarBtn = document.getElementById('toggle-sidebar-btn');
+    if (toggleSidebarBtn) {
+        toggleSidebarBtn.addEventListener('click', toggleSidebarVisibility);
+        console.log('Sidebar toggle button initialized');
+    } else {
+        console.error('Sidebar toggle button not found!');
+    }
+    
+    // ... (rest of existing listeners for center, turntable, background, lights, renderer click) ...
+    
+    console.log('All event listeners set up successfully');
+}
+
+// --- Exports --- 
+// Make sure toggleSidebarVisibility is NOT exported unless needed globally
+// ... (existing exports) ...
+export {
+    initializeApp,
+    process3DMFile,   
+    processOtherFile, 
+    showFrontpage,
+    // NEW: Export showPasswordPrompt if it's needed by index.html
+    showPasswordPrompt 
+    // toggleSidebarVisibility // Usually keep this internal
 };
 
 

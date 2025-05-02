@@ -355,6 +355,10 @@
         <div class="viewer-layout">
             <div class="viewer-area">
                 <div id="viewer-container"></div>
+                <!-- Add Sidebar Toggle Button -->
+                <button id="toggle-sidebar-btn" title="Toggle Sidebar">
+                    <i class="fas fa-bars"></i>
+                </button>
             </div>
             <div class="sidebar">
                 <div class="controls-panel">
@@ -527,11 +531,14 @@
 
                  console.log(`Shared model processing complete for: ${filename}`);
 
-                 // Optionally hide controls irrelevant for shared view
-                 const controlsPanel = document.querySelector('.sidebar .controls-panel');
-                 const modelListPanel = document.querySelector('.sidebar .model-list');
-                 if(controlsPanel) controlsPanel.style.display = 'none';
-                 if(modelListPanel) modelListPanel.style.display = 'none';
+                 // Hide sidebar by default for shared view using the class
+                 const sidebar = document.querySelector('.sidebar');
+                 if (sidebar) {
+                    sidebar.classList.add('hidden');
+                    // Ensure toggle button icon is correct initially
+                    const toggleBtnIcon = document.querySelector('#toggle-sidebar-btn i');
+                    if (toggleBtnIcon) toggleBtnIcon.className = 'fas fa-bars';
+                 }
 
              } catch (error) {
                  console.error('Error loading shared model:', error);
