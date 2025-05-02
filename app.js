@@ -3143,7 +3143,8 @@ export {
     initializeApp,
     process3DMFile,   // Added back
     processOtherFile,
-    showFrontpage     // Added back
+    showFrontpage,     // Added back
+    showPasswordPrompt // Make sure this is exported for index.html
     // Keep others commented out for now unless needed
     // toggleBackground, 
     // toggleTurntable,
