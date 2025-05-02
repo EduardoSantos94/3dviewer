@@ -425,9 +425,45 @@
         </div>
     </main>
 
+    <!-- Share Modal -->
+    <div id="share-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Share Model</h2>
+                <button id="close-share-modal" class="close-btn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p>Choose sharing options for: <strong id="share-model-name"></strong></p>
+                
+                <div class="form-group">
+                    <label>
+                        <input type="radio" name="share-option" value="public" checked> Public Link (Anyone can view)
+                    </label>
+                </div>
+                <div class="form-group">
+                    <label>
+                        <input type="radio" name="share-option" value="password"> Password Protected
+                    </label>
+                    <input type="password" id="share-password" placeholder="Enter password" style="display: none; margin-top: 5px;"/>
+                </div>
+
+                <button id="generate-share-link-btn" class="primary-btn" style="width: 100%; margin-top: 1rem;">Generate Link</button>
+
+                <div id="generated-link-container" style="display: none; margin-top: 1.5rem;">
+                    <p>Shareable Link:</p>
+                    <div style="display: flex; gap: 5px;">
+                        <input type="text" id="generated-link" readonly style="flex-grow: 1; padding: 8px; border: 1px solid var(--border-secondary); border-radius: 4px; background-color: var(--bg-tertiary);">
+                        <button id="copy-link-btn" class="secondary-btn" style="padding: 8px 12px;"><i class="fas fa-copy"></i> Copy</button>
+                    </div>
+                </div>
+                <p id="share-error-message" class="error-message" style="display: none; margin-top: 1rem;"></p>
+            </div>
+        </div>
+    </div>
+
     <div id="loading-overlay" class="loading-overlay" style="display: none;">
         <div class="loading-spinner"></div>
-        <p style="margin-top: 1rem; color: #333;">Uploading...</p>
+        <p style="margin-top: 1rem; color: #333;">Processing...</p>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>

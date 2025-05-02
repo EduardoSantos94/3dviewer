@@ -445,16 +445,117 @@
                 if (loginInfo) loginInfo.style.display = 'flex';
             }
         }
+        
+        // --- NEW: Function to handle loading shared model ---
+        async function loadSharedModel(shareId) {
+             try {
+                 // Hide frontpage, show loading
+                 const frontpage = document.getElementById('frontpage');
+                 const loadingIndicator = document.getElementById('loading-indicator');
+                 const container = document.querySelector('.container');
+                 const dropZone = document.getElementById('drop-zone');
 
-        // Check for model URL parameter
-        async function checkForModelUrl() {
+                 if (frontpage) frontpage.style.display = 'none';
+                 if (loadingIndicator) loadingIndicator.style.display = 'flex';
+                 if (container) container.style.display = 'block'; // Show viewer container
+                 if (dropZone) dropZone.style.display = 'none';
+
+                 // Initialize the viewer first
+                 await initializeApp();
+                 console.log('Viewer initialized, attempting to load shared model...');
+
+                 // 1. Check if link requires password (using anon client)
+                 const { data: shareInfo, error: checkError } = await supabase
+                    .from('shared_links')
+                    .select('access_code, file_path') // Select file_path too
+                    .eq('id', shareId)
+                    .single();
+
+                 if (checkError || !shareInfo) {
+                     throw new Error('Invalid or expired share link.');
+                 }
+                 
+                 let accessCodeInput = null;
+                 if (shareInfo.access_code) {
+                    // Use the showPasswordPrompt function from app.js
+                    // Need to wrap this in a Promise to wait for user input
+                    accessCodeInput = await new Promise((resolve) => {
+                        window.showPasswordPrompt(resolve);
+                    });
+                     
+                    if (accessCodeInput === null) { // User cancelled
+                         console.log('Password prompt cancelled.');
+                         showFrontpage(); // Go back to frontpage
+                         return;
+                     }
+                 }
+
+                 // 2. Call the Edge Function to get the signed URL
+                 const { data: functionData, error: functionError } = await supabase.functions.invoke('get-shared-model-url', {
+                     body: { shareId: shareId, accessCode: accessCodeInput }
+                 });
+
+                 if (functionError) {
+                     // Attempt to parse Supabase Edge Function error
+                     let errMsg = functionError.message;
+                     try {
+                         const errJson = JSON.parse(functionError.context?.responseText || '{}');
+                         errMsg = errJson.error || errMsg;
+                     } catch (e) {/* Ignore parsing error */}
+                     throw new Error(`Error retrieving shared model: ${errMsg}`);
+                 }
+                 
+                 if (!functionData || !functionData.signedUrl || !functionData.filePath) {
+                      throw new Error('Could not retrieve secure model link.');
+                 }
+
+                 const signedUrl = functionData.signedUrl;
+                 const modelFilePath = functionData.filePath; // Get the original file path
+                 const filename = modelFilePath.split('/').pop(); // Extract filename
+                 const fileExtension = filename.split('.').pop().toLowerCase();
+
+                 console.log(`Received signed URL for: ${filename}`);
+
+                 // 3. Load the model using the signed URL and filename
+                 if (fileExtension === '3dm') {
+                     await process3DMFile(signedUrl, filename); // Pass URL and filename
+                 } else if (['obj', 'stl', 'glb', 'gltf'].includes(fileExtension)) {
+                     await processOtherFile(signedUrl, filename); // Pass URL and filename
+                 } else {
+                     throw new Error(`Unsupported shared file type: .${fileExtension}`);
+                 }
+
+                 console.log(`Shared model processing complete for: ${filename}`);
+
+                 // Optionally hide controls irrelevant for shared view
+                 const controlsPanel = document.querySelector('.sidebar .controls-panel');
+                 const modelListPanel = document.querySelector('.sidebar .model-list');
+                 if(controlsPanel) controlsPanel.style.display = 'none';
+                 if(modelListPanel) modelListPanel.style.display = 'none';
+
+             } catch (error) {
+                 console.error('Error loading shared model:', error);
+                 showErrorMessage('Failed to load shared model: ' + error.message);
+                 showFrontpage(); // Show frontpage on error
+             } finally {
+                 const loadingIndicator = document.getElementById('loading-indicator');
+                 if (loadingIndicator) loadingIndicator.style.display = 'none';
+             }
+        }
+
+        // --- MODIFIED: Check for shareId or model URL parameter ---
+        async function checkUrlParamsAndInit() {
             const urlParams = new URLSearchParams(window.location.search);
-            const modelUrl = urlParams.get('model');
-            const filenameParam = urlParams.get('filename'); // Use filename if provided
-            
-            if (modelUrl) {
+            const shareId = urlParams.get('shareId');
+            const modelUrl = urlParams.get('model'); // Keep old logic as fallback
+            const filenameParam = urlParams.get('filename');
+
+            if (shareId) {
+                // Handle shared link loading
+                await loadSharedModel(shareId);
+            } else if (modelUrl) {
+                // --- Keep existing model URL logic as fallback --- 
                 try {
-                    // Hide frontpage and show loading indicator
                     const frontpage = document.getElementById('frontpage');
                     const loadingIndicator = document.getElementById('loading-indicator');
                     const container = document.querySelector('.container');
@@ -465,88 +566,53 @@
                     if (container) container.style.display = 'block';
                     if (dropZone) dropZone.style.display = 'none';
 
-                    // Initialize the viewer first
-                    await initializeApp();
-                    console.log('Viewer initialized, attempting to fetch model from URL...');
+                    await initializeApp(); 
+                    console.log('Viewer initialized, attempting to fetch model from URL (legacy method)...');
 
-                    // Fetch the model data from the signed URL
                     const response = await fetch(decodeURIComponent(modelUrl));
-                    if (!response.ok) {
-                        throw new Error(`Failed to fetch model: ${response.status} ${response.statusText}`);
-                    }
+                    if (!response.ok) throw new Error(`Failed to fetch model: ${response.status}`);
                     const blob = await response.blob();
-                    console.log('Model data fetched successfully, size:', blob.size);
-
-                    // Determine filename
-                    console.log(`Raw filename param: ${filenameParam}`); // Log raw param
-                    let filename = filenameParam ? decodeURIComponent(filenameParam) : 'model_from_url.3dm';
-                    console.log(`Decoded filename param: ${filenameParam ? decodeURIComponent(filenameParam) : 'null'}`); // Log decoded
+                    let filename = filenameParam ? decodeURIComponent(filenameParam) : 'model_from_url';
+                    // ... (rest of filename determination logic from original checkForModelUrl) ...
+                     if (!filename || filename.trim() === '') { filename = 'model_from_url.3dm'; }
+                     if (!filename.includes('.')) {
+                         const urlPath = new URL(decodeURIComponent(modelUrl)).pathname;
+                         const urlExt = urlPath.split('.').pop();
+                         filename = `${filename}.${urlExt && urlExt.length <= 4 ? urlExt : '3dm'}`;
+                     }
                     
-                    // Add check if filename is empty after decoding
-                    if (!filename || filename.trim() === '') {
-                        console.warn('Filename parameter was empty or invalid, defaulting.');
-                        filename = 'model_from_url.3dm';
-                    }
-
-                    if (!filename.includes('.')) {
-                        // Attempt to guess extension from URL if filename lacks one
-                        const urlPath = new URL(decodeURIComponent(modelUrl)).pathname;
-                        const urlExt = urlPath.split('.').pop();
-                        if (urlExt && urlExt.length <= 4) { // Basic check for extension
-                            filename = `${filename}.${urlExt}`;
-                        } else {
-                            filename = `${filename}.3dm`; // Default to .3dm
-                        }
-                    }
-                    console.log('Using filename:', filename);
-
-                    // Create a File object
                     const modelFile = new File([blob], filename, { type: blob.type });
-
-                    // ---- Updated Routing Logic ----
                     const fileExtension = filename.split('.').pop().toLowerCase();
 
                     if (fileExtension === '3dm') {
-                        console.log(`Routing to process3DMFile for: ${filename}`);
                         await process3DMFile(modelFile);
                     } else if (['obj', 'stl', 'glb', 'gltf'].includes(fileExtension)) {
-                        console.log(`Routing to processOtherFile for: ${filename}`);
                         await processOtherFile(modelFile);
                     } else {
-                        throw new Error(`Unsupported file type for viewing: .${fileExtension}`);
+                        throw new Error(`Unsupported file type: .${fileExtension}`);
                     }
-                    // ---- End Updated Routing Logic ----
-                    
-                    console.log(`Model processing complete for: ${filename}`);
+                    console.log(`Legacy model processing complete for: ${filename}`);
 
-                    // Hide loading indicator
-                    if (loadingIndicator) loadingIndicator.style.display = 'none';
                 } catch (error) {
-                    console.error('Error loading model from URL:', error);
-                    const loadingIndicator = document.getElementById('loading-indicator');
-                    if (loadingIndicator) loadingIndicator.style.display = 'none';
+                    console.error('Error loading model from legacy URL:', error);
                     showErrorMessage('Failed to load model: ' + error.message);
-                    // Optionally show the frontpage again or drop zone on error
-                    const frontpage = document.getElementById('frontpage');
-                    if (frontpage) frontpage.style.display = 'flex';
+                    showFrontpage();
+                } finally {
+                     const loadingIndicator = document.getElementById('loading-indicator');
+                     if (loadingIndicator) loadingIndicator.style.display = 'none';
                 }
+                // --- End of legacy model URL logic --- 
             } else {
-                // If no model URL, initialize app normally and show frontpage
-                console.log('No model URL found, initializing app normally.');
+                // No shareId or modelUrl - Normal Initialization
+                console.log('No share or model URL found, initializing app normally.');
                 const loadingIndicator = document.getElementById('loading-indicator');
                 if (loadingIndicator) loadingIndicator.style.display = 'flex';
-                
                 try {
                     await initializeApp();
-                    // Explicitly show the front page after init
-                    showFrontpage(); 
+                    showFrontpage();
                 } catch (error) {
                      console.error('Error initializing app normally:', error);
-                     if (window.showErrorMessage) {
-                        window.showErrorMessage('Error initializing viewer: ' + error.message);
-                     } else {
-                         alert('Error initializing viewer: ' + error.message);
-                     }
+                     showErrorMessage('Error initializing viewer: ' + error.message);
                 } finally {
                     if (loadingIndicator) loadingIndicator.style.display = 'none';
                 }
@@ -557,15 +623,14 @@
         supabase.auth.onAuthStateChange((event, session) => {
             console.log(`Auth event: ${event}`, session ? session.user?.email : 'No session');
             updateAuthUI(session);
-            // Re-check model URL on sign-in potentially?
-            // Or assume page reload handles it.
         });
 
-        // Check initial session and load model if URL parameter exists
+        // --- MODIFIED: Check initial session and THEN check URL params ---
         supabase.auth.getSession().then(({ data: { session } }) => {
             console.log('Initial session check:', session ? session.user?.email : 'No session');
             updateAuthUI(session);
-            checkForModelUrl(); // This will now initializeApp inside if no URL, or after fetch if URL exists
+            // Now call the function that handles URL params and initialization
+            checkUrlParamsAndInit(); 
         });
 
         // Add Logout Listener
@@ -575,7 +640,6 @@
                 try {
                     const { error } = await supabase.auth.signOut();
                     if (error) throw error;
-                    // Redirect to login or index after logout
                     window.location.href = 'login.html'; 
                 } catch (error) {
                     console.error('Error signing out:', error);

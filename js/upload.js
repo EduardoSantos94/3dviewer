@@ -52,13 +52,14 @@ function createModelCard(file) {
             <div class="model-name">${originalName}</div>
             <div class="model-meta">${formattedSize} MB • ${timestamp}</div>
             <div class="model-actions">
-                <button class="model-btn view-btn" onclick="window.viewModel('${file.name}', '${originalName}')">
+                <button class="model-btn view-btn" title="View Model" onclick="viewModel('${file.name}', '${originalName}')">
                     <i class="fas fa-eye"></i>
-                    View
                 </button>
-                <button class="model-btn delete-btn" onclick="window.deleteFile('${file.name}')">
+                <button class="model-btn share-btn" title="Share Model" onclick="showShareModal('${file.name}', '${originalName}')">
+                    <i class="fas fa-share-alt"></i>
+                </button>
+                <button class="model-btn delete-btn" title="Delete Model" onclick="deleteModel('${file.name}')">
                     <i class="fas fa-trash"></i>
-                    Delete
                 </button>
             </div>
         </div>
@@ -645,4 +646,179 @@ function updateAuthUI(session) {
         if (userInfo) userInfo.style.display = 'none';
         if (loginInfo) loginInfo.style.display = 'flex';
     }
-} 
+}
+
+// --- Share Link Functionality ---
+
+let currentShareStoredName = null;
+let currentShareOriginalName = null;
+
+// Function to show the share modal
+window.showShareModal = function(storedName, originalName) {
+    currentShareStoredName = storedName;
+    currentShareOriginalName = originalName;
+    
+    const modal = document.getElementById('share-modal');
+    const modelNameSpan = document.getElementById('share-model-name');
+    const generatedLinkContainer = document.getElementById('generated-link-container');
+    const errorMessage = document.getElementById('share-error-message');
+    const passwordInput = document.getElementById('share-password');
+    const radioPublic = document.querySelector('input[name="share-option"][value="public"]');
+    
+    if (modal && modelNameSpan && generatedLinkContainer && errorMessage && passwordInput && radioPublic) {
+        modelNameSpan.textContent = originalName || storedName;
+        generatedLinkContainer.style.display = 'none'; // Hide previous link
+        errorMessage.style.display = 'none';
+        passwordInput.value = ''; // Clear password
+        passwordInput.style.display = 'none'; // Hide password input initially
+        radioPublic.checked = true; // Default to public
+        modal.style.display = 'flex';
+    } else {
+        console.error('Share modal elements not found!');
+    }
+}
+
+// Function to close the share modal
+function closeShareModal() {
+    const modal = document.getElementById('share-modal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+}
+
+// Function to hash the password (simple example using SubtleCrypto)
+async function hashPassword(password) {
+    if (!password) return null;
+    try {
+        const encoder = new TextEncoder();
+        const data = encoder.encode(password);
+        const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        return hashHex;
+    } catch (error) {
+        console.error('Error hashing password:', error);
+        throw new Error('Could not process password.');
+    }
+}
+
+// Function to create the share link in Supabase
+async function createShareLink() {
+    const storedName = currentShareStoredName;
+    const errorMessage = document.getElementById('share-error-message');
+    const generatedLinkContainer = document.getElementById('generated-link-container');
+    const generatedLinkInput = document.getElementById('generated-link');
+    const generateBtn = document.getElementById('generate-share-link-btn');
+    const loadingOverlay = document.getElementById('loading-overlay');
+
+    if (!storedName || !errorMessage || !generatedLinkContainer || !generatedLinkInput || !generateBtn || !loadingOverlay) {
+        console.error('Required elements for createShareLink not found');
+        showError('Share Error', 'UI elements missing.');
+        return;
+    }
+
+    errorMessage.style.display = 'none';
+    generateBtn.disabled = true;
+    loadingOverlay.style.display = 'flex';
+
+    try {
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        if (sessionError || !session?.user) {
+            throw new Error('Authentication required.');
+        }
+        const userId = session.user.id;
+        const filePath = `${userId}/${storedName}`;
+        
+        const shareOption = document.querySelector('input[name="share-option"]:checked').value;
+        let accessCode = null;
+        let hashedCode = null;
+        
+        if (shareOption === 'password') {
+            accessCode = document.getElementById('share-password').value;
+            if (!accessCode) {
+                throw new Error('Password cannot be empty for protected link.');
+            }
+            hashedCode = await hashPassword(accessCode); // Hash the password
+        }
+
+        // Insert into shared_links table
+        const { data: insertData, error: insertError } = await supabase
+            .from('shared_links')
+            .insert({
+                user_id: userId,
+                file_path: filePath,
+                access_code: hashedCode // Store the hashed code (or null)
+                // expires_at: can be set here if needed
+            })
+            .select('id') // Select the generated ID
+            .single(); // Expect a single row back
+
+        if (insertError) {
+            console.error('Supabase insert error:', insertError);
+            throw new Error(`Failed to create share link: ${insertError.message}`);
+        }
+
+        if (!insertData || !insertData.id) {
+            throw new Error('Failed to retrieve share link ID after creation.');
+        }
+
+        const shareId = insertData.id;
+        const shareUrl = `${window.location.origin}/index.html?shareId=${shareId}`;
+
+        generatedLinkInput.value = shareUrl;
+        generatedLinkContainer.style.display = 'block';
+
+    } catch (error) {
+        console.error('Error creating share link:', error);
+        errorMessage.textContent = error.message;
+        errorMessage.style.display = 'block';
+        generatedLinkContainer.style.display = 'none';
+    } finally {
+        generateBtn.disabled = false;
+        loadingOverlay.style.display = 'none';
+    }
+}
+
+// Event Listeners for Share Modal
+document.addEventListener('DOMContentLoaded', () => {
+    const closeModalBtn = document.getElementById('close-share-modal');
+    const shareOptions = document.querySelectorAll('input[name="share-option"]');
+    const passwordInput = document.getElementById('share-password');
+    const generateBtn = document.getElementById('generate-share-link-btn');
+    const copyBtn = document.getElementById('copy-link-btn');
+    const generatedLinkInput = document.getElementById('generated-link');
+
+    if (closeModalBtn) {
+        closeModalBtn.addEventListener('click', closeShareModal);
+    }
+
+    if (passwordInput) {
+        shareOptions.forEach(radio => {
+            radio.addEventListener('change', () => {
+                passwordInput.style.display = radio.value === 'password' ? 'block' : 'none';
+            });
+        });
+    }
+
+    if (generateBtn) {
+        generateBtn.addEventListener('click', createShareLink);
+    }
+
+    if (copyBtn && generatedLinkInput) {
+        copyBtn.addEventListener('click', () => {
+            generatedLinkInput.select();
+            try {
+                document.execCommand('copy');
+                copyBtn.innerHTML = '<i class="fas fa-check"></i> Copied!';
+                setTimeout(() => {
+                     copyBtn.innerHTML = '<i class="fas fa-copy"></i> Copy';
+                }, 2000);
+            } catch (err) {
+                console.error('Failed to copy link:', err);
+                alert('Failed to copy link. Please copy manually.');
+            }
+        });
+    }
+});
+
+// --- End Share Link Functionality --- 
