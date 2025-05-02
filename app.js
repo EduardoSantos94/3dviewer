@@ -3170,26 +3170,6 @@ function toggleSidebarVisibility() {
     }
 }
 
-// Modify setupEventListeners to add listener for the new button
-function setupEventListeners() {
-    console.log('Setting up event listeners...');
-    
-    // ... (existing listeners for start-viewing, select-files, file-input, drop-zone, material-select, etc.) ...
-
-    // Add listener for the new sidebar toggle button
-    const toggleSidebarBtn = document.getElementById('toggle-sidebar-btn');
-    if (toggleSidebarBtn) {
-        toggleSidebarBtn.addEventListener('click', toggleSidebarVisibility);
-        console.log('Sidebar toggle button initialized');
-    } else {
-        console.error('Sidebar toggle button not found!');
-    }
-    
-    // ... (rest of existing listeners for center, turntable, background, lights, renderer click) ...
-    
-    console.log('All event listeners set up successfully');
-}
-
 // --- Exports --- 
 // Make sure toggleSidebarVisibility is NOT exported unless needed globally
 // ... (existing exports) ...
