@@ -567,12 +567,22 @@
                     
                     const modelUrl = signedUrlData.signedUrl;
                     
-                    // Display title and description
+                    // Display title and description SAFELY
+                    const modelInfoElement = document.getElementById('model-info');
                     const modelTitleElement = document.getElementById('model-title');
                     const modelDescriptionElement = document.getElementById('model-description');
-                    if (modelTitleElement) modelTitleElement.textContent = shareTitle || originalFilename || 'Shared Model';
-                    if (modelDescriptionElement) modelDescriptionElement.textContent = shareDescription || '';
-                    document.getElementById('model-info').style.display = (shareTitle || shareDescription) ? 'block' : 'none';
+                    
+                    if (modelTitleElement) {
+                        modelTitleElement.textContent = shareTitle || originalFilename || 'Shared Model';
+                    }
+                    if (modelDescriptionElement) {
+                        modelDescriptionElement.textContent = shareDescription || '';
+                    }
+                    if (modelInfoElement) {
+                         modelInfoElement.style.display = (shareTitle || shareDescription) ? 'block' : 'none';
+                    } else {
+                         console.warn('#model-info element not found when trying to display title/description.');
+                    }
 
                     // Load the model using the signed URL and retrieved file type
                     if (fileType === '3dm') {
