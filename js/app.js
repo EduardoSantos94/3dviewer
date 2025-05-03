@@ -104,4 +104,21 @@ function zoomToFit(model) {
 
     // Update the camera's near and far planes based on the model size
     // ... (rest of the function)
-} 
+}
+
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.2; // Keep initial value, adjust later if needed
+
+// Append renderer to the correct container
+const mainContentElement = document.getElementById('main-content');
+if (mainContentElement) {
+    mainContentElement.appendChild(renderer.domElement);
+} else {
+    console.error("'main-content' element not found. Cannot append renderer.");
+    // Fallback to body or show error
+    document.body.appendChild(renderer.domElement);
+    showErrorMessage("Viewer container not found. Display might be incorrect.");
+}
+
+// Initialize post-processing
+composer = new EffectComposer(renderer); 
