@@ -594,8 +594,13 @@
                     if (container) container.style.display = 'block';
                     if (dropZone) dropZone.style.display = 'none';
 
-                    await initializeApp(); 
+                    const initSuccess = await initializeApp(); 
                     console.log('Viewer initialized, attempting to fetch model from URL (legacy method)...');
+                    
+                    // Check if initialization was successful before proceeding
+                    if (!initSuccess) {
+                        throw new Error("Viewer initialization failed. Cannot load model.");
+                    }
 
                     const response = await fetch(decodeURIComponent(modelUrl));
                     if (!response.ok) throw new Error(`Failed to fetch model: ${response.status}`);

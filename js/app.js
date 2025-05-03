@@ -162,6 +162,11 @@ async function init() {
     // Initialize post-processing
     composer = new EffectComposer(renderer);
     // ... (rest of init, composer setup, lights, controls, etc.) ...
+
+    // Start the animation loop ONLY ONCE at the end of initialization
+    animate();
+    
+    return true;
 }
 
 function onWindowResize() {
