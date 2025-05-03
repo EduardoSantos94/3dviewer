@@ -107,120 +107,84 @@ function zoomToFit(model) {
     // ... (rest of near/far plane update)
 }
 
-async function init() {
-    // Wait for DOM content to be fully loaded before proceeding
-    if (document.readyState === 'loading') {
-        console.log("DOM not ready yet, waiting...");
-        await new Promise(resolve => document.addEventListener('DOMContentLoaded', resolve));
-        console.log("DOM ready, proceeding with init.");
-    } else {
-        console.log("DOM already ready, proceeding with init.");
-    }
+export async function init() {
+    console.log('Initializing application...');
+    try {
+        await setupRhino();
+        console.log('Rhino3dm setup complete.');
 
-    // Create scene
-    scene = new THREE.Scene();
-    // Initial background setting (will be replaced by gradient/HDR)
-    scene.background = new THREE.Color(0xf0f0f0); // Default light gray
-    
-    // Setup camera
-    camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
-    camera.position.set(5, 5, 5);
-    camera.lookAt(0, 0, 0);
+        const readyStateCheckInterval = setInterval(async function() {
+            if (document.readyState === 'complete' || document.readyState === 'interactive') {
+                clearInterval(readyStateCheckInterval);
+                console.log('DOM is ready, proceeding with init.');
 
-    // Find the existing canvas element (should exist now)
-    const canvas = document.getElementById('viewer-canvas');
-    if (!canvas) {
-        // This should theoretically not happen now, but keep the check
-        console.error("Canvas element #viewer-canvas still not found!");
-        showErrorMessage("Critical error: Viewer canvas element missing.");
-        throw new Error("Required canvas element #viewer-canvas not found.");
-    }
+                try {
+                    // Ensure the target container exists
+                    const container = document.getElementById('main-content'); // Changed ID here
+                    if (!container) {
+                        console.error('Initialization Error: Target container #main-content not found in the DOM.');
+                        showErrorMessage('Initialization failed: Viewer container missing.');
+                        return; // Stop initialization
+                    }
+                    console.log('Target container #main-content found.');
 
-     // Setup renderer using the existing canvas
-    renderer = new THREE.WebGLRenderer({
-        canvas: canvas, // Use the existing canvas
-        antialias: true,
-        powerPreference: "high-performance",
-        preserveDrawingBuffer: true // Needed for screenshots
-    });
-    const container = canvas.parentElement || document.getElementById('main-content'); // Get container size
-    if (container) {
-         renderer.setSize(container.clientWidth, container.clientHeight);
-    } else {
-         renderer.setSize(window.innerWidth, window.innerHeight); // Fallback
-    }
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    renderer.outputColorSpace = THREE.SRGBColorSpace;
-    renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.2; 
+                    scene = new THREE.Scene();
+                    camera = new THREE.PerspectiveCamera(75, container.clientWidth / container.clientHeight, 0.1, 1000);
+                    camera.position.set(0, 0, 10); // Adjust initial camera position
 
-    // Initialize post-processing
-    composer = new EffectComposer(renderer);
-    const renderPass = new RenderPass(scene, camera);
-    composer.addPass(renderPass);
-    
-    bloomPass = new UnrealBloomPass(
-        new THREE.Vector2(window.innerWidth, window.innerHeight),
-        0.2,   
-        0.5,   
-        0.8    
-    );
-    composer.addPass(bloomPass);
-    
-    // Setup lights (including Hemisphere)
-    setupLights();
-    
-    // Setup controls
-    setupControls();
-    
-    // Load HDR Environment Map
-    await loadEnvironment(renderer); // Load the default HDR
+                    renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+                    renderer.setSize(container.clientWidth, container.clientHeight);
+                    renderer.setPixelRatio(window.devicePixelRatio);
+                    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+                    renderer.toneMappingExposure = 1.0;
+                    renderer.outputColorSpace = THREE.SRGBColorSpace; // Correct color space
 
-    // Create gradient background texture (but don't apply yet)
-    createGradientBackground(); 
+                    console.log('Renderer initialized:', renderer);
+                    console.log('Renderer DOM element:', renderer.domElement);
 
-    // Apply initial background based on default mode
-    applyBackground(); 
-    
-    // Update all material presets with the default environment map (if loaded)
-    if (defaultEnvMap) {
-        Object.values(materialPresets).forEach(material => {
-            if (material.envMap !== undefined) {
-                material.envMap = defaultEnvMap;
-                material.needsUpdate = true;
+                    // Append renderer
+                    container.appendChild(renderer.domElement); // Appending to #main-content
+                    console.log('Renderer appended to #main-content.');
+
+                    controls = new OrbitControls(camera, renderer.domElement);
+                    controls.enableDamping = true;
+                    controls.dampingFactor = 0.05;
+                    controls.screenSpacePanning = false;
+                    controls.minDistance = 1;
+                    controls.maxDistance = 500;
+                    controls.maxPolarAngle = Math.PI / 2;
+                    controls.target.set(0, 0, 0);
+                    controls.update();
+                    console.log('OrbitControls initialized.');
+
+                    setupLighting();
+                    await setupEnvironment();
+                    setupEventListeners(); // Ensure listeners are set up after elements exist
+
+                    // Start animation loop only after initialization
+                    animate();
+                    console.log('Animation loop started.');
+                    
+                    // Handle shared links or show frontpage
+                    await handleInitialLoad(); 
+
+                } catch (initError) {
+                    console.error('Error during renderer/controls setup:', initError);
+                    showErrorMessage(`Initialization Error: ${initError.message}`);
+                }
+
+            } else {
+                console.log('DOM not ready yet, waiting... State:', document.readyState);
             }
-        });
-    }
-    
-    // Add floor grid - hidden by default
-    const gridHelper = new THREE.GridHelper(20, 20);
-    gridHelper.visible = false;
-    scene.add(gridHelper);
-    
-    // Create a ground plane - hidden by default
-    const groundGeometry = new THREE.PlaneGeometry(20, 20);
-    const groundMaterial = new THREE.MeshStandardMaterial({
-        color: 0xffffff,
-        roughness: 0.8,
-        metalness: 0.2,
-        side: THREE.DoubleSide
-    });
-    groundPlane = new THREE.Mesh(groundGeometry, groundMaterial);
-    groundPlane.rotation.x = Math.PI / 2;
-    groundPlane.position.y = 0;
-    groundPlane.receiveShadow = true;
-    groundPlane.visible = false; // Set to hidden by default
-    scene.add(groundPlane);
+        }, 100); // Check every 100ms
 
-    // Update floor toggle button state
-    const toggleFloorBtn = document.getElementById('toggle-floor');
-    if (toggleFloorBtn) {
-        toggleFloorBtn.classList.remove('active');
+    } catch (error) {
+        console.error('Error initializing the application:', error);
+        // Show user-friendly error message
+        showErrorMessage(`Error initializing the application: ${error.message}`);
+        // Hide loading indicator if it's still visible
+        hideLoadingIndicator();
     }
-    
-    console.log("Scene init complete.");
 }
 
 function onWindowResize() {
