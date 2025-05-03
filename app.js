@@ -179,17 +179,27 @@ function showFrontpage() {
     const dropZone = document.getElementById('drop-zone');
     const container = document.querySelector('.container');
     
+    console.log('Attempting to show frontpage...');
+    
     if (frontpage) {
         frontpage.style.display = 'flex';
-        console.log('Showing frontpage');
+        console.log('Frontpage element found and displayed.');
+    } else {
+        console.warn('#frontpage element not found when trying to show frontpage.');
     }
     
     if (dropZone) {
         dropZone.style.display = 'none';
+        console.log('Drop zone element found and hidden.');
+    } else {
+        console.warn('#drop-zone element not found when trying to show frontpage.');
     }
     
     if (container) {
         container.style.display = 'none';
+        console.log('.container element found and hidden.');
+    } else {
+        console.warn('.container element not found when trying to show frontpage.');
     }
 }
 
