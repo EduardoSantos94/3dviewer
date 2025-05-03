@@ -478,8 +478,8 @@
     }
 
     // --- Initialization on Window Load with URL Parameter Handling --- 
-    window.onload = async () => {
-        console.log("Window fully loaded. Performing basic initialization.");
+    async function handlePageLoad() {
+        console.log("DOM Content Loaded. Performing initialization.");
         const loadingIndicator = document.getElementById('loading-indicator');
         
         // Show loading indicator
@@ -518,7 +518,7 @@
                     // Fetch share link details from Supabase
                     const { data: shareData, error: shareError } = await supabase
                         .from('shared_links')
-                        .select('file_path, access_code, title, description, original_filename, file_type') // Fetch all needed fields
+                        .select('file_path, access_code, title, description, original_filename, file_type') 
                         .eq('id', shareIdParam)
                         .single();
                         
@@ -550,44 +550,41 @@
                     
                     // Get a signed URL for the file path from the share record
                     const { data: signedUrlData, error: signedUrlError } = await supabase.storage
-                        .from('client-files') // Assuming bucket name is client-files
-                        .createSignedUrl(filePath, 3600); // 1 hour expiry
+                        .from('client-files') 
+                        .createSignedUrl(filePath, 3600); 
                         
                     if (signedUrlError) throw signedUrlError;
                     if (!signedUrlData?.signedUrl) throw new Error('Failed to get signed URL for shared file.');
                     
                     const modelUrl = signedUrlData.signedUrl;
                     
-                    // Use setTimeout to defer DOM manipulation slightly
-                    setTimeout(() => {
-                        // Display title and description SAFELY
-                        const modelInfoElement = document.getElementById('model-info');
-                        const modelTitleElement = document.getElementById('model-title');
-                        const modelDescriptionElement = document.getElementById('model-description');
+                    // Display title and description SAFELY
+                    const modelInfoElement = document.getElementById('model-info');
+                    const modelTitleElement = document.getElementById('model-title');
+                    const modelDescriptionElement = document.getElementById('model-description');
 
-                        // DEBUG LOGS (inside timeout):
-                        console.log('(Inside Timeout) Share Title:', shareTitle);
-                        console.log('(Inside Timeout) Share Description:', shareDescription);
-                        console.log('(Inside Timeout) #model-info found:', !!modelInfoElement);
-                        console.log('(Inside Timeout) #model-title found:', !!modelTitleElement);
-                        console.log('(Inside Timeout) #model-description found:', !!modelDescriptionElement);
-                        
-                        if (modelTitleElement) {
-                            modelTitleElement.textContent = shareTitle || originalFilename || 'Shared Model';
-                        }
-                        if (modelDescriptionElement) {
-                            modelDescriptionElement.textContent = shareDescription || '';
-                        }
-                        if (modelInfoElement) { 
-                             const shouldDisplay = !!(shareTitle || shareDescription); 
-                             console.log('(Inside Timeout) Should display model info:', shouldDisplay);
-                             modelInfoElement.style.display = shouldDisplay ? 'block' : 'none';
-                        } else {
-                             console.warn('(Inside Timeout) #model-info element not found when trying to display title/description.');
-                        }
-                    }, 0); // Defer execution slightly
+                    // DEBUG LOGS:
+                    console.log('Share Title:', shareTitle);
+                    console.log('Share Description:', shareDescription);
+                    console.log('#model-info found:', !!modelInfoElement);
+                    console.log('#model-title found:', !!modelTitleElement);
+                    console.log('#model-description found:', !!modelDescriptionElement);
+                    
+                    if (modelTitleElement) {
+                        modelTitleElement.textContent = shareTitle || originalFilename || 'Shared Model';
+                    }
+                    if (modelDescriptionElement) {
+                        modelDescriptionElement.textContent = shareDescription || '';
+                    }
+                    if (modelInfoElement) { 
+                         const shouldDisplay = !!(shareTitle || shareDescription); 
+                         console.log('Should display model info:', shouldDisplay);
+                         modelInfoElement.style.display = shouldDisplay ? 'block' : 'none';
+                    } else {
+                         console.warn('#model-info element not found when trying to display title/description.');
+                    }
 
-                    // Load the model using the signed URL and retrieved file type
+                    // Load the model using the signed URL and retrieved file type 
                     if (fileType === '3dm') {
                         await process3DMFile(modelUrl, originalFilename); 
                     } else {
@@ -628,13 +625,14 @@
         } catch(error) {
             console.error("Error during application init on load:", error);
             showErrorMessage("Viewer initialization failed: " + error.message);
-            // Attempt to show frontpage even on error, if possible
             try { showFrontpage(); } catch (e) { /* Ignore secondary error */ }
         } finally {
-             // Hide loading indicator regardless of success/failure
              if (loadingIndicator) loadingIndicator.style.display = 'none';
         }
     };
+    
+    // Add event listener for DOMContentLoaded
+    document.addEventListener('DOMContentLoaded', handlePageLoad);
 
     // Initialize auth state listener only if Supabase is available
     if (supabase) { 
