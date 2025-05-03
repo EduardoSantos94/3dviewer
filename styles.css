@@ -1904,7 +1904,7 @@ select:focus {
 /* Sidebar Toggle Button - Fixed on right side */
 #toggle-sidebar-btn {
     position: fixed; /* Position relative to viewport */
-    top: 60px; /* Same vertical position */
+    top: 68px; /* Lowered to be below the 48px nav bar + 20px padding */
     right: 295px; /* Position assuming sidebar (280px) is open + 15px gap */
     z-index: 1600; /* Ensure it's above other elements */
     background-color: var(--bg-secondary); /* Original background */

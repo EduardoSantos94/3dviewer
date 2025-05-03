@@ -705,6 +705,7 @@ async function hashPassword(password) {
 // Function to create the share link in Supabase
 async function createShareLink() {
     const storedName = currentShareStoredName;
+    const originalName = currentShareOriginalName;
     const errorMessage = document.getElementById('share-error-message');
     const generatedLinkContainer = document.getElementById('generated-link-container');
     const generatedLinkInput = document.getElementById('generated-link');
@@ -717,9 +718,9 @@ async function createShareLink() {
     const shareTitle = titleInput ? titleInput.value.trim() : null;
     const shareDescription = descriptionInput ? descriptionInput.value.trim() : null;
 
-    if (!storedName || !errorMessage || !generatedLinkContainer || !generatedLinkInput || !generateBtn || !loadingOverlay) {
+    if (!storedName || !originalName || !errorMessage || !generatedLinkContainer || !generatedLinkInput || !generateBtn || !loadingOverlay) {
         console.error('Required elements for createShareLink not found');
-        showError('Share Error', 'UI elements missing.');
+        showError('Share Error', 'UI elements missing or original name not found.');
         return;
     }
 
@@ -734,6 +735,11 @@ async function createShareLink() {
         }
         const userId = session.user.id;
         const filePath = `${userId}/${storedName}`;
+        const fileType = originalName.split('.').pop()?.toLowerCase();
+
+        if (!fileType) {
+            throw new Error('Could not determine file type from original name.');
+        }
         
         const shareOption = document.querySelector('input[name="share-option"]:checked').value;
         let accessCode = null;
@@ -753,7 +759,9 @@ async function createShareLink() {
             file_path: filePath,
             access_code: hashedCode, // Store the hashed code (or null)
             title: shareTitle || null, // Add title (or null if empty)
-            description: shareDescription || null // Add description (or null if empty)
+            description: shareDescription || null, // Add description (or null if empty)
+            original_filename: originalName, // STORE ORIGINAL FILENAME
+            file_type: fileType // STORE FILE TYPE
             // expires_at: can be set here if needed
         };
 

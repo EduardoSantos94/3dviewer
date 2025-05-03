@@ -503,7 +503,7 @@
         }
         
         try {
-            // Check session
+            // Check session (optional for shared links, but good to have)
             const { data: { session } } = await supabase.auth.getSession();
             console.log('Initial session check:', session ? session.user?.email : 'No session');
             updateAuthUI(session);
@@ -512,35 +512,88 @@
             await initializeApp(); 
             console.log("initializeApp finished.");
 
-            // Check for model parameters in URL
+            // Check for model parameters OR shareId in URL
             const urlParams = new URLSearchParams(window.location.search);
+            const shareIdParam = urlParams.get('shareId');
             const modelUrlParam = urlParams.get('model');
             const modelTypeParam = urlParams.get('type');
-            const filenameParam = urlParams.get('filename'); // Get filename
-            const passwordParam = urlParams.get('password'); // Optional password
-
-            if (modelUrlParam && modelTypeParam) {
-                console.log(`URL parameters found: model=${modelUrlParam}, type=${modelTypeParam}, filename=${filenameParam}`);
+            const filenameParam = urlParams.get('filename');
+            
+            if (shareIdParam) {
+                console.log(`Share ID found: ${shareIdParam}`);
+                hideFrontpage(); // Ensure viewer is visible
                 
-                // Model parameters exist, hide frontpage and load model
-                hideFrontpage(); // This function now appends the renderer
-                console.log("Hiding frontpage to load model from URL...");
+                try {
+                    // Fetch share link details from Supabase
+                    const { data: shareData, error: shareError } = await supabase
+                        .from('shared_links')
+                        .select('file_path, access_code, title, description, original_filename, file_type') // Fetch all needed fields
+                        .eq('id', shareIdParam)
+                        .single();
+                        
+                    if (shareError) throw shareError;
+                    if (!shareData) throw new Error('Share link not found or invalid.');
+                    
+                    console.log('Share link data retrieved:', shareData);
+                    
+                    let filePath = shareData.file_path;
+                    let accessCodeHash = shareData.access_code;
+                    let shareTitle = shareData.title;
+                    let shareDescription = shareData.description;
+                    let originalFilename = shareData.original_filename;
+                    let fileType = shareData.file_type;
 
-                // Use a default name if filenameParam is missing or invalid
-                const modelName = filenameParam ? decodeURIComponent(filenameParam) : `Model.${modelTypeParam}`;
+                    // Handle password protection
+                    if (accessCodeHash) {
+                        // Use showPasswordPrompt - requires app.js modification/export
+                        // For now, just block access
+                        console.warn('Password protected link - access denied (implementation pending).');
+                        showErrorMessage('This link is password protected. Feature coming soon.');
+                        showFrontpage(); // Go back to frontpage
+                        // TODO: Implement password prompt and hash comparison
+                        // const enteredPassword = await promptForPassword(); // Placeholder
+                        // const enteredHash = await hashPassword(enteredPassword);
+                        // if (enteredHash !== accessCodeHash) { ... throw error ... }
+                        return; // Stop processing if password check fails
+                    }
+                    
+                    // Get a signed URL for the file path from the share record
+                    const { data: signedUrlData, error: signedUrlError } = await supabase.storage
+                        .from('client-files') // Assuming bucket name is client-files
+                        .createSignedUrl(filePath, 3600); // 1 hour expiry
+                        
+                    if (signedUrlError) throw signedUrlError;
+                    if (!signedUrlData?.signedUrl) throw new Error('Failed to get signed URL for shared file.');
+                    
+                    const modelUrl = signedUrlData.signedUrl;
+                    
+                    // Display title and description
+                    const modelTitleElement = document.getElementById('model-title');
+                    const modelDescriptionElement = document.getElementById('model-description');
+                    if (modelTitleElement) modelTitleElement.textContent = shareTitle || originalFilename || 'Shared Model';
+                    if (modelDescriptionElement) modelDescriptionElement.textContent = shareDescription || '';
+                    document.getElementById('model-info').style.display = (shareTitle || shareDescription) ? 'block' : 'none';
 
-                // Decode the model URL
-                const decodedModelUrl = decodeURIComponent(modelUrlParam);
-
-                // TODO: Implement password check if passwordParam exists
-                if (passwordParam) {
-                    console.log("Password parameter found, validation needed.");
-                    // Example: showPasswordPrompt((enteredPassword) => { ... });
-                    // For now, just log a warning
-                    console.warn("Password protection not fully implemented yet.");
+                    // Load the model using the signed URL and retrieved file type
+                    if (fileType === '3dm') {
+                        await process3DMFile(modelUrl, originalFilename); 
+                    } else {
+                        await processOtherFile(modelUrl, originalFilename);
+                    }
+                    console.log(`Model ${originalFilename} loaded successfully from share link.`);
+                    
+                } catch (shareLoadError) {
+                    console.error(`Error loading shared model: ${shareLoadError}`);
+                    showErrorMessage(`Failed to load shared model: ${shareLoadError.message}. The link might be invalid or expired.`);
+                    showFrontpage(); // Fallback to frontpage
                 }
-
-                // Load the model based on type
+                
+            } else if (modelUrlParam && modelTypeParam) { // Original direct URL parameter handling
+                console.log(`Direct URL parameters found: model=${modelUrlParam}, type=${modelTypeParam}, filename=${filenameParam}`);
+                hideFrontpage();
+                const modelName = filenameParam ? decodeURIComponent(filenameParam) : `Model.${modelTypeParam}`;
+                const decodedModelUrl = decodeURIComponent(modelUrlParam);
+                // ... (rest of existing direct load logic) ...
                 try {
                     if (modelTypeParam === '3dm') {
                         await process3DMFile(decodedModelUrl, modelName); // Pass URL and name
@@ -551,13 +604,11 @@
                 } catch (loadError) {
                     console.error(`Error loading model from URL: ${loadError}`);
                     showErrorMessage(`Failed to load model: ${loadError.message}. Please check the link or try uploading manually.`);
-                    // Fallback to showing the frontpage if loading fails
                     showFrontpage(); 
                 }
-
             } else {
-                // No model parameters, show the frontpage
-                console.log("No model parameters found in URL. Showing frontpage.");
+                // No parameters, show frontpage
+                console.log("No model or share parameters found in URL. Showing frontpage.");
                 showFrontpage();
             }
 
