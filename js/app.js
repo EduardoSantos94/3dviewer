@@ -108,26 +108,24 @@ function zoomToFit(model) {
 }
 
 export async function init() {
-    console.log('Initializing application...');
+    console.log('Initializing application (using stricter DOM check)...');
     try {
         await setupRhino();
         console.log('Rhino3dm setup complete.');
 
-        const readyStateCheckInterval = setInterval(async function() {
-            if (document.readyState === 'complete' || document.readyState === 'interactive') {
-                clearInterval(readyStateCheckInterval);
-                console.log('DOM is ready, proceeding with init.');
+        const checkDomInterval = setInterval(async () => {
+            // Check BOTH readyState AND the existence of the container
+            const container = document.getElementById('main-content');
+            const isDomReady = document.readyState === 'complete' || document.readyState === 'interactive';
+
+            if (isDomReady && container) {
+                clearInterval(checkDomInterval);
+                console.log('DOM is ready and #main-content found.');
 
                 try {
-                    // Ensure the target container exists
-                    const container = document.getElementById('main-content'); // Changed ID here
-                    if (!container) {
-                        console.error('Initialization Error: Target container #main-content not found in the DOM.');
-                        showErrorMessage('Initialization failed: Viewer container missing.');
-                        return; // Stop initialization
-                    }
-                    console.log('Target container #main-content found.');
-
+                    // --- Proceed with initialization inside the successful check --- 
+                    console.log('Target container #main-content confirmed.');
+                    
                     scene = new THREE.Scene();
                     camera = new THREE.PerspectiveCamera(75, container.clientWidth / container.clientHeight, 0.1, 1000);
                     camera.position.set(0, 0, 10); // Adjust initial camera position
@@ -167,6 +165,7 @@ export async function init() {
                     
                     // Handle shared links or show frontpage
                     await handleInitialLoad(); 
+                    // --- End of initialization block --- 
 
                 } catch (initError) {
                     console.error('Error during renderer/controls setup:', initError);
@@ -174,15 +173,13 @@ export async function init() {
                 }
 
             } else {
-                console.log('DOM not ready yet, waiting... State:', document.readyState);
+                console.log(`DOM/Container not ready yet. State: ${document.readyState}, Container found: ${!!container}`);
             }
-        }, 100); // Check every 100ms
+        }, 50); // Check more frequently (e.g., every 50ms)
 
     } catch (error) {
         console.error('Error initializing the application:', error);
-        // Show user-friendly error message
         showErrorMessage(`Error initializing the application: ${error.message}`);
-        // Hide loading indicator if it's still visible
         hideLoadingIndicator();
     }
 }
