@@ -658,13 +658,16 @@
             updateAuthUI(session);
         });
 
-        // --- MODIFIED: Check initial session and THEN check URL params ---
-        supabase.auth.getSession().then(({ data: { session } }) => {
-            console.log('Initial session check:', session ? session.user?.email : 'No session');
-            updateAuthUI(session);
-            // Now call the function that handles URL params and initialization
-            checkUrlParamsAndInit(); 
-        });
+        // --- MODIFIED: Check initial session and THEN check URL params ON WINDOW LOAD ---
+        window.onload = () => {
+            console.log("Window fully loaded, checking session and URL params...");
+            supabase.auth.getSession().then(({ data: { session } }) => {
+                console.log('Initial session check:', session ? session.user?.email : 'No session');
+                updateAuthUI(session);
+                // Now call the function that handles URL params and initialization
+                checkUrlParamsAndInit(); 
+            });
+        };
 
         // Add Logout Listener
         const logoutButton = document.getElementById('logout-btn');
