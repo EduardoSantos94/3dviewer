@@ -41,6 +41,7 @@ function createModelCard(file) {
     const size = (file.metadata?.size || 0) / (1024 * 1024);
     const formattedSize = size.toFixed(2);
     const timestamp = new Date(file.created_at || Date.now()).toLocaleDateString();
+    const isShared = file.is_shared; // Get the share status
 
     const card = document.createElement('div');
     card.className = 'model-card';
@@ -51,7 +52,7 @@ function createModelCard(file) {
         <div class="model-info">
             <div class="model-name">
                 <span class="filename">${file.original_name}</span>
-                <span class="share-status-icon" style="display: none; margin-left: 8px;" title="Shared"><i class="fas fa-share-alt"></i></span>
+                <span class="share-status-icon" style="display: ${isShared ? 'inline-block' : 'none'}; margin-left: 8px;" title="Shared"><i class="fas fa-share-alt"></i></span>
             </div>
             <div class="model-meta">${formattedSize} MB • ${timestamp}</div>
         </div>
@@ -59,7 +60,7 @@ function createModelCard(file) {
             <button class="model-btn view-btn" title="View Model" onclick="viewModel('${file.name}', '${originalName}')">
                 <i class="fas fa-eye"></i>
             </button>
-            <button class="model-btn share-btn" title="Share Model" onclick="showShareModal('${file.name}', '${originalName}')">
+            <button class="model-btn share-btn" title="${isShared ? 'Manage Share' : 'Share Model'}">
                 <i class="fas fa-share-alt"></i>
             </button>
             <button class="model-btn delete-btn" title="Delete Model" onclick="deleteModel('${file.name}')">
@@ -147,8 +148,20 @@ async function updateModelsGrid() {
 
         if (storageError) throw storageError;
 
+        // Fetch existing share links for the user
+        const { data: shares, error: shareError } = await supabase
+            .from('shared_links')
+            .select('file_path, id') // Select file_path and id to identify shares
+            .eq('user_id', session.user.id);
+
+        if (shareError) {
+            console.error('Error fetching share links:', shareError);
+            // Don't throw, just proceed without share status if fetching fails
+        }
+
         console.log('Files retrieved:', files);
         console.log('Mappings retrieved:', mappings);
+        console.log('Shares retrieved:', shares);
 
         if (!files || files.length === 0) {
             modelsGrid.style.display = 'none';
@@ -159,14 +172,21 @@ async function updateModelsGrid() {
         // Create a map of stored names to file mappings
         const mappingsMap = new Map(mappings.map(m => [m.stored_name, m]));
 
+        // Create a Set of file paths that have shares for quick lookup
+        const sharedFilePaths = new Set(shares ? shares.map(s => s.file_path) : []);
+
         modelsGrid.innerHTML = '';
         files.forEach(file => {
             const mapping = mappingsMap.get(file.name);
             const originalName = mapping?.original_name || getOriginalFilename(file.name);
+            const filePath = `${session.user.id}/${file.name}`;
+            const isShared = sharedFilePaths.has(filePath);
+
             const card = createModelCard({
                 ...file,
                 original_name: originalName,
-                stored_name: file.name
+                stored_name: file.name,
+                is_shared: isShared // Pass share status to card creation
             });
             modelsGrid.appendChild(card);
         });
