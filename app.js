@@ -228,14 +228,15 @@ function hideFrontpage() {
         }
     }
     
-    // Then show the drop zone for file selection
+    // Hide the drop zone
     if (dropZone) {
-        dropZone.style.display = 'flex';
+        dropZone.style.display = 'none'; 
     }
 
-    // Ensure viewer is visible
-    if (viewerContainer) {
-        viewerContainer.style.display = 'block';
+    // Ensure viewer area is visible (though container visibility should handle this)
+    const viewerArea = document.getElementById('viewer-area');
+    if (viewerArea) {
+        viewerArea.style.display = 'block';
     }
     
     // Force a resize event to ensure proper rendering
