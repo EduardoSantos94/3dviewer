@@ -106,19 +106,68 @@ function zoomToFit(model) {
     // ... (rest of the function)
 }
 
-renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.2; // Keep initial value, adjust later if needed
+async function init() {
+    // Create scene
+    scene = new THREE.Scene();
+    // ... (scene background setup) ...
+    
+    // Setup camera
+    // ... (camera setup) ...
 
-// Append renderer to the correct container
-const mainContentElement = document.getElementById('main-content');
-if (mainContentElement) {
-    mainContentElement.appendChild(renderer.domElement);
-} else {
-    console.error("'main-content' element not found. Cannot append renderer.");
-    // Fallback to body or show error
-    document.body.appendChild(renderer.domElement);
-    showErrorMessage("Viewer container not found. Display might be incorrect.");
+    // Find the existing canvas element
+    const canvas = document.getElementById('viewer-canvas');
+    if (!canvas) {
+        console.error("Canvas element with id 'viewer-canvas' not found in the DOM!");
+        showErrorMessage("Viewer canvas element is missing. Cannot initialize 3D view.");
+        throw new Error("Required canvas element #viewer-canvas not found."); // Stop initialization
+    }
+
+    // Setup renderer using the existing canvas
+    renderer = new THREE.WebGLRenderer({ 
+        canvas: canvas, // Use the existing canvas
+        antialias: true,
+        powerPreference: "high-performance",
+        preserveDrawingBuffer: true // Needed for screenshots
+    });
+    // Set size and pixel ratio based on the PARENT container, not necessarily window
+    // We'll adjust this in onWindowResize later
+    const container = canvas.parentElement || document.getElementById('main-content'); // Get container size
+    if (container) {
+         renderer.setSize(container.clientWidth, container.clientHeight);
+    } else {
+         renderer.setSize(window.innerWidth, window.innerHeight); // Fallback
+    }
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.2; 
+    
+    // NO LONGER NEEDED: document.getElementById('main-content').appendChild(renderer.domElement);
+
+    // Initialize post-processing
+    composer = new EffectComposer(renderer);
+    // ... (rest of init, composer setup, lights, controls, etc.) ...
 }
 
-// Initialize post-processing
-composer = new EffectComposer(renderer); 
+function onWindowResize() {
+    // Update camera aspect ratio
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    
+    // Update renderer size based on its container
+    const canvas = renderer.domElement;
+    const container = canvas.parentElement || document.getElementById('main-content');
+    if (container) {
+        renderer.setSize(container.clientWidth, container.clientHeight);
+    } else {
+        renderer.setSize(window.innerWidth, window.innerHeight); // Fallback
+    }
+    
+    // Update composer size
+    if (composer) { // Check if composer exists
+        composer.setSize(container ? container.clientWidth : window.innerWidth, 
+                         container ? container.clientHeight : window.innerHeight);
+    }
+} 
