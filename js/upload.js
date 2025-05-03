@@ -681,29 +681,126 @@ function updateAuthUI(session) {
 
 let currentShareStoredName = null;
 let currentShareOriginalName = null;
+let currentShareId = null; // Add variable to store existing share ID
 
 // Function to show the share modal
-window.showShareModal = function(storedName, originalName) {
+window.showShareModal = async function(storedName, originalName) { // Make async
     currentShareStoredName = storedName;
     currentShareOriginalName = originalName;
-    
+    currentShareId = null; // Reset current share ID
+
+    // Get DOM elements
     const modal = document.getElementById('share-modal');
+    const modalTitle = modal.querySelector('.modal-header h2');
     const modelNameSpan = document.getElementById('share-model-name');
+    const titleInput = document.getElementById('share-title');
+    const descriptionInput = document.getElementById('share-description');
     const generatedLinkContainer = document.getElementById('generated-link-container');
+    const generatedLinkInput = document.getElementById('generated-link');
     const errorMessage = document.getElementById('share-error-message');
     const passwordInput = document.getElementById('share-password');
     const radioPublic = document.querySelector('input[name="share-option"][value="public"]');
-    
-    if (modal && modelNameSpan && generatedLinkContainer && errorMessage && passwordInput && radioPublic) {
-        modelNameSpan.textContent = originalName || storedName;
-        generatedLinkContainer.style.display = 'none'; // Hide previous link
-        errorMessage.style.display = 'none';
-        passwordInput.value = ''; // Clear password
-        passwordInput.style.display = 'none'; // Hide password input initially
-        radioPublic.checked = true; // Default to public
-        modal.style.display = 'flex';
-    } else {
+    const radioPassword = document.querySelector('input[name="share-option"][value="password"]');
+    const mainButton = document.getElementById('generate-share-link-btn');
+    const loadingOverlay = document.getElementById('loading-overlay');
+
+    // Ensure all elements exist
+    if (!modal || !modalTitle || !modelNameSpan || !titleInput || !descriptionInput || !generatedLinkContainer || !generatedLinkInput || !errorMessage || !passwordInput || !radioPublic || !radioPassword || !mainButton || !loadingOverlay) {
         console.error('Share modal elements not found!');
+        showError('UI Error', 'Could not open share dialog.');
+        return;
+    }
+
+    // Reset modal state
+    modelNameSpan.textContent = originalName || storedName;
+    generatedLinkContainer.style.display = 'none';
+    errorMessage.style.display = 'none';
+    titleInput.value = '';
+    descriptionInput.value = '';
+    passwordInput.value = '';
+    passwordInput.style.display = 'none';
+    radioPublic.checked = true;
+    mainButton.disabled = false;
+    // Remove delete button if it exists from previous opens
+    const existingDeleteBtn = document.getElementById('delete-share-link-btn');
+    if (existingDeleteBtn) existingDeleteBtn.remove();
+
+    loadingOverlay.style.display = 'flex';
+
+    try {
+        // Check session
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        if (sessionError || !session?.user) throw new Error('Authentication required.');
+        const userId = session.user.id;
+        const filePath = `${userId}/${storedName}`;
+
+        // Check if a share already exists for this file path
+        const { data: existingShare, error: fetchError } = await supabase
+            .from('shared_links')
+            .select('id, title, description, access_code')
+            .eq('user_id', userId)
+            .eq('file_path', filePath)
+            .maybeSingle(); // Use maybeSingle to handle 0 or 1 result
+
+        if (fetchError) throw fetchError;
+
+        if (existingShare) {
+            // --- Manage Existing Share Mode ---
+            console.log('Existing share found:', existingShare);
+            currentShareId = existingShare.id; // Store the ID
+
+            modalTitle.textContent = 'Manage Share';
+            mainButton.textContent = 'Update Link';
+
+            titleInput.value = existingShare.title || '';
+            descriptionInput.value = existingShare.description || '';
+
+            if (existingShare.access_code) {
+                radioPassword.checked = true;
+                passwordInput.style.display = 'block';
+                // Don't pre-fill password, maybe add placeholder?
+                passwordInput.placeholder = 'Enter new password to change, or leave blank to keep existing';
+            } else {
+                radioPublic.checked = true;
+                passwordInput.style.display = 'none';
+            }
+
+            // Show the generated link immediately
+            const shareUrl = `${window.location.origin}/index.html?shareId=${currentShareId}`;
+            generatedLinkInput.value = shareUrl;
+            generatedLinkContainer.style.display = 'block';
+
+            // Add Delete button
+            const deleteBtn = document.createElement('button');
+            deleteBtn.id = 'delete-share-link-btn';
+            deleteBtn.textContent = 'Delete Share Link';
+            deleteBtn.className = 'secondary-btn delete-share-btn'; // Reuse styles, add specific class
+            deleteBtn.style.marginTop = '1rem';
+            deleteBtn.style.width = '100%';
+            deleteBtn.style.backgroundColor = 'var(--danger-primary)'; // Make it red
+            deleteBtn.style.color = 'var(--text-inverted)';
+            deleteBtn.style.borderColor = 'var(--danger-primary)';
+            deleteBtn.onclick = () => deleteShareLink(currentShareId);
+            mainButton.parentNode.insertBefore(deleteBtn, mainButton.nextSibling); // Insert after main button
+
+        } else {
+            // --- Create New Share Mode ---
+            console.log('No existing share found for this file.');
+            modalTitle.textContent = 'Share Model';
+            mainButton.textContent = 'Generate Link';
+            passwordInput.placeholder = 'Enter password'; // Reset placeholder
+            // Reset fields (already done above)
+        }
+
+        modal.style.display = 'flex';
+
+    } catch (error) {
+        console.error('Error preparing share modal:', error);
+        errorMessage.textContent = `Error loading share info: ${error.message}`;
+        errorMessage.style.display = 'block';
+        // Optionally close modal or just show error
+    } finally {
+        loadingOverlay.style.display = 'none';
     }
 }
 
@@ -712,6 +809,9 @@ function closeShareModal() {
     const modal = document.getElementById('share-modal');
     if (modal) {
         modal.style.display = 'none';
+        // Remove the delete button if it exists
+        const deleteBtn = document.getElementById('delete-share-link-btn');
+        if (deleteBtn) deleteBtn.remove();
     }
 }
 
@@ -731,10 +831,12 @@ async function hashPassword(password) {
     }
 }
 
-// Function to create the share link in Supabase
-async function createShareLink() {
+// Function to create or update the share link in Supabase
+async function createShareLink() { // Rename implies create or update now
     const storedName = currentShareStoredName;
     const originalName = currentShareOriginalName;
+    const existingShareId = currentShareId; // Get the stored ID
+
     const errorMessage = document.getElementById('share-error-message');
     const generatedLinkContainer = document.getElementById('generated-link-container');
     const generatedLinkInput = document.getElementById('generated-link');
@@ -776,41 +878,80 @@ async function createShareLink() {
         
         if (shareOption === 'password') {
             accessCode = document.getElementById('share-password').value;
-            if (!accessCode) {
+            // If managing an existing link and password field is blank, DO NOT update the hash
+            if (existingShareId && !accessCode) {
+                hashedCode = undefined; // Special value to signal no change to password hash
+            } else if (!accessCode) {
                 throw new Error('Password cannot be empty for protected link.');
+            } else {
+                hashedCode = await hashPassword(accessCode); // Hash the new password
             }
-            hashedCode = await hashPassword(accessCode); // Hash the password
+        } else {
+            hashedCode = null; // Explicitly set to null for public links
         }
 
-        // Prepare data for insertion, including title and description
-        const insertPayload = {
+        // Prepare data for insert or update
+        const payload = {
             user_id: userId,
             file_path: filePath,
-            access_code: hashedCode, // Store the hashed code (or null)
-            title: shareTitle || null, // Add title (or null if empty)
-            description: shareDescription || null, // Add description (or null if empty)
-            original_filename: originalName, // STORE ORIGINAL FILENAME
-            file_type: fileType // STORE FILE TYPE
-            // expires_at: can be set here if needed
+            title: shareTitle || null,
+            description: shareDescription || null,
+            original_filename: originalName,
+            file_type: fileType
+            // Only include access_code if it needs to be set or changed
         };
-
-        // Insert into shared_links table
-        const { data: insertData, error: insertError } = await supabase
-            .from('shared_links')
-            .insert(insertPayload) // Use the payload object
-            .select('id') // Select the generated ID
-            .single(); // Expect a single row back
-
-        if (insertError) {
-            console.error('Supabase insert error:', insertError);
-            throw new Error(`Failed to create share link: ${insertError.message}`);
+        if (hashedCode !== undefined) { // If hashedCode is not undefined, update it
+             payload.access_code = hashedCode;
         }
 
-        if (!insertData || !insertData.id) {
-            throw new Error('Failed to retrieve share link ID after creation.');
+        let shareId;
+        let operationResult;
+        let operationError;
+
+        if (existingShareId) {
+            // --- Update Existing Share ---
+            console.log(`Updating share link ID: ${existingShareId} with payload:`, payload);
+            const { data, error } = await supabase
+                .from('shared_links')
+                .update(payload)
+                .eq('id', existingShareId)
+                .eq('user_id', userId) // Ensure user owns the record
+                .select('id') // Select ID to confirm update
+                .single();
+            operationResult = data;
+            operationError = error;
+            shareId = existingShareId; // ID doesn't change on update
+            if (!operationError) showSuccess('Share link updated successfully!');
+
+        } else {
+            // --- Insert New Share ---
+            console.log('Inserting new share link with payload:', payload);
+            const { data, error } = await supabase
+                .from('shared_links')
+                .insert(payload)
+                .select('id')
+                .single();
+            operationResult = data;
+            operationError = error;
+            if (!operationError && operationResult) {
+                 shareId = operationResult.id;
+                 currentShareId = shareId; // Store the new ID
+                 showSuccess('Share link created successfully!');
+            } else if (!operationResult && !operationError) {
+                 // Handle case where insert might succeed but return no data unexpectedly
+                 operationError = new Error('Failed to retrieve share link ID after creation.');
+            }
         }
 
-        const shareId = insertData.id;
+        if (operationError) {
+            console.error('Supabase operation error:', operationError);
+            throw new Error(`Failed to ${existingShareId ? 'update' : 'create'} share link: ${operationError.message}`);
+        }
+
+        if (!shareId) {
+            throw new Error(`Failed to get share link ID after ${existingShareId ? 'update' : 'creation'}.`);
+        }
+
         const shareUrl = `${window.location.origin}/index.html?shareId=${shareId}`;
 
         generatedLinkInput.value = shareUrl;
@@ -843,6 +984,51 @@ async function createShareLink() {
         generatedLinkContainer.style.display = 'none';
     } finally {
         generateBtn.disabled = false;
+        loadingOverlay.style.display = 'none';
+    }
+}
+
+// --- Add Delete Share Link Function ---
+async function deleteShareLink(shareIdToDelete) {
+    if (!shareIdToDelete) {
+        showError('Delete Error', 'Cannot delete - Share ID is missing.');
+        return;
+    }
+
+    if (!confirm('Are you sure you want to permanently delete this share link? This cannot be undone.')) {
+        return;
+    }
+
+    const loadingOverlay = document.getElementById('loading-overlay');
+    loadingOverlay.style.display = 'flex';
+
+    try {
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        if (sessionError || !session?.user) {
+            throw new Error('Authentication required.');
+        }
+
+        console.log(`Attempting to delete share link ID: ${shareIdToDelete}`);
+
+        const { error: deleteError } = await supabase
+            .from('shared_links')
+            .delete()
+            .eq('id', shareIdToDelete)
+            .eq('user_id', session.user.id); // Ensure user owns the record
+
+        if (deleteError) {
+            console.error('Supabase delete error:', deleteError);
+            throw new Error(`Failed to delete share link: ${deleteError.message}`);
+        }
+
+        showSuccess('Share link deleted successfully.');
+        closeShareModal();
+        await updateModelsGrid(); // Refresh the grid to update the icon
+
+    } catch (error) {
+        console.error('Error deleting share link:', error);
+        showError('Delete Error', error.message);
+    } finally {
         loadingOverlay.style.display = 'none';
     }
 }
