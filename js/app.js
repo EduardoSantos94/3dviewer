@@ -108,30 +108,41 @@ function zoomToFit(model) {
 }
 
 async function init() {
-    // Create scene
-    scene = new THREE.Scene();
-    // ... (scene background setup) ...
-    
-    // Setup camera
-    // ... (camera setup) ...
-
-    // Find the existing canvas element
-    const canvas = document.getElementById('viewer-canvas');
-    if (!canvas) {
-        console.error("Canvas element with id 'viewer-canvas' not found in the DOM!");
-        showErrorMessage("Viewer canvas element is missing. Cannot initialize 3D view.");
-        throw new Error("Required canvas element #viewer-canvas not found."); // Stop initialization
+    // Wait for DOM content to be fully loaded before proceeding
+    if (document.readyState === 'loading') {
+        console.log("DOM not ready yet, waiting...");
+        await new Promise(resolve => document.addEventListener('DOMContentLoaded', resolve));
+        console.log("DOM ready, proceeding with init.");
+    } else {
+        console.log("DOM already ready, proceeding with init.");
     }
 
-    // Setup renderer using the existing canvas
-    renderer = new THREE.WebGLRenderer({ 
+    // Create scene
+    scene = new THREE.Scene();
+    // Initial background setting (will be replaced by gradient/HDR)
+    scene.background = new THREE.Color(0xf0f0f0); // Default light gray
+    
+    // Setup camera
+    camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+    camera.position.set(5, 5, 5);
+    camera.lookAt(0, 0, 0);
+
+    // Find the existing canvas element (should exist now)
+    const canvas = document.getElementById('viewer-canvas');
+    if (!canvas) {
+        // This should theoretically not happen now, but keep the check
+        console.error("Canvas element #viewer-canvas still not found!");
+        showErrorMessage("Critical error: Viewer canvas element missing.");
+        throw new Error("Required canvas element #viewer-canvas not found.");
+    }
+
+     // Setup renderer using the existing canvas
+    renderer = new THREE.WebGLRenderer({
         canvas: canvas, // Use the existing canvas
         antialias: true,
         powerPreference: "high-performance",
         preserveDrawingBuffer: true // Needed for screenshots
     });
-    // Set size and pixel ratio based on the PARENT container, not necessarily window
-    // We'll adjust this in onWindowResize later
     const container = canvas.parentElement || document.getElementById('main-content'); // Get container size
     if (container) {
          renderer.setSize(container.clientWidth, container.clientHeight);
@@ -144,29 +155,72 @@ async function init() {
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.2; 
-    
-    // Check the fallback logic I added previously, just in case
-    const mainContentElement = document.getElementById('main-content');
-    if (!mainContentElement) { // This condition should NOT be true if HTML is correct
-        console.error("'main-content' element not found. Attempting fallback to body.");
-        // Add check for document.body before fallback appendChild
-        if (document.body) {
-             document.body.appendChild(renderer.domElement); 
-             showErrorMessage("Viewer container not found. Display might be incorrect.");
-        } else {
-             console.error("CRITICAL: document.body not found. Cannot append renderer anywhere.");
-             throw new Error("Cannot append renderer: document.body is null.");
-        }
-    }
 
     // Initialize post-processing
     composer = new EffectComposer(renderer);
-    // ... (rest of init, composer setup, lights, controls, etc.) ...
-
-    // Start the animation loop ONLY ONCE at the end of initialization
-    animate();
+    const renderPass = new RenderPass(scene, camera);
+    composer.addPass(renderPass);
     
-    return true;
+    bloomPass = new UnrealBloomPass(
+        new THREE.Vector2(window.innerWidth, window.innerHeight),
+        0.2,   
+        0.5,   
+        0.8    
+    );
+    composer.addPass(bloomPass);
+    
+    // Setup lights (including Hemisphere)
+    setupLights();
+    
+    // Setup controls
+    setupControls();
+    
+    // Load HDR Environment Map
+    await loadEnvironment(renderer); // Load the default HDR
+
+    // Create gradient background texture (but don't apply yet)
+    createGradientBackground(); 
+
+    // Apply initial background based on default mode
+    applyBackground(); 
+    
+    // Update all material presets with the default environment map (if loaded)
+    if (defaultEnvMap) {
+        Object.values(materialPresets).forEach(material => {
+            if (material.envMap !== undefined) {
+                material.envMap = defaultEnvMap;
+                material.needsUpdate = true;
+            }
+        });
+    }
+    
+    // Add floor grid - hidden by default
+    const gridHelper = new THREE.GridHelper(20, 20);
+    gridHelper.visible = false;
+    scene.add(gridHelper);
+    
+    // Create a ground plane - hidden by default
+    const groundGeometry = new THREE.PlaneGeometry(20, 20);
+    const groundMaterial = new THREE.MeshStandardMaterial({
+        color: 0xffffff,
+        roughness: 0.8,
+        metalness: 0.2,
+        side: THREE.DoubleSide
+    });
+    groundPlane = new THREE.Mesh(groundGeometry, groundMaterial);
+    groundPlane.rotation.x = Math.PI / 2;
+    groundPlane.position.y = 0;
+    groundPlane.receiveShadow = true;
+    groundPlane.visible = false; // Set to hidden by default
+    scene.add(groundPlane);
+
+    // Update floor toggle button state
+    const toggleFloorBtn = document.getElementById('toggle-floor');
+    if (toggleFloorBtn) {
+        toggleFloorBtn.classList.remove('active');
+    }
+    
+    console.log("Scene init complete.");
 }
 
 function onWindowResize() {
