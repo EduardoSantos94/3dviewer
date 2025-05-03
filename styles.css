@@ -156,13 +156,12 @@ body {
 
 /* Container */
 .container {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    display: none; /* Initial state controlled by JS */
-    z-index: 50; /* Keep relatively low */
+    padding-top: 78px; /* Nav (48px) + Estimated Info Bar (~30px) */
+    height: calc(100% - 78px); /* Adjust height */
+    position: relative; 
+    top: 78px; /* Push down */
+    /* display: none; */ /* Controlled by JS */
+    z-index: 50; 
 }
 
 .viewer-layout {
@@ -1901,12 +1900,12 @@ select:focus {
     display: none;
 }
 
-/* Sidebar Toggle Button - Fixed on right side */
+/* Sidebar Toggle Button - Adjust top position */
 #toggle-sidebar-btn {
-    position: fixed; /* Position relative to viewport */
-    top: 68px; /* Lowered to be below the 48px nav bar + 20px padding */
-    right: 295px; /* Position assuming sidebar (280px) is open + 15px gap */
-    z-index: 1600; /* Ensure it's above other elements */
+    position: fixed; 
+    top: 88px; /* Container top (78px) + 10px padding */
+    right: 295px; 
+    z-index: 1600; 
     background-color: var(--bg-secondary); /* Original background */
     color: var(--text-primary); /* Original color */
     border: 1px solid var(--border-primary); /* Original border */
@@ -1954,32 +1953,38 @@ select:focus {
     /* background-color: rgba(0, 0, 255, 0.1); */ /* REMOVE TEMP DEBUG */
 }
 
-/* Styling for Model Info Container */
+/* Styling for Model Info Container (Now a Bar Below Nav) */
 .model-info-container {
-    position: absolute; /* Position relative to the main-content area */
-    bottom: 10px;       /* Position at the bottom */
-    left: 10px;         /* Position on the left */
-    background-color: rgba(255, 0, 0, 0.7) !important; /* --- DEBUGGING: Bright Red Background --- */
-    color: white;       /* White text */
-    padding: 10px 15px; /* Padding */
-    border-radius: 5px; /* Rounded corners */
-    max-width: 80%;     /* Prevent it from becoming too wide */
-    z-index: 10;        /* Ensure it's above the canvas */
-    pointer-events: none; /* Allow clicks to pass through to the canvas if needed */
-    border: 2px solid yellow; /* --- DEBUGGING: Yellow Border --- */
+    position: fixed;
+    top: 48px; /* Position directly below the 48px nav bar */
+    left: 0;
+    width: 100%;
+    background-color: var(--bg-tertiary); /* Use tertiary for slight contrast */
+    color: var(--text-secondary);
+    padding: 6px 24px; /* Match nav horizontal padding, less vertical */
+    text-align: center;
+    z-index: 1400; /* Below nav (1500), above toggle button (1600) */
+    box-shadow: 0 1px 3px var(--shadow-color-light); /* Subtle shadow */
+    box-sizing: border-box;
+    /* display: none; is handled by inline style and JS */
+    /* Remove old absolute positioning styles */
 }
 
 .model-info-container h2 {
-    margin: 0 0 5px 0; /* Adjust title margin */
-    font-size: 1.1em;
+    display: inline-block; /* Allow description on same line if space */
+    margin: 0 15px 0 0; /* Spacing between title and description */
+    font-size: 0.9em; /* Slightly smaller */
+    font-weight: 500; /* Medium weight */
+    color: var(--text-primary); /* Make title slightly more prominent */
 }
 
 .model-info-container p {
-    margin: 0;          /* Adjust description margin */
-    font-size: 0.9em;
+    display: inline-block;
+    margin: 0;
+    font-size: 0.9em; /* Slightly smaller */
 }
 
-#viewer-area { /* REMOVE TEMP DEBUG */
+#viewer-area { 
     flex: 1;
     position: relative;
     overflow: hidden;
