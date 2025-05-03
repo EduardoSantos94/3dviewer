@@ -140,6 +140,15 @@ export async function init() {
                     console.log('Renderer initialized:', renderer);
                     console.log('Renderer DOM element:', renderer.domElement);
 
+                    // --- AGGRESSIVE DEBUGGING --- 
+                    console.log('Attempting to append renderer. Container element:', container);
+                    if (!container) {
+                        console.error('CRITICAL: Container is null JUST BEFORE appendChild!');
+                        showErrorMessage('Critical error: Viewer container became null unexpectedly.');
+                        return; 
+                    }
+                    // --- END DEBUGGING ---
+
                     // Append renderer
                     container.appendChild(renderer.domElement); // Appending to #main-content
                     console.log('Renderer appended to #main-content.');
