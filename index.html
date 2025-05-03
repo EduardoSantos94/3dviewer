@@ -447,247 +447,101 @@
         document.body.appendChild(errorDiv);
     };
 
-    // Initialize Supabase client with error handling
+    // Initialize Supabase client 
     const supabaseUrl = 'https://lwmcnwwkgdauqgxukwhn.supabase.co';
     const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx3bWNud3drZ2RhdXFneHVrd2huIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQ5NzcwNzcsImV4cCI6MjA2MDU1MzA3N30._NfRA6_3PL9JLEG9-X9P3Tzg5E59NuXtcmQzOdkraNE';
-
+    let supabase = null; // Initialize as null
     try {
-        const supabase = createClient(supabaseUrl, supabaseKey);
+        supabase = createClient(supabaseUrl, supabaseKey);
         window.supabase = supabase;
+        console.log("Supabase client initialized successfully.");
+    } catch (error) {
+        console.error('CRITICAL: Failed to initialize Supabase client:', error);
+        showErrorMessage('Failed to initialize critical connection: ' + error.message);
+        // Hide loading indicator if it exists
+        const loadingIndicatorOnInitError = document.getElementById('loading-indicator');
+        if (loadingIndicatorOnInitError) loadingIndicatorOnInitError.style.display = 'none';
+    }
 
-        // Update auth UI function
-        function updateAuthUI(session) {
-            const userInfo = document.getElementById('user-info');
-            const loginInfo = document.getElementById('login-info');
-            const userEmail = document.getElementById('user-email');
+    // Update auth UI function
+    function updateAuthUI(session) {
+         const userInfo = document.getElementById('user-info');
+         const loginInfo = document.getElementById('login-info');
+         const userEmail = document.getElementById('user-email');
 
-            if (session?.user) {
-                if (userEmail) userEmail.textContent = session.user.email;
-                if (userInfo) userInfo.style.display = 'flex';
-                if (loginInfo) loginInfo.style.display = 'none';
-            } else {
-                if (userInfo) userInfo.style.display = 'none';
-                if (loginInfo) loginInfo.style.display = 'flex';
-            }
+         if (session?.user) {
+             if (userEmail) userEmail.textContent = session.user.email;
+             if (userInfo) userInfo.style.display = 'flex';
+             if (loginInfo) loginInfo.style.display = 'none';
+         } else {
+             if (userInfo) userInfo.style.display = 'none';
+             if (loginInfo) loginInfo.style.display = 'flex';
+         }
+    }
+
+    // --- Simplified Initialization on Window Load --- 
+    window.onload = async () => {
+        console.log("Window fully loaded. Performing basic initialization.");
+        const loadingIndicator = document.getElementById('loading-indicator');
+        
+        // Show loading indicator only if Supabase initialized successfully
+        if (supabase && loadingIndicator) {
+             loadingIndicator.style.display = 'flex';
         }
         
-        // --- NEW: Function to handle loading shared model ---
-        async function loadSharedModel(shareId) {
-             try {
-                 // Hide frontpage, show loading
-                 const frontpage = document.getElementById('frontpage');
-                 const loadingIndicator = document.getElementById('loading-indicator');
-                 const container = document.querySelector('.container');
-                 const dropZone = document.getElementById('drop-zone');
-
-                 if (frontpage) frontpage.style.display = 'none';
-                 if (loadingIndicator) loadingIndicator.style.display = 'flex';
-                 if (container) container.style.display = 'block'; // Show viewer container
-                 if (dropZone) dropZone.style.display = 'none';
-
-                 // Initialize the viewer first
-                 await initializeApp();
-                 console.log('Viewer initialized, attempting to load shared model...');
-
-                 // 1. Check if link requires password (using anon client)
-                 const { data: shareInfo, error: checkError } = await supabase
-                    .from('shared_links')
-                    .select('access_code, file_path') // Select file_path too
-                    .eq('id', shareId)
-                    .single();
-
-                 if (checkError || !shareInfo) {
-                     throw new Error('Invalid or expired share link.');
-                 }
-                 
-                 let accessCodeInput = null;
-                 if (shareInfo.access_code) {
-                    // Use the showPasswordPrompt function from app.js
-                    // Need to wrap this in a Promise to wait for user input
-                    accessCodeInput = await new Promise((resolve) => {
-                        window.showPasswordPrompt(resolve);
-                    });
-                     
-                    if (accessCodeInput === null) { // User cancelled
-                         console.log('Password prompt cancelled.');
-                         showFrontpage(); // Go back to frontpage
-                         return;
-                     }
-                 }
-
-                 // 2. Call the Edge Function to get the signed URL
-                 const { data: functionData, error: functionError } = await supabase.functions.invoke('get-shared-model-url', {
-                     body: { shareId: shareId, accessCode: accessCodeInput }
-                 });
-
-                 if (functionError) {
-                     // Attempt to parse Supabase Edge Function error
-                     let errMsg = functionError.message;
-                     try {
-                         const errJson = JSON.parse(functionError.context?.responseText || '{}');
-                         errMsg = errJson.error || errMsg;
-                     } catch (e) {/* Ignore parsing error */}
-                     throw new Error(`Error retrieving shared model: ${errMsg}`);
-                 }
-                 
-                 if (!functionData || !functionData.signedUrl || !functionData.filePath) {
-                      throw new Error('Could not retrieve secure model link.');
-                 }
-
-                 const signedUrl = functionData.signedUrl;
-                 const modelFilePath = functionData.filePath; // Get the original file path
-                 const filename = modelFilePath.split('/').pop(); // Extract filename
-                 const fileExtension = filename.split('.').pop().toLowerCase();
-
-                 console.log(`Received signed URL for: ${filename}`);
-
-                 // 3. Load the model using the signed URL and filename
-                 if (fileExtension === '3dm') {
-                     await process3DMFile(signedUrl, filename); // Pass URL and filename
-                 } else if (['obj', 'stl', 'glb', 'gltf'].includes(fileExtension)) {
-                     await processOtherFile(signedUrl, filename); // Pass URL and filename
-                 } else {
-                     throw new Error(`Unsupported shared file type: .${fileExtension}`);
-                 }
-
-                 console.log(`Shared model processing complete for: ${filename}`);
-
-                 // Hide sidebar by default for shared view using the class
-                 const sidebar = document.querySelector('.sidebar');
-                 if (sidebar) {
-                    sidebar.classList.add('hidden');
-                    // Ensure toggle button icon is correct initially
-                    const toggleBtnIcon = document.querySelector('#toggle-sidebar-btn i');
-                    if (toggleBtnIcon) toggleBtnIcon.className = 'fas fa-bars';
-                 }
-
-             } catch (error) {
-                 console.error('Error loading shared model:', error);
-                 showErrorMessage('Failed to load shared model: ' + error.message);
-                 showFrontpage(); // Show frontpage on error
-             } finally {
-                 const loadingIndicator = document.getElementById('loading-indicator');
-                 if (loadingIndicator) loadingIndicator.style.display = 'none';
-             }
+        // Ensure supabase was initialized before proceeding
+        if (!supabase) {
+            console.error("Supabase client not available. Cannot proceed with app initialization.");
+            // Error message was already shown during Supabase init failure
+            return; 
         }
+        
+        try {
+            // Check session first
+            const { data: { session } } = await supabase.auth.getSession();
+            console.log('Initial session check:', session ? session.user?.email : 'No session');
+            updateAuthUI(session);
 
-        // --- MODIFIED: Check for shareId or model URL parameter ---
-        async function checkUrlParamsAndInit() {
-            const urlParams = new URLSearchParams(window.location.search);
-            const shareId = urlParams.get('shareId');
-            const modelUrl = urlParams.get('model'); // Keep old logic as fallback
-            const filenameParam = urlParams.get('filename');
+            // Directly initialize the app
+            await initializeApp(); 
+            console.log("initializeApp finished.");
 
-            if (shareId) {
-                // Handle shared link loading
-                await loadSharedModel(shareId);
-            } else if (modelUrl) {
-                // --- Keep existing model URL logic as fallback --- 
-                try {
-                    const frontpage = document.getElementById('frontpage');
-                    const loadingIndicator = document.getElementById('loading-indicator');
-                    const container = document.querySelector('.container');
-                    const dropZone = document.getElementById('drop-zone');
-                    
-                    if (frontpage) frontpage.style.display = 'none';
-                    if (loadingIndicator) loadingIndicator.style.display = 'flex';
-                    if (container) container.style.display = 'block';
-                    if (dropZone) dropZone.style.display = 'none';
+            // Always show the frontpage initially in this simplified test
+            showFrontpage();
+            console.log("Showing frontpage.");
 
-                    const initSuccess = await initializeApp(); 
-                    console.log('Viewer initialized, attempting to fetch model from URL (legacy method)...');
-                    
-                    // Check if initialization was successful before proceeding
-                    if (!initSuccess) {
-                        throw new Error("Viewer initialization failed. Cannot load model.");
-                    }
-
-                    const response = await fetch(decodeURIComponent(modelUrl));
-                    if (!response.ok) throw new Error(`Failed to fetch model: ${response.status}`);
-                    const blob = await response.blob();
-                    let filename = filenameParam ? decodeURIComponent(filenameParam) : 'model_from_url';
-                    // ... (rest of filename determination logic from original checkForModelUrl) ...
-                     if (!filename || filename.trim() === '') { filename = 'model_from_url.3dm'; }
-                     if (!filename.includes('.')) {
-                         const urlPath = new URL(decodeURIComponent(modelUrl)).pathname;
-                         const urlExt = urlPath.split('.').pop();
-                         filename = `${filename}.${urlExt && urlExt.length <= 4 ? urlExt : '3dm'}`;
-                     }
-                    
-                    const modelFile = new File([blob], filename, { type: blob.type });
-                    const fileExtension = filename.split('.').pop().toLowerCase();
-
-                    if (fileExtension === '3dm') {
-                        await process3DMFile(modelFile);
-                    } else if (['obj', 'stl', 'glb', 'gltf'].includes(fileExtension)) {
-                        await processOtherFile(modelFile);
-                    } else {
-                        throw new Error(`Unsupported file type: .${fileExtension}`);
-                    }
-                    console.log(`Legacy model processing complete for: ${filename}`);
-
-                } catch (error) {
-                    console.error('Error loading model from legacy URL:', error);
-                    showErrorMessage('Failed to load model: ' + error.message);
-                    showFrontpage();
-                } finally {
-                     const loadingIndicator = document.getElementById('loading-indicator');
-                     if (loadingIndicator) loadingIndicator.style.display = 'none';
-                }
-                // --- End of legacy model URL logic --- 
-            } else {
-                // No shareId or modelUrl - Normal Initialization
-                console.log('No share or model URL found, initializing app normally.');
-                const loadingIndicator = document.getElementById('loading-indicator');
-                if (loadingIndicator) loadingIndicator.style.display = 'flex';
-                try {
-                    await initializeApp();
-                    showFrontpage();
-                } catch (error) {
-                     console.error('Error initializing app normally:', error);
-                     showErrorMessage('Error initializing viewer: ' + error.message);
-                } finally {
-                    if (loadingIndicator) loadingIndicator.style.display = 'none';
-                }
-            }
+        } catch(error) {
+            console.error("Error during application init on load:", error);
+            showErrorMessage("Viewer initialization failed: " + error.message);
+        } finally {
+             // Hide loading indicator regardless of success/failure
+             if (loadingIndicator) loadingIndicator.style.display = 'none';
         }
+    };
 
-        // Initialize auth state listener
+    // Initialize auth state listener only if Supabase is available
+    if (supabase) { 
         supabase.auth.onAuthStateChange((event, session) => {
             console.log(`Auth event: ${event}`, session ? session.user?.email : 'No session');
             updateAuthUI(session);
         });
 
-        // --- MODIFIED: Check initial session and THEN check URL params ON WINDOW LOAD ---
-        window.onload = () => {
-            console.log("Window fully loaded, checking session and URL params...");
-            supabase.auth.getSession().then(({ data: { session } }) => {
-                console.log('Initial session check:', session ? session.user?.email : 'No session');
-                updateAuthUI(session);
-                // Now call the function that handles URL params and initialization
-                checkUrlParamsAndInit(); 
-            });
-        };
-
-        // Add Logout Listener
+        // Add Logout Listener only if Supabase is available
         const logoutButton = document.getElementById('logout-btn');
-        if (logoutButton) {
+        if (logoutButton) { 
             logoutButton.addEventListener('click', async () => {
-                try {
-                    const { error } = await supabase.auth.signOut();
-                    if (error) throw error;
-                    window.location.href = 'login.html'; 
-                } catch (error) {
-                    console.error('Error signing out:', error);
-                    showErrorMessage('Error signing out: ' + error.message);
-                }
+                 try {
+                     const { error } = await supabase.auth.signOut();
+                     if (error) throw error;
+                     window.location.href = 'login.html'; 
+                 } catch (error) {
+                     console.error('Error signing out:', error);
+                     showErrorMessage('Error signing out: ' + error.message);
+                 }
             });
         }
+    } // End of if(supabase)
 
-    } catch (error) {
-        console.error('Failed to initialize Supabase:', error);
-        showErrorMessage('Failed to initialize Supabase: ' + error.message);
-    }
 </script>
 <script src="theme.js" defer></script>
 </body>
