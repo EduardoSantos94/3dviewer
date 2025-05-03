@@ -1906,7 +1906,7 @@ select:focus {
     position: absolute;
     top: 15px; /* Adjust as needed */
     right: 15px; /* Adjust as needed */
-    z-index: 100; /* Ensure it's above the viewer canvas */
+    z-index: 1100; /* Ensure it's above the viewer canvas & nav bar */
     background-color: var(--bg-secondary);
     color: var(--text-primary);
     border: 1px solid var(--border-primary);
