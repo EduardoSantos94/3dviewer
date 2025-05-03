@@ -183,4 +183,32 @@ function onWindowResize() {
         composer.setSize(container ? container.clientWidth : window.innerWidth, 
                          container ? container.clientHeight : window.innerHeight);
     }
+}
+
+function showErrorMessage(message) {
+    // Create error message element
+    const errorDiv = document.createElement('div');
+    errorDiv.className = 'error-message';
+    errorDiv.innerHTML = `
+        <div class="error-content">
+            <i class="fas fa-exclamation-triangle"></i>
+            <h3>Error</h3>
+            <p>${message}</p>
+            <button id="error-close">OK</button>
+        </div>
+    `;
+    
+    // Check if document.body exists before appending
+    if (document.body) {
+        document.body.appendChild(errorDiv);
+    } else {
+        console.error("Cannot show error message: document.body is not available yet.");
+        // As a last resort, use alert, though it's less user-friendly
+        alert("Error: " + message);
+        return; // Stop further execution for this message
+    }
+    
+    // Add event listener to close button
+    const closeBtn = document.getElementById('error-close');
+    // ... rest of showErrorMessage ...
 } 
