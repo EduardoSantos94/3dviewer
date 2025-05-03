@@ -740,6 +740,7 @@ window.showShareModal = async function(storedName, originalName) { // Make async
             .select('id, title, description, access_code')
             .eq('user_id', userId)
             .eq('file_path', filePath)
+            .limit(1)
             .maybeSingle(); // Use maybeSingle to handle 0 or 1 result
 
         if (fetchError) throw fetchError;
