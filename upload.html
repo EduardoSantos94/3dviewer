@@ -446,19 +446,26 @@
                 </div>
                 <!-- End Title and Description Inputs -->
 
-                <div class="form-group" style="margin-top: 1rem;">
-                    <label>
-                        <input type="radio" name="share-option" value="public" checked> Public Link (Anyone can view)
-                    </label>
+                <!-- Replaced Radio Buttons -->
+                <div class="share-options-container">
+                    <div class="share-option-item">
+                        <label class="share-option-label">
+                            <input type="radio" name="share-option" value="public" checked>
+                            <i class="fas fa-globe-americas"></i> Public Link
+                            <span>(Anyone can view)</span>
+                        </label>
+                    </div>
+                    <div class="share-option-item">
+                        <label class="share-option-label">
+                            <input type="radio" name="share-option" value="password">
+                            <i class="fas fa-lock"></i> Password Protected
+                        </label>
+                        <input type="password" id="share-password" placeholder="Enter password" style="display: none; margin-top: 8px; width: calc(100% - 16px); padding: 8px; border: 1px solid var(--border-secondary); border-radius: 4px; background-color: var(--bg-tertiary); color: var(--text-primary); box-sizing: border-box; margin-left: 8px;"/>
+                    </div>
                 </div>
-                <div class="form-group">
-                    <label>
-                        <input type="radio" name="share-option" value="password"> Password Protected
-                    </label>
-                    <input type="password" id="share-password" placeholder="Enter password" style="display: none; margin-top: 5px; width: 100%; padding: 8px; border: 1px solid var(--border-secondary); border-radius: 4px; background-color: var(--bg-tertiary); color: var(--text-primary);"/>
-                </div>
+                <!-- End Replaced Radio Buttons -->
 
-                <button id="generate-share-link-btn" class="primary-btn" style="width: 100%; margin-top: 1rem;">Generate Link</button>
+                <button id="generate-share-link-btn" class="primary-btn" style="width: 100%; margin-top: 1.5rem;">Generate Link</button>
 
                 <div id="generated-link-container" style="display: none; margin-top: 1.5rem;">
                     <p>Shareable Link:</p>

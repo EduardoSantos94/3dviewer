@@ -1999,4 +1999,86 @@ select:focus {
     /* We might need to find the original .ui-sidebar rule if it exists */
     /* Remove padding-top */
     /* padding-top: 50px; */ 
-} 
+}
+
+/* --- Share Modal Option Styling --- */
+.share-options-container {
+    display: flex;
+    gap: 1rem;
+    margin-top: 1rem;
+    margin-bottom: 1rem;
+}
+
+.share-option-item {
+    flex: 1;
+    border: 1px solid var(--border-secondary);
+    border-radius: 8px;
+    padding: 1rem;
+    background-color: var(--bg-tertiary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    position: relative; /* For potential future absolute elements */
+}
+
+.share-option-item:hover {
+    background-color: var(--border-primary);
+    border-color: var(--text-tertiary);
+}
+
+/* Style the label containing the radio button */
+.share-option-label {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem; /* Space between radio/icon and text */
+    font-weight: 500;
+    color: var(--text-primary);
+    cursor: pointer; /* Ensure label itself is clickable */
+}
+
+.share-option-label i {
+    font-size: 1.1rem; /* Slightly larger icons */
+    color: var(--icon-secondary); /* Use secondary icon color */
+    width: 20px; /* Fixed width for alignment */
+    text-align: center;
+}
+
+.share-option-label span {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    font-weight: 400;
+    margin-left: auto; /* Push the span to the right */
+}
+
+/* Hide the actual radio button */
+.share-option-label input[type="radio"] {
+    appearance: none;
+    -webkit-appearance: none;
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+/* Highlight the selected item */
+.share-option-item:has(input[type="radio"]:checked) {
+    border-color: var(--accent-primary);
+    background-color: var(--accent-primary-light);
+    box-shadow: 0 0 0 2px var(--accent-primary-light);
+}
+
+.share-option-item:has(input[type="radio"]:checked) .share-option-label i {
+    color: var(--accent-primary);
+}
+
+/* Position the password input correctly */
+#share-password {
+    margin-top: 0.75rem;
+    width: calc(100% - 0px); /* Adjust width if needed, considering padding */
+    box-sizing: border-box;
+    /* Removed margin-left as it's now block level */
+}
+/* --- End Share Modal Option Styling --- */
+
+/* Loading overlay adjustments if needed */
+
+/* Loading overlay adjustments if needed */ 
