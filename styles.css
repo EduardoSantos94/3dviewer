@@ -1903,13 +1903,13 @@ select:focus {
 
 /* Sidebar Toggle Button */
 #toggle-sidebar-btn {
-    position: absolute;
-    top: 15px; /* Adjust as needed */
+    position: fixed; /* Changed from absolute */
+    top: 60px; /* Adjusted for nav bar (48px height + padding) */
     right: 15px; /* Adjust as needed */
-    z-index: 1100; /* Ensure it's above the viewer canvas & nav bar */
-    background-color: var(--bg-secondary);
-    color: var(--text-primary);
-    border: 1px solid var(--border-primary);
+    z-index: 1600; /* Ensure it's above nav bar (1500) */
+    background-color: red; /* TEMP: Make it obvious */
+    color: white; /* TEMP: Ensure text/icon is visible */
+    border: 1px solid black; /* TEMP: Add border */
     border-radius: 50%; /* Make it circular */
     width: 40px;
     height: 40px;
@@ -1951,6 +1951,7 @@ select:focus {
     flex-grow: 1; 
     height: 100%; 
     overflow: hidden; /* Optional: Hide overflow if canvas resizes */
+    background-color: rgba(0, 0, 255, 0.1); /* TEMP: Blue background */
 }
 
 /* Styling for Model Info Container */
@@ -1975,4 +1976,11 @@ select:focus {
 .model-info-container p {
     margin: 0;          /* Adjust description margin */
     font-size: 0.9em;
+}
+
+#viewer-area { /* Add temporary background */
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+    background-color: rgba(0, 255, 0, 0.1); /* TEMP: Green background */
 } 
