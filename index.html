@@ -479,40 +479,86 @@
          }
     }
 
-    // --- Simplified Initialization on Window Load --- 
+    // --- Initialization on Window Load with URL Parameter Handling --- 
     window.onload = async () => {
         console.log("Window fully loaded. Performing basic initialization.");
         const loadingIndicator = document.getElementById('loading-indicator');
         
-        // Show loading indicator only if Supabase initialized successfully
-        if (supabase && loadingIndicator) {
-             loadingIndicator.style.display = 'flex';
-        }
+        // Show loading indicator
+        if (loadingIndicator) loadingIndicator.style.display = 'flex';
         
-        // Ensure supabase was initialized before proceeding
+        // Initialize Supabase first
         if (!supabase) {
-            console.error("Supabase client not available. Cannot proceed with app initialization.");
-            // Error message was already shown during Supabase init failure
+            console.error("Supabase client not available. Cannot proceed.");
+            if (loadingIndicator) loadingIndicator.style.display = 'none';
+            showErrorMessage("Critical connection error. Please refresh.");
             return; 
         }
         
         try {
-            // Check session first
+            // Check session
             const { data: { session } } = await supabase.auth.getSession();
             console.log('Initial session check:', session ? session.user?.email : 'No session');
             updateAuthUI(session);
 
-            // Directly initialize the app
+            // Initialize the Three.js app components (scene, camera, renderer etc.)
             await initializeApp(); 
             console.log("initializeApp finished.");
 
-            // Always show the frontpage initially in this simplified test
-            showFrontpage();
-            console.log("Showing frontpage.");
+            // Check for model parameters in URL
+            const urlParams = new URLSearchParams(window.location.search);
+            const modelUrlParam = urlParams.get('model');
+            const modelTypeParam = urlParams.get('type');
+            const filenameParam = urlParams.get('filename'); // Get filename
+            const passwordParam = urlParams.get('password'); // Optional password
+
+            if (modelUrlParam && modelTypeParam) {
+                console.log(`URL parameters found: model=${modelUrlParam}, type=${modelTypeParam}, filename=${filenameParam}`);
+                
+                // Model parameters exist, hide frontpage and load model
+                hideFrontpage(); // This function now appends the renderer
+                console.log("Hiding frontpage to load model from URL...");
+
+                // Use a default name if filenameParam is missing or invalid
+                const modelName = filenameParam ? decodeURIComponent(filenameParam) : `Model.${modelTypeParam}`;
+
+                // Decode the model URL
+                const decodedModelUrl = decodeURIComponent(modelUrlParam);
+
+                // TODO: Implement password check if passwordParam exists
+                if (passwordParam) {
+                    console.log("Password parameter found, validation needed.");
+                    // Example: showPasswordPrompt((enteredPassword) => { ... });
+                    // For now, just log a warning
+                    console.warn("Password protection not fully implemented yet.");
+                }
+
+                // Load the model based on type
+                try {
+                    if (modelTypeParam === '3dm') {
+                        await process3DMFile(decodedModelUrl, modelName); // Pass URL and name
+                    } else {
+                        await processOtherFile(decodedModelUrl, modelName); // Pass URL and name
+                    }
+                    console.log(`Model ${modelName} loaded successfully from URL.`);
+                } catch (loadError) {
+                    console.error(`Error loading model from URL: ${loadError}`);
+                    showErrorMessage(`Failed to load model: ${loadError.message}. Please check the link or try uploading manually.`);
+                    // Fallback to showing the frontpage if loading fails
+                    showFrontpage(); 
+                }
+
+            } else {
+                // No model parameters, show the frontpage
+                console.log("No model parameters found in URL. Showing frontpage.");
+                showFrontpage();
+            }
 
         } catch(error) {
             console.error("Error during application init on load:", error);
             showErrorMessage("Viewer initialization failed: " + error.message);
+            // Attempt to show frontpage even on error, if possible
+            try { showFrontpage(); } catch (e) { /* Ignore secondary error */ }
         } finally {
              // Hide loading indicator regardless of success/failure
              if (loadingIndicator) loadingIndicator.style.display = 'none';

@@ -198,7 +198,7 @@ function hideFrontpage() {
     const frontpage = document.getElementById('frontpage');
     const dropZone = document.getElementById('drop-zone');
     const container = document.querySelector('.container');
-    const viewerContainer = document.getElementById('viewer-container');
+    const viewerContainer = document.getElementById('viewer-area'); // This ID doesn't exist, should be viewer-area
     
     if (frontpage) {
         frontpage.style.display = 'none';
@@ -208,6 +208,24 @@ function hideFrontpage() {
     // Show the main container first
     if (container) {
         container.style.display = 'block';
+        
+        // --- ADDED appendChild here ---
+        // Ensure renderer exists before appending
+        if (renderer && renderer.domElement) {
+            const viewerArea = document.getElementById('viewer-area');
+            if (viewerArea) {
+                // Clear previous canvas if any (optional, but good practice)
+                while (viewerArea.firstChild) {
+                    viewerArea.removeChild(viewerArea.firstChild);
+                }
+                viewerArea.appendChild(renderer.domElement);
+                console.log('Renderer appended to #viewer-area');
+            } else {
+                console.error('#viewer-area not found when trying to append renderer!');
+            }
+        } else {
+            console.error('Renderer or renderer.domElement not ready during hideFrontpage!');
+        }
     }
     
     // Then show the drop zone for file selection
@@ -533,8 +551,8 @@ async function init() {
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.2; // Keep initial value, adjust later if needed
-    // Append to the correct container
-    document.getElementById('viewer-area').appendChild(renderer.domElement);
+    // --- REMOVED appendChild from here ---
+    // document.getElementById('viewer-area').appendChild(renderer.domElement);
 
     // Initialize post-processing
     composer = new EffectComposer(renderer);
