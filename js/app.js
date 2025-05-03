@@ -108,91 +108,80 @@ function zoomToFit(model) {
 }
 
 export async function init() {
-    console.log('Initializing application (using stricter DOM check)...');
+    console.log('Initializing application (Direct DOM access after window.onload)...');
     try {
-        await setupRhino();
+        // Rhino setup should happen first
+        await setupRhino(); 
         console.log('Rhino3dm setup complete.');
 
-        const checkDomInterval = setInterval(async () => {
-            // Check BOTH readyState AND the existence of the container
-            const container = document.getElementById('main-content');
-            const isDomReady = document.readyState === 'complete' || document.readyState === 'interactive';
+        // --- DOM is assumed ready because init is called via window.onload --- 
+        const container = document.getElementById('main-content');
+        
+        // **Crucial Check**:
+        if (!container) {
+            console.error('CRITICAL INIT ERROR: Target container #main-content not found even after window.onload!');
+            showErrorMessage('Fatal Error: Viewer container element (#main-content) is missing. Cannot initialize.');
+            // We cannot proceed without the container.
+            // Depending on requirements, you might hide loading, show an error state, etc.
+            hideLoadingIndicator(); 
+            return; // Stop initialization decisively
+        }
+        console.log('Target container #main-content successfully found.');
 
-            if (isDomReady && container) {
-                clearInterval(checkDomInterval);
-                console.log('DOM is ready and #main-content found.');
+        // --- Proceed with initialization --- 
+        scene = new THREE.Scene();
+        camera = new THREE.PerspectiveCamera(75, container.clientWidth / container.clientHeight, 0.1, 1000);
+        camera.position.set(0, 0, 10); // Adjust as needed
 
-                try {
-                    // --- Proceed with initialization inside the successful check --- 
-                    console.log('[Simplified Init] Target container #main-content confirmed.');
-                    
-                    scene = new THREE.Scene();
-                    camera = new THREE.PerspectiveCamera(75, container.clientWidth / container.clientHeight, 0.1, 1000);
-                    camera.position.set(0, 0, 10); // Adjust initial camera position
+        renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(container.clientWidth, container.clientHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.0;
+        renderer.outputColorSpace = THREE.SRGBColorSpace;
 
-                    renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-                    renderer.setSize(container.clientWidth, container.clientHeight);
-                    renderer.setPixelRatio(window.devicePixelRatio);
-                    // Minimal renderer setup for testing
-                    // renderer.toneMapping = THREE.ACESFilmicToneMapping;
-                    // renderer.toneMappingExposure = 1.0;
-                    // renderer.outputColorSpace = THREE.SRGBColorSpace; 
+        console.log('Renderer initialized.');
+        console.log('Renderer DOM element:', renderer.domElement);
 
-                    console.log('[Simplified Init] Renderer initialized.');
-                    console.log('[Simplified Init] Renderer DOM element:', renderer.domElement);
+        // Append renderer - This is the critical point
+        console.log('Attempting to append renderer...');
+        container.appendChild(renderer.domElement);
+        console.log('Renderer appended to #main-content.');
 
-                    // --- AGGRESSIVE DEBUGGING --- 
-                    console.log('[Simplified Init] Attempting to append renderer. Container element:', container);
-                    if (!container) {
-                        console.error('CRITICAL: Container is null JUST BEFORE appendChild!');
-                        showErrorMessage('Critical error: Viewer container became null unexpectedly.');
-                        return; 
-                    }
-                    // --- END DEBUGGING ---
+        // Restore other setup calls
+        controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        // ... other control settings ...
+        controls.target.set(0, 0, 0);
+        controls.update();
+        console.log('OrbitControls initialized.');
+        
+        setupLighting();
+        console.log('Lighting setup complete.');
+        
+        await setupEnvironment();
+        console.log('Environment setup complete.');
+        
+        setupEventListeners(); 
+        console.log('Event listeners setup complete.');
 
-                    // Append renderer
-                    container.appendChild(renderer.domElement); // Appending to #main-content
-                    console.log('[Simplified Init] Renderer appended to #main-content.');
-
-                    // --- Temporarily commented out other setup --- 
-                    // controls = new OrbitControls(camera, renderer.domElement);
-                    // console.log('[Simplified Init] OrbitControls would initialize here.');
-                    
-                    // setupLighting();
-                    // console.log('[Simplified Init] setupLighting would run here.');
-                    
-                    // await setupEnvironment();
-                    // console.log('[Simplified Init] setupEnvironment would run here.');
-                    
-                    // setupEventListeners(); 
-                    // console.log('[Simplified Init] setupEventListeners would run here.');
-
-                    // animate();
-                    // console.log('[Simplified Init] Animation loop would start here.');
-                    
-                    // await handleInitialLoad(); 
-                    // console.log('[Simplified Init] handleInitialLoad would run here.');
-                    // --- End of temporarily commented out setup --- 
-
-                    // Basic render to confirm append worked
-                    if (scene && camera && renderer) {
-                        renderer.render(scene, camera);
-                        console.log('[Simplified Init] Initial render completed.');
-                    }
-
-                } catch (initError) {
-                    console.error('Error during simplified renderer/controls setup:', initError);
-                    showErrorMessage(`Initialization Error (Simplified): ${initError.message}`);
-                }
-
-            } else {
-                console.log(`DOM/Container not ready yet. State: ${document.readyState}, Container found: ${!!container}`);
-            }
-        }, 50); // Check more frequently (e.g., every 50ms)
+        // Start animation loop
+        animate();
+        console.log('Animation loop started.');
+        
+        // Initial load logic (e.g., loading shared model or showing frontpage)
+        // This was previously inside init, ensure it's called appropriately AFTER init completes
+        // We might need to adjust where handleInitialLoad is called in index.html's logic
+        // For now, keep it commented here as its placement depends on the calling structure
+        // await handleInitialLoad(); 
+        // console.log('handleInitialLoad would run here.');
 
     } catch (error) {
-        console.error('Error initializing the application:', error);
-        showErrorMessage(`Error initializing the application: ${error.message}`);
+        console.error('Error during application initialization:', error);
+        // Use the specific line number if possible, otherwise a general message
+        const errorLine = error.stack ? error.stack.split('\n')[1] : '(unknown location)';
+        showErrorMessage(`Initialization Error at ${errorLine}: ${error.message}`);
         hideLoadingIndicator();
     }
 }
