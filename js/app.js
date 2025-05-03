@@ -108,12 +108,8 @@ function zoomToFit(model) {
 }
 
 export async function init() {
-    console.log('Initializing application (Direct DOM access after window.onload)...');
+    console.log('Initializing application (Rhino Init Deferred)...');
     try {
-        // Rhino setup should happen first
-        await setupRhino(); 
-        console.log('Rhino3dm setup complete.');
-
         // --- DOM is assumed ready because init is called via window.onload --- 
         const container = document.getElementById('main-content');
         
@@ -121,17 +117,15 @@ export async function init() {
         if (!container) {
             console.error('CRITICAL INIT ERROR: Target container #main-content not found even after window.onload!');
             showErrorMessage('Fatal Error: Viewer container element (#main-content) is missing. Cannot initialize.');
-            // We cannot proceed without the container.
-            // Depending on requirements, you might hide loading, show an error state, etc.
             hideLoadingIndicator(); 
             return; // Stop initialization decisively
         }
         console.log('Target container #main-content successfully found.');
 
-        // --- Proceed with initialization --- 
+        // --- Initialize Core Three.js First --- 
         scene = new THREE.Scene();
         camera = new THREE.PerspectiveCamera(75, container.clientWidth / container.clientHeight, 0.1, 1000);
-        camera.position.set(0, 0, 10); // Adjust as needed
+        camera.position.set(0, 0, 10); 
 
         renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
         renderer.setSize(container.clientWidth, container.clientHeight);
@@ -143,12 +137,18 @@ export async function init() {
         console.log('Renderer initialized.');
         console.log('Renderer DOM element:', renderer.domElement);
 
-        // Append renderer - This is the critical point
+        // Append renderer BEFORE setting up Rhino
         console.log('Attempting to append renderer...');
         container.appendChild(renderer.domElement);
         console.log('Renderer appended to #main-content.');
+        
+        // --- Initialize Rhino AFTER Appending Renderer ---
+        console.log('Now attempting to set up Rhino3dm...');
+        await setupRhino(); 
+        console.log('Rhino3dm setup complete.');
+        // --------------------------------------------------
 
-        // Restore other setup calls
+        // --- Continue with rest of setup ---
         controls = new OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
         controls.dampingFactor = 0.05;
@@ -170,16 +170,11 @@ export async function init() {
         animate();
         console.log('Animation loop started.');
         
-        // Initial load logic (e.g., loading shared model or showing frontpage)
-        // This was previously inside init, ensure it's called appropriately AFTER init completes
-        // We might need to adjust where handleInitialLoad is called in index.html's logic
-        // For now, keep it commented here as its placement depends on the calling structure
+        // Note: handleInitialLoad might need to be called from index.html after init completes
         // await handleInitialLoad(); 
-        // console.log('handleInitialLoad would run here.');
 
     } catch (error) {
         console.error('Error during application initialization:', error);
-        // Use the specific line number if possible, otherwise a general message
         const errorLine = error.stack ? error.stack.split('\n')[1] : '(unknown location)';
         showErrorMessage(`Initialization Error at ${errorLine}: ${error.message}`);
         hideLoadingIndicator();
