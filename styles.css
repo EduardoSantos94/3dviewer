@@ -1983,4 +1983,12 @@ select:focus {
     position: relative;
     overflow: hidden;
     background-color: rgba(0, 255, 0, 0.1); /* TEMP: Green background */
+}
+
+/* Style for the right-hand control sidebar */
+.sidebar {
+    z-index: 1500; /* Lower than toggle button (1600) */
+    position: relative; /* Needed for z-index to apply */
+    /* Existing styles like width, background etc. might be here */
+    /* We might need to find the original .ui-sidebar rule if it exists */
 } 

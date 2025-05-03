@@ -266,6 +266,11 @@
         /* Remove fixed position from old auth styles if they exist elsewhere */
         /* .auth-status { position: static; ... } */
         
+        /* Add style to ensure sidebar is behind the toggle button */
+        .sidebar {
+            z-index: 1500; /* Lower than toggle button (1600) */
+            position: relative; /* Needed for z-index to apply */
+        }
     </style>
 </head>
 <body>
@@ -424,7 +429,7 @@
         </div>
     </div>
 
-<script type="module">
+    <script type="module">
     import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.3/+esm';
     import { initializeApp, process3DMFile, showFrontpage, hideFrontpage, processOtherFile } from './app.js';
 
