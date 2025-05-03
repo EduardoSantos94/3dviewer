@@ -2035,6 +2035,14 @@ select:focus {
     cursor: pointer; /* Ensure label itself is clickable */
 }
 
+/* Container for the main text and sub-text */
+.share-option-text {
+    display: flex;
+    flex-direction: column; /* Stack main text and sub-text */
+    line-height: 1.2; /* Adjust line height for stacking */
+    flex-grow: 1; /* Allow text container to take available space */
+}
+
 .share-option-label i {
     font-size: 1.1rem; /* Slightly larger icons */
     color: var(--icon-secondary); /* Use secondary icon color */
@@ -2046,7 +2054,7 @@ select:focus {
     font-size: 0.8rem;
     color: var(--text-secondary);
     font-weight: 400;
-    margin-left: auto; /* Push the span to the right */
+    /* Removed margin-left: auto; */
 }
 
 /* Hide the actual radio button */
