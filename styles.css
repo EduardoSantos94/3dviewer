@@ -1915,7 +1915,7 @@ select:focus {
     height: 40px;
     font-size: 16px; /* Restore original size */
     cursor: pointer;
-    display: flex;
+    display: flex !important; /* FORCE VISIBILITY FOR DEBUG */
     align-items: center;
     justify-content: center;
     box-shadow: 0 2px 5px var(--shadow-color-medium);
