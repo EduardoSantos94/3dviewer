@@ -1901,24 +1901,24 @@ select:focus {
     display: none;
 }
 
-/* Sidebar Toggle Button - Positioned inside sidebar */
+/* Sidebar Toggle Button - Fixed on right side */
 #toggle-sidebar-btn {
-    position: absolute; /* Relative to .sidebar */
-    top: 10px; 
-    left: 10px; 
-    z-index: 1550; /* Above sidebar content, below nav */
-    background-color: var(--bg-secondary); /* Restore original */
-    color: var(--text-primary); /* Restore original */
-    border: 1px solid var(--border-primary); /* Restore original */
+    position: fixed; /* Position relative to viewport */
+    top: 60px; /* Same vertical position */
+    right: 15px; /* Position on the right */
+    z-index: 1600; /* Ensure it's above other elements */
+    background-color: var(--bg-secondary); /* Original background */
+    color: var(--text-primary); /* Original color */
+    border: 1px solid var(--border-primary); /* Original border */
     border-radius: 50%; 
-    width: 30px; /* Slightly smaller */
-    height: 30px;
-    font-size: 14px; /* Smaller icon */
+    width: 40px; /* Restore original size */
+    height: 40px;
+    font-size: 16px; /* Restore original size */
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 1px 3px var(--shadow-color-light);
+    box-shadow: 0 2px 5px var(--shadow-color-medium);
     transition: all 0.2s ease;
 }
 
@@ -1991,6 +1991,6 @@ select:focus {
     position: relative; 
     /* Existing styles like width, background etc. might be here */
     /* We might need to find the original .ui-sidebar rule if it exists */
-    /* Add padding-top to prevent button overlap */
-    padding-top: 50px; /* Adjust as needed based on button size/position */
+    /* Remove padding-top */
+    /* padding-top: 50px; */ 
 } 
