@@ -353,12 +353,33 @@
     <!-- Main Container -->
     <div class="container">
         <div class="viewer-layout">
-            <div class="viewer-area">
-                <div id="viewer-container"></div>
-                <!-- Add Sidebar Toggle Button -->
-                <button id="toggle-sidebar-btn" title="Toggle Sidebar">
-                    <i class="fas fa-bars"></i>
-                </button>
+            <div id="viewer-area">
+                <div id="sidebar">
+                    <!-- Sidebar content: materials, environment maps -->
+                    <h3>Materials</h3>
+                    <div id="materials-list"></div>
+                    <hr>
+                    <h3>Environment</h3>
+                    <select id="environment-select"></select>
+                    <!-- Add more controls as needed -->
+                </div>
+                <div id="main-content">
+                    <canvas id="viewer-canvas"></canvas>
+                    <button id="toggle-sidebar-btn">Toggle Sidebar</button> <!-- Existing Toggle Button -->
+                    
+                    <!-- New elements for Title and Description -->
+                    <div id="model-info" class="model-info-container">
+                        <h2 id="model-title"></h2>
+                        <p id="model-description"></p>
+                    </div>
+                    
+                    <div id="loading-indicator" style="display: none;">
+                        <div class="spinner"></div> Loading model...
+                    </div>
+                    <div id="password-prompt" style="display: none;">
+                        <!-- Password prompt content -->
+                    </div>
+                </div>
             </div>
             <div class="sidebar">
                 <div class="controls-panel">

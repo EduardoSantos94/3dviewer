@@ -1942,4 +1942,37 @@ select:focus {
 }
 
 /* Ensure main container takes full height */
-/* ... rest of CSS ... */ 
+/* ... rest of CSS ... */
+
+/* Ensure main-content is positioned relatively for absolute positioning inside */
+#main-content {
+    position: relative; 
+    /* Ensure it takes up the necessary space */
+    flex-grow: 1; 
+    height: 100%; 
+    overflow: hidden; /* Optional: Hide overflow if canvas resizes */
+}
+
+/* Styling for Model Info Container */
+.model-info-container {
+    position: absolute; /* Position relative to the main-content area */
+    bottom: 10px;       /* Position at the bottom */
+    left: 10px;         /* Position on the left */
+    background-color: rgba(0, 0, 0, 0.6); /* Semi-transparent background */
+    color: white;       /* White text */
+    padding: 10px 15px; /* Padding */
+    border-radius: 5px; /* Rounded corners */
+    max-width: 80%;     /* Prevent it from becoming too wide */
+    z-index: 10;        /* Ensure it's above the canvas */
+    pointer-events: none; /* Allow clicks to pass through to the canvas if needed */
+}
+
+.model-info-container h2 {
+    margin: 0 0 5px 0; /* Adjust title margin */
+    font-size: 1.1em;
+}
+
+.model-info-container p {
+    margin: 0;          /* Adjust description margin */
+    font-size: 0.9em;
+} 

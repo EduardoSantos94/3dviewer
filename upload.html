@@ -435,7 +435,18 @@
             <div class="modal-body">
                 <p>Choose sharing options for: <strong id="share-model-name"></strong></p>
                 
-                <div class="form-group">
+                <!-- Add Title and Description Inputs -->
+                <div class="form-group" style="margin-top: 1rem;">
+                    <label for="share-title" style="display: block; margin-bottom: 5px;">Title (Optional):</label>
+                    <input type="text" id="share-title" placeholder="e.g., Engagement Ring Design V2" style="width: 100%; padding: 8px; border: 1px solid var(--border-secondary); border-radius: 4px; background-color: var(--bg-tertiary); color: var(--text-primary);"> 
+                </div>
+                <div class="form-group" style="margin-top: 1rem;">
+                    <label for="share-description" style="display: block; margin-bottom: 5px;">Description (Optional):</label>
+                    <textarea id="share-description" placeholder="e.g., 18k Rose Gold with 1.5ct center stone" rows="3" style="width: 100%; padding: 8px; border: 1px solid var(--border-secondary); border-radius: 4px; background-color: var(--bg-tertiary); color: var(--text-primary);"></textarea>
+                </div>
+                <!-- End Title and Description Inputs -->
+
+                <div class="form-group" style="margin-top: 1rem;">
                     <label>
                         <input type="radio" name="share-option" value="public" checked> Public Link (Anyone can view)
                     </label>
@@ -444,7 +455,7 @@
                     <label>
                         <input type="radio" name="share-option" value="password"> Password Protected
                     </label>
-                    <input type="password" id="share-password" placeholder="Enter password" style="display: none; margin-top: 5px;"/>
+                    <input type="password" id="share-password" placeholder="Enter password" style="display: none; margin-top: 5px; width: 100%; padding: 8px; border: 1px solid var(--border-secondary); border-radius: 4px; background-color: var(--bg-tertiary); color: var(--text-primary);"/>
                 </div>
 
                 <button id="generate-share-link-btn" class="primary-btn" style="width: 100%; margin-top: 1rem;">Generate Link</button>

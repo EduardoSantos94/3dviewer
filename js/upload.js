@@ -711,6 +711,12 @@ async function createShareLink() {
     const generateBtn = document.getElementById('generate-share-link-btn');
     const loadingOverlay = document.getElementById('loading-overlay');
 
+    // Get Title and Description values
+    const titleInput = document.getElementById('share-title');
+    const descriptionInput = document.getElementById('share-description');
+    const shareTitle = titleInput ? titleInput.value.trim() : null;
+    const shareDescription = descriptionInput ? descriptionInput.value.trim() : null;
+
     if (!storedName || !errorMessage || !generatedLinkContainer || !generatedLinkInput || !generateBtn || !loadingOverlay) {
         console.error('Required elements for createShareLink not found');
         showError('Share Error', 'UI elements missing.');
@@ -741,15 +747,20 @@ async function createShareLink() {
             hashedCode = await hashPassword(accessCode); // Hash the password
         }
 
+        // Prepare data for insertion, including title and description
+        const insertPayload = {
+            user_id: userId,
+            file_path: filePath,
+            access_code: hashedCode, // Store the hashed code (or null)
+            title: shareTitle || null, // Add title (or null if empty)
+            description: shareDescription || null // Add description (or null if empty)
+            // expires_at: can be set here if needed
+        };
+
         // Insert into shared_links table
         const { data: insertData, error: insertError } = await supabase
             .from('shared_links')
-            .insert({
-                user_id: userId,
-                file_path: filePath,
-                access_code: hashedCode // Store the hashed code (or null)
-                // expires_at: can be set here if needed
-            })
+            .insert(insertPayload) // Use the payload object
             .select('id') // Select the generated ID
             .single(); // Expect a single row back
 
@@ -767,6 +778,26 @@ async function createShareLink() {
 
         generatedLinkInput.value = shareUrl;
         generatedLinkContainer.style.display = 'block';
+
+        // --- Auto-copy logic ---
+        generatedLinkInput.select(); // Select the text
+        try {
+            const successful = document.execCommand('copy');
+            const msg = successful ? 'successful' : 'unsuccessful';
+            console.log('Auto-copying link was ' + msg);
+            // Update copy button text immediately
+            const copyBtn = document.getElementById('copy-link-btn');
+            if (copyBtn) {
+                copyBtn.innerHTML = '<i class="fas fa-check"></i> Copied!';
+                setTimeout(() => {
+                    copyBtn.innerHTML = '<i class="fas fa-copy"></i> Copy';
+                }, 2500); // Reset after 2.5 seconds
+            }
+        } catch (err) {
+            console.error('Auto-copy failed:', err);
+            // Optionally alert the user or just rely on manual copy
+        }
+        // --- End Auto-copy logic ---
 
     } catch (error) {
         console.error('Error creating share link:', error);
