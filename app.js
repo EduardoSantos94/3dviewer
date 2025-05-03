@@ -533,7 +533,8 @@ async function init() {
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.2; // Keep initial value, adjust later if needed
-    document.getElementById('viewer-container').appendChild(renderer.domElement);
+    // Append to the correct container
+    document.getElementById('viewer-area').appendChild(renderer.domElement);
 
     // Initialize post-processing
     composer = new EffectComposer(renderer);
