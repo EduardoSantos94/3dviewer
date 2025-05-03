@@ -1901,24 +1901,24 @@ select:focus {
     display: none;
 }
 
-/* Sidebar Toggle Button */
+/* Sidebar Toggle Button - Positioned inside sidebar */
 #toggle-sidebar-btn {
-    position: fixed; /* Changed from absolute */
-    top: 60px; /* Adjusted for nav bar (48px height + padding) */
-    right: 15px; /* Adjust as needed */
-    z-index: 1600; /* Ensure it's above nav bar (1500) */
-    background-color: red; /* TEMP: Make it obvious */
-    color: white; /* TEMP: Ensure text/icon is visible */
-    border: 1px solid black; /* TEMP: Add border */
-    border-radius: 50%; /* Make it circular */
-    width: 40px;
-    height: 40px;
-    font-size: 16px;
+    position: absolute; /* Relative to .sidebar */
+    top: 10px; 
+    left: 10px; 
+    z-index: 1550; /* Above sidebar content, below nav */
+    background-color: var(--bg-secondary); /* Restore original */
+    color: var(--text-primary); /* Restore original */
+    border: 1px solid var(--border-primary); /* Restore original */
+    border-radius: 50%; 
+    width: 30px; /* Slightly smaller */
+    height: 30px;
+    font-size: 14px; /* Smaller icon */
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 2px 5px var(--shadow-color-medium);
+    box-shadow: 0 1px 3px var(--shadow-color-light);
     transition: all 0.2s ease;
 }
 
@@ -1951,7 +1951,7 @@ select:focus {
     flex-grow: 1; 
     height: 100%; 
     overflow: hidden; /* Optional: Hide overflow if canvas resizes */
-    background-color: rgba(0, 0, 255, 0.1); /* TEMP: Blue background */
+    /* background-color: rgba(0, 0, 255, 0.1); */ /* REMOVE TEMP DEBUG */
 }
 
 /* Styling for Model Info Container */
@@ -1978,17 +1978,19 @@ select:focus {
     font-size: 0.9em;
 }
 
-#viewer-area { /* Add temporary background */
+#viewer-area { /* REMOVE TEMP DEBUG */
     flex: 1;
     position: relative;
     overflow: hidden;
-    background-color: rgba(0, 255, 0, 0.1); /* TEMP: Green background */
+    /* background-color: rgba(0, 255, 0, 0.1); */
 }
 
 /* Style for the right-hand control sidebar */
 .sidebar {
-    z-index: 1500; /* Lower than toggle button (1600) */
-    position: relative; /* Needed for z-index to apply */
+    z-index: 1500; 
+    position: relative; 
     /* Existing styles like width, background etc. might be here */
     /* We might need to find the original .ui-sidebar rule if it exists */
+    /* Add padding-top to prevent button overlap */
+    padding-top: 50px; /* Adjust as needed based on button size/position */
 } 
