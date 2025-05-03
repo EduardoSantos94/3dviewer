@@ -108,8 +108,14 @@ function zoomToFit(model) {
 }
 
 export async function init() {
-    console.log('Initializing application (Rhino Init Deferred)...');
+    console.log('Initializing application (Rhino Init First)...');
     try {
+        // --- Initialize Rhino FIRST ---
+        console.log('Attempting to set up Rhino3dm...');
+        await setupRhino(); 
+        console.log('Rhino3dm setup complete.');
+        // ----------------------------
+
         // --- DOM is assumed ready because init is called via window.onload --- 
         const container = document.getElementById('main-content');
         
@@ -122,7 +128,7 @@ export async function init() {
         }
         console.log('Target container #main-content successfully found.');
 
-        // --- Initialize Core Three.js First --- 
+        // --- Proceed with Three.js initialization --- 
         scene = new THREE.Scene();
         camera = new THREE.PerspectiveCamera(75, container.clientWidth / container.clientHeight, 0.1, 1000);
         camera.position.set(0, 0, 10); 
@@ -137,17 +143,11 @@ export async function init() {
         console.log('Renderer initialized.');
         console.log('Renderer DOM element:', renderer.domElement);
 
-        // Append renderer BEFORE setting up Rhino
+        // Append renderer 
         console.log('Attempting to append renderer...');
         container.appendChild(renderer.domElement);
         console.log('Renderer appended to #main-content.');
         
-        // --- Initialize Rhino AFTER Appending Renderer ---
-        console.log('Now attempting to set up Rhino3dm...');
-        await setupRhino(); 
-        console.log('Rhino3dm setup complete.');
-        // --------------------------------------------------
-
         // --- Continue with rest of setup ---
         controls = new OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
