@@ -563,12 +563,12 @@
                     const modelTitleElement = document.getElementById('model-title');
                     const modelDescriptionElement = document.getElementById('model-description');
 
-                    // DEBUG LOGS:
-                    console.log('Share Title:', shareTitle);
-                    console.log('Share Description:', shareDescription);
-                    console.log('#model-info found:', !!modelInfoElement);
-                    console.log('#model-title found:', !!modelTitleElement);
-                    console.log('#model-description found:', !!modelDescriptionElement);
+                    // Re-add DEBUG LOGS:
+                    console.log('(DOMContentLoaded) Share Title:', shareTitle);
+                    console.log('(DOMContentLoaded) Share Description:', shareDescription);
+                    console.log('(DOMContentLoaded) #model-info found:', !!modelInfoElement);
+                    console.log('(DOMContentLoaded) #model-title found:', !!modelTitleElement);
+                    console.log('(DOMContentLoaded) #model-description found:', !!modelDescriptionElement);
                     
                     if (modelTitleElement) {
                         modelTitleElement.textContent = shareTitle || originalFilename || 'Shared Model';
@@ -578,10 +578,11 @@
                     }
                     if (modelInfoElement) { 
                          const shouldDisplay = !!(shareTitle || shareDescription); 
-                         console.log('Should display model info:', shouldDisplay);
-                         modelInfoElement.style.display = shouldDisplay ? 'block' : 'none';
+                         console.log('(DOMContentLoaded) Should display model info:', shouldDisplay);
+                         // Force display with !important
+                         modelInfoElement.style.setProperty('display', shouldDisplay ? 'block' : 'none', 'important');
                     } else {
-                         console.warn('#model-info element not found when trying to display title/description.');
+                         console.warn('(DOMContentLoaded) #model-info element not found when trying to display title/description.');
                     }
 
                     // Load the model using the signed URL and retrieved file type 

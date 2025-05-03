@@ -1959,13 +1959,14 @@ select:focus {
     position: absolute; /* Position relative to the main-content area */
     bottom: 10px;       /* Position at the bottom */
     left: 10px;         /* Position on the left */
-    background-color: rgba(0, 0, 0, 0.6); /* Semi-transparent background */
+    background-color: rgba(255, 0, 0, 0.7) !important; /* --- DEBUGGING: Bright Red Background --- */
     color: white;       /* White text */
     padding: 10px 15px; /* Padding */
     border-radius: 5px; /* Rounded corners */
     max-width: 80%;     /* Prevent it from becoming too wide */
     z-index: 10;        /* Ensure it's above the canvas */
     pointer-events: none; /* Allow clicks to pass through to the canvas if needed */
+    border: 2px solid yellow; /* --- DEBUGGING: Yellow Border --- */
 }
 
 .model-info-container h2 {
