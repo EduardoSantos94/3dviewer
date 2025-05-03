@@ -1905,7 +1905,7 @@ select:focus {
 #toggle-sidebar-btn {
     position: fixed; /* Position relative to viewport */
     top: 60px; /* Same vertical position */
-    right: 15px; /* Position on the right */
+    right: 295px; /* Position assuming sidebar (280px) is open + 15px gap */
     z-index: 1600; /* Ensure it's above other elements */
     background-color: var(--bg-secondary); /* Original background */
     color: var(--text-primary); /* Original color */
@@ -1915,7 +1915,7 @@ select:focus {
     height: 40px;
     font-size: 16px; /* Restore original size */
     cursor: pointer;
-    display: flex !important; /* FORCE VISIBILITY FOR DEBUG */
+    display: flex; /* Removed !important */
     align-items: center;
     justify-content: center;
     box-shadow: 0 2px 5px var(--shadow-color-medium);

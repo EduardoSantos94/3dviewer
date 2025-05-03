@@ -3178,16 +3178,27 @@ export {
 // Add this function
 function toggleSidebarVisibility() {
     const sidebar = document.querySelector('.sidebar');
-    const toggleBtnIcon = document.querySelector('#toggle-sidebar-btn i');
-    if (sidebar && toggleBtnIcon) {
+    const toggleBtn = document.getElementById('toggle-sidebar-btn'); // Get the button itself
+    const toggleBtnIcon = toggleBtn ? toggleBtn.querySelector('i') : null; // Get icon from button
+    
+    if (sidebar && toggleBtn && toggleBtnIcon) { // Check if button exists too
         sidebar.classList.toggle('hidden');
         const isHidden = sidebar.classList.contains('hidden');
+        
         // Change icon based on state
         toggleBtnIcon.className = `fas ${isHidden ? 'fa-bars' : 'fa-times'}`;
+        
+        // Dynamically adjust button position
+        if (isHidden) {
+            toggleBtn.style.right = '15px'; // Position near viewport edge when sidebar is hidden
+        } else {
+            toggleBtn.style.right = '295px'; // Position next to sidebar when visible (280px + 15px gap)
+        }
+        
         // Optional: Trigger resize to adjust canvas
         window.dispatchEvent(new Event('resize'));
     } else {
-        console.error('Sidebar or toggle button not found');
+        console.error('Sidebar or toggle button/icon not found');
     }
 }
 
