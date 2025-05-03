@@ -87,7 +87,6 @@ function zoomToFit(model) {
     // ... (calculate center, size, maxDim, fov, cameraZ) ...
 
     // Position the camera
-    // Use a consistent direction for zooming
     const direction = new THREE.Vector3(0, 0.5, 1).normalize(); // Slightly elevated view
     camera.position.copy(center).add(direction.multiplyScalar(cameraZ));
     camera.lookAt(center);
@@ -103,7 +102,9 @@ function zoomToFit(model) {
     }
 
     // Update the camera's near and far planes based on the model size
-    // ... (rest of the function)
+    const minZ = Math.max(0.1, maxDim * 0.01);
+    const maxZ = Math.max(1000, maxDim * 10);
+    // ... (rest of near/far plane update)
 }
 
 async function init() {
