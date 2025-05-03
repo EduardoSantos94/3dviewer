@@ -551,7 +551,7 @@
                     // Get a signed URL for the file path from the share record
                     const { data: signedUrlData, error: signedUrlError } = await supabase.storage
                         .from('client-files') 
-                        .createSignedUrl(filePath, 3600); 
+                        .createSignedUrl(filePath, 31536000); // <-- Increased duration to 1 year
                         
                     if (signedUrlError) throw signedUrlError;
                     if (!signedUrlData?.signedUrl) throw new Error('Failed to get signed URL for shared file.');

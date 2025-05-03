@@ -49,21 +49,30 @@ function createModelCard(file) {
             <i class="fas fa-cube"></i>
         </div>
         <div class="model-info">
-            <div class="model-name">${originalName}</div>
-            <div class="model-meta">${formattedSize} MB • ${timestamp}</div>
-            <div class="model-actions">
-                <button class="model-btn view-btn" title="View Model" onclick="viewModel('${file.name}', '${originalName}')">
-                    <i class="fas fa-eye"></i>
-                </button>
-                <button class="model-btn share-btn" title="Share Model" onclick="showShareModal('${file.name}', '${originalName}')">
-                    <i class="fas fa-share-alt"></i>
-                </button>
-                <button class="model-btn delete-btn" title="Delete Model" onclick="deleteModel('${file.name}')">
-                    <i class="fas fa-trash"></i>
-                </button>
+            <div class="model-name">
+                <span class="filename">${file.original_name}</span>
+                <span class="share-status-icon" style="display: none; margin-left: 8px;" title="Shared"><i class="fas fa-share-alt"></i></span>
             </div>
+            <div class="model-meta">${formattedSize} MB • ${timestamp}</div>
+        </div>
+        <div class="model-actions">
+            <button class="model-btn view-btn" title="View Model" onclick="viewModel('${file.name}', '${originalName}')">
+                <i class="fas fa-eye"></i>
+            </button>
+            <button class="model-btn share-btn" title="Share Model" onclick="showShareModal('${file.name}', '${originalName}')">
+                <i class="fas fa-share-alt"></i>
+            </button>
+            <button class="model-btn delete-btn" title="Delete Model" onclick="deleteModel('${file.name}')">
+                <i class="fas fa-trash"></i>
+            </button>
         </div>
     `;
+
+    // Add event listeners
+    card.querySelector('.view-btn').addEventListener('click', () => viewModel(file.name, originalName));
+    card.querySelector('.delete-btn').addEventListener('click', () => deleteModel(file.name));
+    card.querySelector('.share-btn').addEventListener('click', () => showShareModal(file.name, originalName));
+
     return card;
 }
 
