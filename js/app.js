@@ -145,7 +145,19 @@ async function init() {
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.2; 
     
-    // NO LONGER NEEDED: document.getElementById('main-content').appendChild(renderer.domElement);
+    // Check the fallback logic I added previously, just in case
+    const mainContentElement = document.getElementById('main-content');
+    if (!mainContentElement) { // This condition should NOT be true if HTML is correct
+        console.error("'main-content' element not found. Attempting fallback to body.");
+        // Add check for document.body before fallback appendChild
+        if (document.body) {
+             document.body.appendChild(renderer.domElement); 
+             showErrorMessage("Viewer container not found. Display might be incorrect.");
+        } else {
+             console.error("CRITICAL: document.body not found. Cannot append renderer anywhere.");
+             throw new Error("Cannot append renderer: document.body is null.");
+        }
+    }
 
     // Initialize post-processing
     composer = new EffectComposer(renderer);
