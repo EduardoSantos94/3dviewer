@@ -571,6 +571,13 @@
                     const modelInfoElement = document.getElementById('model-info');
                     const modelTitleElement = document.getElementById('model-title');
                     const modelDescriptionElement = document.getElementById('model-description');
+
+                    // DEBUG LOGS:
+                    console.log('Share Title:', shareTitle);
+                    console.log('Share Description:', shareDescription);
+                    console.log('#model-info found:', !!modelInfoElement);
+                    console.log('#model-title found:', !!modelTitleElement);
+                    console.log('#model-description found:', !!modelDescriptionElement);
                     
                     if (modelTitleElement) {
                         modelTitleElement.textContent = shareTitle || originalFilename || 'Shared Model';
@@ -578,8 +585,10 @@
                     if (modelDescriptionElement) {
                         modelDescriptionElement.textContent = shareDescription || '';
                     }
-                    if (modelInfoElement) {
-                         modelInfoElement.style.display = (shareTitle || shareDescription) ? 'block' : 'none';
+                    if (modelInfoElement) { 
+                         const shouldDisplay = !!(shareTitle || shareDescription); // Check if either has a truthy value
+                         console.log('Should display model info:', shouldDisplay);
+                         modelInfoElement.style.display = shouldDisplay ? 'block' : 'none';
                     } else {
                          console.warn('#model-info element not found when trying to display title/description.');
                     }
