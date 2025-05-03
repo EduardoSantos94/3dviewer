@@ -124,7 +124,7 @@ export async function init() {
 
                 try {
                     // --- Proceed with initialization inside the successful check --- 
-                    console.log('Target container #main-content confirmed.');
+                    console.log('[Simplified Init] Target container #main-content confirmed.');
                     
                     scene = new THREE.Scene();
                     camera = new THREE.PerspectiveCamera(75, container.clientWidth / container.clientHeight, 0.1, 1000);
@@ -133,15 +133,16 @@ export async function init() {
                     renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
                     renderer.setSize(container.clientWidth, container.clientHeight);
                     renderer.setPixelRatio(window.devicePixelRatio);
-                    renderer.toneMapping = THREE.ACESFilmicToneMapping;
-                    renderer.toneMappingExposure = 1.0;
-                    renderer.outputColorSpace = THREE.SRGBColorSpace; // Correct color space
+                    // Minimal renderer setup for testing
+                    // renderer.toneMapping = THREE.ACESFilmicToneMapping;
+                    // renderer.toneMappingExposure = 1.0;
+                    // renderer.outputColorSpace = THREE.SRGBColorSpace; 
 
-                    console.log('Renderer initialized:', renderer);
-                    console.log('Renderer DOM element:', renderer.domElement);
+                    console.log('[Simplified Init] Renderer initialized.');
+                    console.log('[Simplified Init] Renderer DOM element:', renderer.domElement);
 
                     // --- AGGRESSIVE DEBUGGING --- 
-                    console.log('Attempting to append renderer. Container element:', container);
+                    console.log('[Simplified Init] Attempting to append renderer. Container element:', container);
                     if (!container) {
                         console.error('CRITICAL: Container is null JUST BEFORE appendChild!');
                         showErrorMessage('Critical error: Viewer container became null unexpectedly.');
@@ -151,34 +152,37 @@ export async function init() {
 
                     // Append renderer
                     container.appendChild(renderer.domElement); // Appending to #main-content
-                    console.log('Renderer appended to #main-content.');
+                    console.log('[Simplified Init] Renderer appended to #main-content.');
 
-                    controls = new OrbitControls(camera, renderer.domElement);
-                    controls.enableDamping = true;
-                    controls.dampingFactor = 0.05;
-                    controls.screenSpacePanning = false;
-                    controls.minDistance = 1;
-                    controls.maxDistance = 500;
-                    controls.maxPolarAngle = Math.PI / 2;
-                    controls.target.set(0, 0, 0);
-                    controls.update();
-                    console.log('OrbitControls initialized.');
-
-                    setupLighting();
-                    await setupEnvironment();
-                    setupEventListeners(); // Ensure listeners are set up after elements exist
-
-                    // Start animation loop only after initialization
-                    animate();
-                    console.log('Animation loop started.');
+                    // --- Temporarily commented out other setup --- 
+                    // controls = new OrbitControls(camera, renderer.domElement);
+                    // console.log('[Simplified Init] OrbitControls would initialize here.');
                     
-                    // Handle shared links or show frontpage
-                    await handleInitialLoad(); 
-                    // --- End of initialization block --- 
+                    // setupLighting();
+                    // console.log('[Simplified Init] setupLighting would run here.');
+                    
+                    // await setupEnvironment();
+                    // console.log('[Simplified Init] setupEnvironment would run here.');
+                    
+                    // setupEventListeners(); 
+                    // console.log('[Simplified Init] setupEventListeners would run here.');
+
+                    // animate();
+                    // console.log('[Simplified Init] Animation loop would start here.');
+                    
+                    // await handleInitialLoad(); 
+                    // console.log('[Simplified Init] handleInitialLoad would run here.');
+                    // --- End of temporarily commented out setup --- 
+
+                    // Basic render to confirm append worked
+                    if (scene && camera && renderer) {
+                        renderer.render(scene, camera);
+                        console.log('[Simplified Init] Initial render completed.');
+                    }
 
                 } catch (initError) {
-                    console.error('Error during renderer/controls setup:', initError);
-                    showErrorMessage(`Initialization Error: ${initError.message}`);
+                    console.error('Error during simplified renderer/controls setup:', initError);
+                    showErrorMessage(`Initialization Error (Simplified): ${initError.message}`);
                 }
 
             } else {
