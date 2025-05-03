@@ -81,4 +81,27 @@ async function loadModelFromSharedLink(linkId, password = null) {
         modelTitleElement.textContent = 'Error Loading Model';
         modelDescriptionElement.textContent = error.message;
     }
+}
+
+function zoomToFit(model) {
+    // ... (calculate center, size, maxDim, fov, cameraZ) ...
+
+    // Position the camera
+    // Use a consistent direction for zooming
+    const direction = new THREE.Vector3(0, 0.5, 1).normalize(); // Slightly elevated view
+    camera.position.copy(center).add(direction.multiplyScalar(cameraZ));
+    camera.lookAt(center);
+
+    // Update camera controls ONLY IF they exist
+    if (controls) {
+        controls.target.copy(center);
+        controls.update();
+    } else {
+        console.warn('OrbitControls not initialized when zoomToFit was called.');
+        // Manually update projection matrix if controls are missing
+        camera.updateProjectionMatrix(); 
+    }
+
+    // Update the camera's near and far planes based on the model size
+    // ... (rest of the function)
 } 
