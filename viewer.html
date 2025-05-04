@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="
+        default-src 'self';
+        script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://www.googletagmanager.com https://www.google-analytics.com https://unpkg.com blob:;
+        style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com;
+        font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com;
+        connect-src 'self' https://*.supabase.co wss://*.supabase.co https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://www.google-analytics.com https://unpkg.com;
+        img-src 'self' data: blob: https://*.supabase.co https://www.google-analytics.com;
+        worker-src 'self' blob:;
+        child-src 'self' blob:;
+    ">
+    <title>3D Jewelry Viewer</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+    
+    <!-- Load Rhino3dm directly -->
+    <script src="https://cdn.jsdelivr.net/npm/rhino3dm@8.4.0/rhino3dm.min.js"></script>
+    
+    <!-- Load Supabase before app.js -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    
+    <!-- App script loads last -->
+    <script type="module" src="app.js"></script>
+
+    <style>
+        /* Error Message Styles */
+        .error-message {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .error-content {
+            background-color: white;
+            padding: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            max-width: 400px;
+            text-align: center;
+        }
+
+        .error-content i {
+            color: #dc3545;
+            font-size: 2rem;
+            margin-bottom: 1rem;
+        }
+
+        .error-content h3 {
+            color: #333;
+            margin: 0.5rem 0;
+        }
+
+        .error-content p {
+            color: #666;
+            margin: 1rem 0;
+        }
+
+        .error-content button {
+            background-color: #dc3545;
+            color: white;
+            border: none;
+            padding: 0.5rem 1.5rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: background-color 0.2s;
+        }
+
+        .error-content button:hover {
+            background-color: #c82333;
+        }
+
+        /* Auth Styles */
+        .auth-status {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 9999;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background-color: rgba(255, 255, 255, 0.9);
+            padding: 8px 12px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .auth-btn {
+            background-color: #007AFF;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .auth-btn:hover {
+            background-color: #0056b3;
+        }
+
+        #user-email {
+            color: #333;
+            font-size: 14px;
+            margin-right: 10px;
+        }
+
+        #upload-btn {
+            background-color: var(--success-primary, #28a745); /* Use success color, fallback green */
+            color: #ffffff; /* Always white text */
+        }
+
+        #upload-btn:hover {
+            background-color: var(--success-primary-hover, #218838);
+            color: #ffffff; /* Always white text */
+        }
+
+        #logout-btn.nav-btn { /* Increase specificity */
+            background-color: var(--danger-primary, #dc3545); /* Use danger color, fallback red */
+            color: #ffffff; /* Always white text */
+        }
+
+        #logout-btn.nav-btn:hover {
+            background-color: var(--danger-primary-hover, #c82333);
+            color: #ffffff; /* Always white text */
+        }
+
+        .theme-toggle-btn {
+            background-color: transparent;
+            border: none;
+            padding: 0;
+            cursor: pointer;
+            font-size: 1rem;
+            color: #333;
+        }
+
+        .theme-toggle-btn:hover {
+            color: #007AFF;
+        }
+
+        /* Added Top Navigation Styles */
+        .top-nav {
+            background-color: var(--bg-overlay); /* Use variable */
+            backdrop-filter: saturate(180%) blur(20px);
+            -webkit-backdrop-filter: saturate(180%) blur(20px);
+            border-bottom: 1px solid var(--border-primary); /* Use variable */
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1500; /* Higher than sidebar/frontpage, but allow modals over */
+            height: 48px;
+            display: flex;
+            align-items: center;
+        }
+
+        .nav-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 24px;
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .nav-left, .nav-right {
+            display: flex;
+            align-items: center;
+        }
+
+        .nav-brand {
+            text-decoration: none;
+            color: var(--text-primary); /* Use variable */
+            font-size: 1.1rem;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: opacity 0.2s ease;
+        }
+
+        .nav-brand:hover {
+            opacity: 0.7;
+        }
+
+        .nav-brand i {
+            color: var(--icon-primary); /* Use variable */
+        }
+
+        .auth-status-inline {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .auth-status-inline #user-info,
+        .auth-status-inline #login-info {
+            display: flex; /* Ensure these are flex containers */
+            align-items: center;
+            gap: 10px; /* Spacing between buttons */
+        }
+
+        #user-email {
+            color: var(--text-secondary); /* Use variable */
+            font-size: 0.9rem;
+            margin-right: 6px; /* Reduced margin */
+        }
+
+        .nav-btn {
+            background: none;
+            border: none;
+            color: var(--link-color); /* Use variable */
+            font-size: 0.9rem;
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s ease;
+            background-color: transparent; /* Explicitly transparent */
+        }
+
+        .nav-btn:hover {
+            background-color: var(--accent-primary-light); /* Use variable */
+            color: var(--accent-primary-hover); /* Use variable */
+        }
+
+        .nav-btn i {
+             color: inherit; /* Icons inherit button color */
+        }
+
+        /* Adjust main container padding for fixed nav */
+        .container {
+            padding-top: 48px; /* Height of the nav bar */
+            height: calc(100% - 48px); /* Adjust height */
+            position: relative; /* Ensure positioning context */
+            top: 48px; /* Push down */
+        }
+
+        /* Remove fixed position from old auth styles if they exist elsewhere */
+        /* .auth-status { position: static; ... } */
+        
+        /* Add style to ensure sidebar is behind the toggle button */
+        .sidebar {
+            z-index: 1500; /* Lower than toggle button (1600) */
+            position: relative; /* Needed for z-index to apply */
+        }
+    </style>
+</head>
+<body>
+    <!-- Top Navigation -->
+    <nav class="top-nav">
+        <div class="nav-content">
+            <div class="nav-left">
+                <a href="#" class="nav-brand">
+                    <i class="fas fa-gem"></i> <!-- Changed icon -->
+                    Jewelry Viewer
+                </a>
+            </div>
+            <div class="nav-right">
+                <!-- Moved Auth Status Here -->
+                <div id="auth-status" class="auth-status-inline">
+                    <div id="user-info" style="display: none;">
+                        <span id="user-email"></span>
+                        <button id="upload-btn" class="nav-btn" onclick="window.location.href='upload.html'">
+                            <i class="fas fa-upload"></i> Upload
+                        </button>
+                        <button id="logout-btn" class="nav-btn logout-btn">Logout</button>
+                        <button id="theme-toggle" class="nav-btn theme-toggle-btn" title="Toggle Theme">
+                            <i class="fas fa-moon"></i>
+                        </button>
+                    </div>
+                    <div id="login-info">
+                        <button id="login-btn" class="nav-btn" onclick="window.location.href='login.html'">
+                             <i class="fas fa-sign-in-alt"></i> Login
+                        </button>
+                        <button id="theme-toggle-login" class="nav-btn theme-toggle-btn" title="Toggle Theme">
+                            <i class="fas fa-moon"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Model Info Bar (Moved Here) -->
+    <div id="model-info" class="model-info-container" style="display: none;">
+        <h2 id="model-title"></h2>
+        <p id="model-description"></p>
+    </div>
+
+    <!-- Loading Indicator -->
+    <div id="loading-indicator">
+        <div class="spinner"></div>
+        <p class="loading-text">Loading...</p>
+    </div>
+
+    <!-- Progress Bar for Model Loading -->
+    <div id="progress-container" class="progress-container">
+        <div id="progress" class="progress-bar"></div>
+    </div>
+
+    <!-- Front Page -->
+    <div id="frontpage" class="frontpage">
+        <div class="frontpage-content">
+            <h1>3D Jewelry Viewer</h1>
+            <p>Upload and view your 3D jewelry models in high quality with realistic materials and lighting.</p>
+            
+            <div class="supported-formats">
+                <h3>Supported Formats</h3>
+                <ul>
+                    <li>3DM (Rhino)</li>
+                    <li>OBJ</li>
+                    <li>STL</li>
+                    <li>GLB/GLTF</li>
+                </ul>
+            </div>
+            
+            <button id="start-viewing" class="cta-button">Start Viewing</button>
+        </div>
+    </div>
+
+    <!-- Drop Zone -->
+    <div id="drop-zone" class="drop-zone">
+        <div class="drop-zone-content">
+            <i class="fas fa-cloud-upload-alt"></i>
+            <h2>Drop your 3D model here</h2>
+            <p>or</p>
+            <button id="select-files" class="select-files-btn">
+                <i class="fas fa-folder-open"></i>
+                Select Files
+            </button>
+            <input type="file" id="file-input" accept=".3dm,.obj,.stl,.glb,.gltf" multiple style="display: none;">
+            <p class="supported-formats">Supported formats: 3DM, OBJ, STL, GLB/GLTF</p>
+        </div>
+    </div>
+
+    <!-- Main Container -->
+    <div class="container">
+        <div class="viewer-layout">
+            <button id="toggle-sidebar-btn">
+                <i class="fas fa-bars"></i>
+            </button>
+            <div id="viewer-area">
+                <div id="main-content">
+                    <canvas id="viewer-canvas"></canvas>
+                    
+                    <div id="loading-indicator" style="display: none;">
+                        <div class="spinner"></div> Loading model...
+                    </div>
+                    <div id="password-prompt" style="display: none;">
+                        <!-- Password prompt content -->
+                    </div>
+                </div>
+            </div>
+            <div class="sidebar">
+                <div class="controls-panel">
+                    <h3>Controls</h3>
+                    <div class="control-group">
+                        <label>Material</label>
+                        <select id="material-select">
+                            <option value="original">Original File Material</option>
+                            <option value="gold">Yellow Gold (High Quality)</option>
+                            <option value="rose-gold">Rose Gold (High Quality)</option>
+                            <option value="white-gold">White Gold (High Quality)</option>
+                            <option value="fast-gold">Yellow Gold (Fast Render)</option>
+                            <option value="fast-rose-gold">Rose Gold (Fast Render)</option>
+                            <option value="fast-white-gold">White Gold (Fast Render)</option>
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <button id="center-model">Center Model</button>
+                    </div>
+                    <div class="control-group">
+                        <div class="control-buttons">
+                            <label for="ambient-light">Ambient Light:</label>
+                            <input type="range" id="ambient-light" name="ambient-light" min="0" max="2" step="0.05" value="0.5">
+                            <label for="directional-light">Directional Light:</label>
+                            <input type="range" id="directional-light" name="directional-light" min="0" max="2" step="0.05" value="0.8">
+                            <label for="hemisphere-light">Hemisphere Light:</label>
+                            <input type="range" id="hemisphere-light" name="hemisphere-light" min="0" max="2" step="0.05" value="0.4">
+                        </div>
+                        <div class="control-group">
+                            <button id="toggle-background"><i class="fas fa-adjust"></i> Toggle Background</button>
+                            <button id="toggle-turntable"><i class="fas fa-sync-alt"></i> Toggle Turntable</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="model-list">
+                    <h3>Loaded Models</h3>
+                    <div id="model-list-content"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.3/+esm';
+    import { initializeApp, process3DMFile, showFrontpage, hideFrontpage, processOtherFile } from './app.js';
+
+    // Make process3DMFile globally available (if needed elsewhere, otherwise remove)
+    window.process3DMFile = process3DMFile;
+    // Make processOtherFile globally available if needed (consider if necessary)
+    // window.processOtherFile = processOtherFile;
+
+    // Add showErrorMessage function
+    window.showErrorMessage = function(message) {
+        const errorDiv = document.createElement('div');
+        errorDiv.className = 'error-message';
+        const errorContent = document.createElement('div');
+        errorContent.className = 'error-content';
+        errorContent.innerHTML = `
+            <i class="fas fa-exclamation-circle"></i>
+            <h3>Error</h3>
+            <p>${message}</p>
+            <button onclick="this.closest('.error-message').remove()">Close</button>
+        `;
+        errorDiv.appendChild(errorContent);
+        document.body.appendChild(errorDiv);
+    };
+
+    // Initialize Supabase client 
+    const supabaseUrl = 'https://lwmcnwwkgdauqgxukwhn.supabase.co';
+    const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx3bWNud3drZ2RhdXFneHVrd2huIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQ5NzcwNzcsImV4cCI6MjA2MDU1MzA3N30._NfRA6_3PL9JLEG9-X9P3Tzg5E59NuXtcmQzOdkraNE';
+    let supabase = null; // Initialize as null
+    try {
+        supabase = createClient(supabaseUrl, supabaseKey);
+        window.supabase = supabase;
+        console.log("Supabase client initialized successfully.");
+    } catch (error) {
+        console.error('CRITICAL: Failed to initialize Supabase client:', error);
+        showErrorMessage('Failed to initialize critical connection: ' + error.message);
+        // Hide loading indicator if it exists
+        const loadingIndicatorOnInitError = document.getElementById('loading-indicator');
+        if (loadingIndicatorOnInitError) loadingIndicatorOnInitError.style.display = 'none';
+    }
+
+    // Update auth UI function
+    function updateAuthUI(session) {
+         const userInfo = document.getElementById('user-info');
+         const loginInfo = document.getElementById('login-info');
+         const userEmail = document.getElementById('user-email');
+
+         if (session?.user) {
+             if (userEmail) userEmail.textContent = session.user.email;
+             if (userInfo) userInfo.style.display = 'flex';
+             if (loginInfo) loginInfo.style.display = 'none';
+         } else {
+             if (userInfo) userInfo.style.display = 'none';
+             if (loginInfo) loginInfo.style.display = 'flex';
+         }
+    }
+
+    // --- Initialization on Window Load with URL Parameter Handling --- 
+    async function handlePageLoad() {
+        console.log("DOM Content Loaded. Performing initialization.");
+        const loadingIndicator = document.getElementById('loading-indicator');
+        
+        // Show loading indicator
+        if (loadingIndicator) loadingIndicator.style.display = 'flex';
+        
+        // Initialize Supabase first
+        if (!supabase) {
+            console.error("Supabase client not available. Cannot proceed.");
+            if (loadingIndicator) loadingIndicator.style.display = 'none';
+            showErrorMessage("Critical connection error. Please refresh.");
+            return; 
+        }
+        
+        try {
+            // Check session (optional for shared links, but good to have)
+            const { data: { session } } = await supabase.auth.getSession();
+            console.log('Initial session check:', session ? session.user?.email : 'No session');
+            updateAuthUI(session);
+
+            // Initialize the Three.js app components (scene, camera, renderer etc.)
+            await initializeApp(); 
+            console.log("initializeApp finished.");
+
+            // Check for model parameters OR shareId in URL
+            const urlParams = new URLSearchParams(window.location.search);
+            const shareIdParam = urlParams.get('shareId');
+            const modelUrlParam = urlParams.get('model');
+            const modelTypeParam = urlParams.get('type');
+            const filenameParam = urlParams.get('filename');
+            
+            if (shareIdParam) {
+                console.log(`Share ID found: ${shareIdParam}`);
+                hideFrontpage(); // Ensure viewer is visible
+                
+                try {
+                    // Fetch share link details from Supabase
+                    const { data: shareData, error: shareError } = await supabase
+                        .from('shared_links')
+                        .select('file_path, access_code, title, description, original_filename, file_type') 
+                        .eq('id', shareIdParam)
+                        .single();
+                        
+                    if (shareError) throw shareError;
+                    if (!shareData) throw new Error('Share link not found or invalid.');
+                    
+                    console.log('Share link data retrieved:', shareData);
+                    
+                    let filePath = shareData.file_path;
+                    let accessCodeHash = shareData.access_code;
+                    let shareTitle = shareData.title;
+                    let shareDescription = shareData.description;
+                    let originalFilename = shareData.original_filename;
+                    let fileType = shareData.file_type;
+
+                    // Handle password protection
+                    if (accessCodeHash) {
+                        // Use showPasswordPrompt - requires app.js modification/export
+                        // For now, just block access
+                        console.warn('Password protected link - access denied (implementation pending).');
+                        showErrorMessage('This link is password protected. Feature coming soon.');
+                        showFrontpage(); // Go back to frontpage
+                        // TODO: Implement password prompt and hash comparison
+                        // const enteredPassword = await promptForPassword(); // Placeholder
+                        // const enteredHash = await hashPassword(enteredPassword);
+                        // if (enteredHash !== accessCodeHash) { ... throw error ... }
+                        return; // Stop processing if password check fails
+                    }
+                    
+                    // Get a signed URL for the file path from the share record
+                    const { data: signedUrlData, error: signedUrlError } = await supabase.storage
+                        .from('client-files') 
+                        .createSignedUrl(filePath, 31536000); // <-- Increased duration to 1 year
+                        
+                    if (signedUrlError) throw signedUrlError;
+                    if (!signedUrlData?.signedUrl) throw new Error('Failed to get signed URL for shared file.');
+                    
+                    const modelUrl = signedUrlData.signedUrl;
+                    
+                    // Display title and description SAFELY
+                    const modelInfoElement = document.getElementById('model-info');
+                    const modelTitleElement = document.getElementById('model-title');
+                    const modelDescriptionElement = document.getElementById('model-description');
+
+                    // Re-add DEBUG LOGS:
+                    console.log('(DOMContentLoaded) Share Title:', shareTitle);
+                    console.log('(DOMContentLoaded) Share Description:', shareDescription);
+                    console.log('(DOMContentLoaded) #model-info found:', !!modelInfoElement);
+                    console.log('(DOMContentLoaded) #model-title found:', !!modelTitleElement);
+                    console.log('(DOMContentLoaded) #model-description found:', !!modelDescriptionElement);
+                    
+                    if (modelTitleElement) {
+                        modelTitleElement.textContent = shareTitle || originalFilename || 'Shared Model';
+                    }
+                    if (modelDescriptionElement) {
+                        modelDescriptionElement.textContent = shareDescription || '';
+                    }
+                    if (modelInfoElement) { 
+                         const shouldDisplay = !!(shareTitle || shareDescription); 
+                         console.log('(DOMContentLoaded) Should display model info:', shouldDisplay);
+                         // Force display with !important
+                         modelInfoElement.style.setProperty('display', shouldDisplay ? 'block' : 'none', 'important');
+                    } else {
+                         console.warn('(DOMContentLoaded) #model-info element not found when trying to display title/description.');
+                    }
+
+                    // Load the model using the signed URL and retrieved file type 
+                    if (fileType === '3dm') {
+                        await process3DMFile(modelUrl, originalFilename); 
+                    } else {
+                        await processOtherFile(modelUrl, originalFilename);
+                    }
+                    console.log(`Model ${originalFilename} loaded successfully from share link.`);
+                    
+                } catch (shareLoadError) {
+                    console.error(`Error loading shared model: ${shareLoadError}`);
+                    showErrorMessage(`Failed to load shared model: ${shareLoadError.message}. The link might be invalid or expired.`);
+                    showFrontpage(); // Fallback to frontpage
+                }
+                
+            } else if (modelUrlParam && modelTypeParam) { // Original direct URL parameter handling
+                console.log(`Direct URL parameters found: model=${modelUrlParam}, type=${modelTypeParam}, filename=${filenameParam}`);
+                hideFrontpage();
+                const modelName = filenameParam ? decodeURIComponent(filenameParam) : `Model.${modelTypeParam}`;
+                const decodedModelUrl = decodeURIComponent(modelUrlParam);
+                // ... (rest of existing direct load logic) ...
+                try {
+                    if (modelTypeParam === '3dm') {
+                        await process3DMFile(decodedModelUrl, modelName); // Pass URL and name
+                    } else {
+                        await processOtherFile(decodedModelUrl, modelName); // Pass URL and name
+                    }
+                    console.log(`Model ${modelName} loaded successfully from URL.`);
+                } catch (loadError) {
+                    console.error(`Error loading model from URL: ${loadError}`);
+                    showErrorMessage(`Failed to load model: ${loadError.message}. Please check the link or try uploading manually.`);
+                    showFrontpage(); 
+                }
+            } else {
+                // No parameters, show frontpage
+                console.log("No model or share parameters found in URL. Showing frontpage.");
+                showFrontpage();
+            }
+
+        } catch(error) {
+            console.error("Error during application init on load:", error);
+            showErrorMessage("Viewer initialization failed: " + error.message);
+            try { showFrontpage(); } catch (e) { /* Ignore secondary error */ }
+        } finally {
+             if (loadingIndicator) loadingIndicator.style.display = 'none';
+        }
+    };
+    
+    // Add event listener for DOMContentLoaded
+    document.addEventListener('DOMContentLoaded', handlePageLoad);
+
+    // Initialize auth state listener only if Supabase is available
+    if (supabase) { 
+        supabase.auth.onAuthStateChange((event, session) => {
+            console.log(`Auth event: ${event}`, session ? session.user?.email : 'No session');
+            updateAuthUI(session);
+        });
+
+        // Add Logout Listener only if Supabase is available
+        const logoutButton = document.getElementById('logout-btn');
+        if (logoutButton) { 
+            logoutButton.addEventListener('click', async () => {
+                 try {
+                     const { error } = await supabase.auth.signOut();
+                     if (error) throw error;
+                     window.location.href = 'login.html'; 
+                 } catch (error) {
+                     console.error('Error signing out:', error);
+                     showErrorMessage('Error signing out: ' + error.message);
+                 }
+            });
+        }
+    } // End of if(supabase)
+
+</script>
+<script src="theme.js" defer></script>
+</body>
+</html> 
