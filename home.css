@@ -52,7 +52,7 @@ nav a:hover {
     min-height: 100%;
     width: auto;
     height: auto;
-    object-fit: cover; /* Cover the area, cropping if needed */
+    /* object-fit: cover; */ /* Temporarily commented out */
     z-index: -1; /* Put video behind other content */
     background-color: #000; /* Add fallback color here */
     /* Removed transform */
