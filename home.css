@@ -50,9 +50,22 @@ nav a:hover {
     height: 100%; /* Changed */
     z-index: -1; /* Changed from -100 to ensure it's behind .container */
     background-color: #000; /* Fallback background color */
+    overflow: hidden; /* Hide anything that might overflow */
+    /* background-image: url('images/hero-background.jpg'); /* REMOVED background image - REPLACE with your image path */
     /* Add background-image or video styles here later */
-    background-size: cover;
-    background-position: center center;
+    /* background-size: cover;  REMOVED */
+    /* background-position: center center; REMOVED */
+}
+
+#background-video {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 100%;
+    height: 100%;
+    object-fit: cover; /* Cover the area, cropping if needed */
+    transform: translate(-50%, -50%);
+    z-index: -1; /* Keep behind content */
 }
 
 /* Style for background video/image can be added later */
