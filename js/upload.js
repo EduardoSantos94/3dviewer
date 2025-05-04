@@ -237,7 +237,7 @@ async function viewModel(storedName, originalName) {
         console.log(`[viewModel] Determined file extension: ${fileExtension}`); 
 
         // Construct viewer URL
-        const viewerUrl = new URL('index.html', window.location.origin);
+        const viewerUrl = new URL('viewer.html', window.location.origin);
         viewerUrl.searchParams.set('model', encodeURIComponent(data.signedUrl));
         viewerUrl.searchParams.set('type', fileExtension);
         
