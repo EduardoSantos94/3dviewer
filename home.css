@@ -42,20 +42,14 @@ nav a:hover {
 /* REMOVED #background-element style block */
 
 /* Restoring video styles */
-#background-video { /* Apply positioning directly to the video */
-    position: fixed; /* Changed from absolute */
+#background-video { 
+    position: fixed; 
     right: 0;
     bottom: 0;
-    top: 0; 
-    left: 0;
-    min-width: 100%;
+    min-width: 100%; 
     min-height: 100%;
-    width: auto;
-    height: auto;
-    /* object-fit: cover; */ /* Temporarily commented out */
     z-index: -1; /* Put video behind other content */
-    background-color: #000; /* Add fallback color here */
-    /* Removed transform */
+    /* Removed top, left, width, height, object-fit, background-color */
 }
 /**/
 
