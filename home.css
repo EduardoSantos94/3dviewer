@@ -15,6 +15,8 @@ body, html {
 
 .container {
     max-width: 800px;
+    position: relative; /* Needed for z-index */
+    z-index: 10; /* Ensure content is above background */
 }
 
 h1 {
@@ -33,6 +35,24 @@ nav a {
 
 nav a:hover {
     color: #ffffff; /* Brighter on hover */
+}
+
+/* Style for background video/image */
+#background-element {
+    position: fixed;
+    right: 0;
+    bottom: 0;
+    top: 0; /* Added */
+    left: 0; /* Added */
+    min-width: 100%; 
+    min-height: 100%;
+    width: 100%; /* Changed */
+    height: 100%; /* Changed */
+    z-index: -1; /* Changed from -100 to ensure it's behind .container */
+    background-color: #000; /* Fallback background color */
+    /* Add background-image or video styles here later */
+    background-size: cover;
+    background-position: center center;
 }
 
 /* Style for background video/image can be added later */
