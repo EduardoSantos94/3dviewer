@@ -38,36 +38,20 @@ nav a:hover {
 }
 
 /* Style for background video/image */
-#background-element {
-    position: fixed;
+#background-video { /* Apply positioning directly to the video */
+    position: fixed; /* Changed from absolute */
     right: 0;
     bottom: 0;
-    top: 0; /* Added */
-    left: 0; /* Added */
-    min-width: 100%; 
+    top: 0; 
+    left: 0;
+    min-width: 100%;
     min-height: 100%;
-    width: 100%; /* Changed */
-    height: 100%; /* Changed */
-    z-index: -1; /* Changed from -100 to ensure it's behind .container */
-    background-color: #000; /* Fallback background color */
-    overflow: hidden; /* Hide anything that might overflow */
-    /* background-image: url('images/hero-background.jpg'); /* REMOVED background image - REPLACE with your image path */
-    /* Add background-image or video styles here later */
-    /* background-size: cover;  REMOVED */
-    /* background-position: center center; REMOVED */
-}
-
-#background-video {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    min-width: 100%; /* Changed from width */
-    min-height: 100%; /* Changed from height */
-    width: auto; /* Added */
-    height: auto; /* Added */
+    width: auto;
+    height: auto;
     object-fit: cover; /* Cover the area, cropping if needed */
-    transform: translate(-50%, -50%);
-    /* z-index: -1; Removed - should inherit parent z-index */
+    z-index: -1; /* Put video behind other content */
+    background-color: #000; /* Add fallback color here */
+    /* Removed transform */
 }
 
 /* Style for background video/image can be added later */
