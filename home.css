@@ -9,25 +9,52 @@ body, html {
     overflow: hidden; 
 }
 
-/* Video Overlay for reduced opacity effect */
-#background-video::before {
-    content: "";
+/* Removed #background-video::before rule */
+
+#video-background-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: -2; /* Furthest back */
+}
+
+#background-video { 
+  position: absolute; /* Fill the container */
+  top: 0;
+  left: 0;
+  width: 100%; 
+  height: 100%; 
+  object-fit: cover;
+  /* z-index not needed here, it's within its container */
+  pointer-events: none;
+}
+
+#video-overlay {
     position: absolute;
     top: 0;
     left: 0;
     width: 100%;
     height: 100%;
-    background-color: rgba(0, 0, 0, 0.3); /* Dark overlay, adjust 0.3 for more/less opacity */
-    z-index: -1; /* Sits on top of video, but behind video's direct z-index */
+    background-color: rgba(0, 0, 0, 0.3); /* Adjust opacity here */
+    z-index: -1; /* Sits on top of video, behind text */
 }
 
 .container {
+    /* Flexbox for centering */
+    display: flex;
+    flex-direction: column;
+    justify-content: center; /* Vertical center */
+    align-items: center;     /* Horizontal center */
+    min-height: 100vh;       /* Take full viewport height */
+
     max-width: 800px;
     position: relative; 
-    z-index: 10; 
-    margin: 0 auto; /* Center block-level element */
-    text-align: center; /* Center inline/text content within container */
-    padding-top: 30vh; /* Adjusted for better vertical centering */
+    z-index: 10; /* Ensures text is on top of video and overlay */
+    margin: 0 auto; 
+    text-align: center; 
+    /* padding-top: 30vh; Removed, flexbox handles centering */
     opacity: 0;
     animation: fadeInContent 1.5s 0.5s ease-out forwards; 
 }
@@ -62,50 +89,37 @@ nav a:hover {
 /* Style for background video/image */
 /* REMOVED #background-element style block */
 
-/* Restoring video styles */
-#background-video { 
-  position : fixed;
-  top      : 0;
-  left     : 0;
-  width    : 100%; /* Using 100% instead of min-width or vw */
-  height   : 100%; /* Using 100% instead of min-height or vh */
-  object-fit : cover;
-  z-index  : -2;  /* Pushed further back to allow overlay */
-  pointer-events : none;
-}
-/**/
-
 /* Media Queries for Responsiveness */
-@media (max-width: 768px) { /* For tablets and smaller */
+@media (max-width: 768px) { 
     .container {
-        padding-top: 25vh; /* Slightly less vertical padding */
-        padding-left: 1em; /* Add some side padding */
-        padding-right: 1em; /* Add some side padding */
+        /* padding-top: 25vh; Removed, flexbox handles centering */
+        padding-left: 1em; 
+        padding-right: 1em; 
     }
 
     h1 {
-        font-size: 2.5em; /* Reduce heading size */
+        font-size: 2.5em; 
     }
 
     nav a {
-        font-size: 1.1em; /* Reduce link size */
-        margin: 0 0.5em; /* Reduce horizontal margin for links */
+        font-size: 1.1em; 
+        margin: 0 0.5em; 
     }
 }
 
-@media (max-width: 480px) { /* For mobile phones */
+@media (max-width: 480px) { 
     .container {
-        padding-top: 35vh; /* Adjusted for better vertical centering on mobile */
+        /* padding-top: 35vh; Removed, flexbox handles centering */
     }
     
     h1 {
-        font-size: 2.2em; /* Further refined */
+        font-size: 2.2em; 
     }
 
     nav a {
-        font-size: 1.1em;   /* Slightly larger on mobile for tap */
-        display: block; /* Stack links vertically */
-        margin: 1em 0; /* Increased vertical margin for stacked links */
+        font-size: 1.1em;   
+        display: block; 
+        margin: 1em 0; 
     }
 }
 
