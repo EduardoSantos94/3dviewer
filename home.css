@@ -10,7 +10,7 @@ body, html {
     justify-content: center;
     align-items: center;
     text-align: center;
-    overflow: hidden; /* Prevent scrollbars if background element is full screen */
+    /* overflow: hidden; */ /* Temporarily commented out */
 }
 
 .container {
@@ -46,8 +46,10 @@ nav a:hover {
   position : fixed;     /* makes it stick to viewport             */
   top      : 0;
   left     : 0;
-  width    : 100vw;
-  height   : 100vh;
+  min-width: 100%; /* Reverted from 100vw */
+  min-height: 100%; /* Reverted from 100vh */
+  width    : auto; /* Added to ensure it scales with min values */
+  height   : auto; /* Added to ensure it scales with min values */
   object-fit : cover;   /* fills the screen, keeps aspect‑ratio    */
   z-index  : -1;        /* sits behind every other element         */
   pointer-events : none;/* video never steals clicks               */
