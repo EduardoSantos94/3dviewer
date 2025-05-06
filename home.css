@@ -45,17 +45,15 @@ nav a:hover {
 /* REMOVED #background-element style block */
 
 /* Restoring video styles */
-#background-video { /* Updated to user-provided rules */
-  position : fixed;     /* makes it stick to viewport             */
+#background-video { 
+  position : fixed;
   top      : 0;
   left     : 0;
-  min-width: 100%; /* Reverted from 100vw */
-  min-height: 100%; /* Reverted from 100vh */
-  width    : auto; /* Added to ensure it scales with min values */
-  height   : auto; /* Added to ensure it scales with min values */
-  object-fit : cover;   /* fills the screen, keeps aspect‑ratio    */
-  z-index  : -1;        /* sits behind every other element         */
-  pointer-events : none;/* video never steals clicks               */
+  width    : 100%; /* Using 100% instead of min-width or vw */
+  height   : 100%; /* Using 100% instead of min-height or vh */
+  object-fit : cover;
+  z-index  : -1;
+  pointer-events : none;
 }
 /**/
 
