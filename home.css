@@ -10,7 +10,7 @@ body, html {
     /* justify-content: center; Removed */
     /* align-items: center; Removed */
     /* text-align: center; Removed - will be on .container */
-    overflow: hidden; /* Restored */
+    /* overflow: hidden; */ /* REMOVED to test video visibility */
 }
 
 .container {
