@@ -57,6 +57,40 @@ nav a:hover {
 }
 /**/
 
+/* Media Queries for Responsiveness */
+@media (max-width: 768px) { /* For tablets and smaller */
+    .container {
+        padding-top: 15vh; /* Slightly less vertical padding */
+        padding-left: 1em; /* Add some side padding */
+        padding-right: 1em; /* Add some side padding */
+    }
+
+    h1 {
+        font-size: 2.5em; /* Reduce heading size */
+    }
+
+    nav a {
+        font-size: 1.1em; /* Reduce link size */
+        margin: 0 0.5em; /* Reduce horizontal margin for links */
+    }
+}
+
+@media (max-width: 480px) { /* For mobile phones */
+    .container {
+        padding-top: 10vh; /* Even less vertical padding */
+    }
+    
+    h1 {
+        font-size: 2em; /* Further reduce heading size */
+    }
+
+    nav a {
+        font-size: 1em;   /* Further reduce link size */
+        display: block; /* Stack links vertically */
+        margin: 0.5em 0; /* Add vertical margin */
+    }
+}
+
 /* Style for background video/image can be added later */
 /* e.g.,
 #background-video {
