@@ -42,14 +42,15 @@ nav a:hover {
 /* REMOVED #background-element style block */
 
 /* Restoring video styles */
-#background-video { 
-    position: fixed; 
-    right: 0;
-    bottom: 0;
-    min-width: 100%; 
-    min-height: 100%;
-    z-index: -1; /* Put video behind other content */
-    /* Removed top, left, width, height, object-fit, background-color */
+#background-video { /* Updated to user-provided rules */
+  position : fixed;     /* makes it stick to viewport             */
+  top      : 0;
+  left     : 0;
+  width    : 100vw;
+  height   : 100vh;
+  object-fit : cover;   /* fills the screen, keeps aspect‑ratio    */
+  z-index  : -1;        /* sits behind every other element         */
+  pointer-events : none;/* video never steals clicks               */
 }
 /**/
 
